@@ -23,7 +23,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.0",
-    "dotenv": "^16.4.7",
+    "dotenv": "^18.0.8",
     "express": "^5.0.1",
     "next": "^16.1.6",
     "react": "^19.0.0",
@@ -38,7 +38,7 @@
     "@types/node": "^22.13.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "eslint": "^9.21.0",
+    "eslint": "^10.13.0",
     "tsx": "^4.19.3",
     "typescript": "~5.8.2",
     "typescript-eslint": "^8.25.0",
