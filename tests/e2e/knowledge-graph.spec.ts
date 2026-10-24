@@ -25,7 +25,7 @@ async function uploadFixtureSyllabus(page: Page, customPreview?: unknown) {
     });
   });
 
-  await page.goto("/professor/upload");
+  await page.goto(`/professor/upload?courseId=${COURSE_ID}`);
   await page.waitForSelector('input[type="file"]');
 
   await page.setInputFiles('input[type="file"]', {

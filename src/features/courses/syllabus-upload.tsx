@@ -10,7 +10,6 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Modal,
   ModalHeader,
@@ -20,30 +19,9 @@ import {
 } from "@/components/ui/modal";
 import { z } from "zod";
 import { GraphPreview, type GraphPreviewConcept } from "./graph-preview";
-import { uuidSchema } from "@/contracts/common";
+import type { UUID } from "@/contracts/common";
+import { syllabusUploadPreviewResponseSchema } from "@/contracts/course";
 import { apiErrorSchema } from "@/contracts/errors";
-
-const rawConceptSchema = z.object({
-  label: z.string().min(1),
-  description: z.string(),
-  category: z.string(),
-  difficulty: z.number().int().min(1).max(5),
-});
-
-const rawEdgeSchema = z.tuple([z.string().min(1), z.string().min(1)]);
-
-const syllabusPreviewSchema = z.object({
-  concepts: z.array(rawConceptSchema).min(1).max(40),
-  edges: z.array(rawEdgeSchema),
-});
-
-export const syllabusUploadPreviewResponseSchema = z.object({
-  courseId: uuidSchema,
-  totalPages: z.number().int().nonnegative(),
-  processedPages: z.number().int().nonnegative(),
-  truncated: z.boolean(),
-  preview: syllabusPreviewSchema,
-});
 
 export type UploadState =
   | "idle"
@@ -54,7 +32,7 @@ export type UploadState =
   | "error";
 
 export interface SyllabusPreviewData {
-  courseId: string;
+  courseId: UUID;
   totalPages: number;
   processedPages: number;
   truncated: boolean;
@@ -122,12 +100,35 @@ function getErrorMessage(status: number, errorData: unknown): string {
   return "An unexpected error occurred. Please try again.";
 }
 
-export function SyllabusUpload(): React.JSX.Element {
+const graphCommitResponseSchema = z.object({
+  success: z.literal(true),
+  nodeCount: z.number().int().nonnegative(),
+  edgeCount: z.number().int().nonnegative(),
+});
+
+async function readApiErrorMessage(
+  response: Response,
+  operation: "upload" | "commit",
+): Promise<string> {
+  try {
+    const body: unknown = await response.json();
+    return getErrorMessage(response.status, body);
+  } catch (error: unknown) {
+    console.error("[SyllabusUpload] Failed to decode API error response", {
+      operation,
+      status: response.status,
+      error,
+    });
+    return getErrorMessage(response.status, null);
+  }
+}
+
+export interface SyllabusUploadProps {
+  courseId: UUID;
+}
+
+export function SyllabusUpload({ courseId }: SyllabusUploadProps): React.JSX.Element {
   const [state, setState] = useState<UploadState>("idle");
-  // TODO: wire from route params/auth once course context is available
-  const [courseId, setCourseId] = useState<string>(
-    "11111111-1111-4111-8111-111111111111"
-  );
   const [previewData, setPreviewData] = useState<SyllabusPreviewData | null>(
     null
   );
@@ -159,7 +160,7 @@ export function SyllabusUpload(): React.JSX.Element {
     setState("uploading");
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("syllabus", file);
 
       const res = await fetch(
         `/api/courses/${encodeURIComponent(courseId)}/upload`,
@@ -170,21 +171,25 @@ export function SyllabusUpload(): React.JSX.Element {
       );
 
       if (!res.ok) {
-        let errBody: unknown;
-        try {
-          errBody = await res.json();
-        } catch {
-          errBody = null;
-        }
-        setErrorMessage(getErrorMessage(res.status, errBody));
+        const errorMsg = await readApiErrorMessage(res, "upload");
+        setErrorMessage(errorMsg);
+        setPreviewData(null);
         setState("error");
         return;
       }
 
-      const data = await res.json();
+      const data: unknown = await res.json();
       const parsed = syllabusUploadPreviewResponseSchema.safeParse(data);
       if (!parsed.success) {
         setErrorMessage("Invalid server response");
+        setPreviewData(null);
+        setState("error");
+        return;
+      }
+
+      if (parsed.data.courseId.toLowerCase() !== courseId.toLowerCase()) {
+        setErrorMessage("Invalid server response");
+        setPreviewData(null);
         setState("error");
         return;
       }
@@ -195,10 +200,11 @@ export function SyllabusUpload(): React.JSX.Element {
         processedPages: parsed.data.processedPages,
         truncated: parsed.data.truncated,
         concepts: parsed.data.preview.concepts,
-        edges: parsed.data.preview.edges as [string, string][],
+        edges: parsed.data.preview.edges,
       });
       setState("preview");
-    } catch (err) {
+    } catch (err: unknown) {
+      console.error("[SyllabusUpload] Upload failed", err);
       setErrorMessage(
         err instanceof Error
           ? err.message
@@ -239,42 +245,39 @@ export function SyllabusUpload(): React.JSX.Element {
     setState("committing");
     try {
       const res = await fetch(
-        `/api/courses/${encodeURIComponent(previewData.courseId)}/graph`,
+        `/api/courses/${encodeURIComponent(courseId)}/graph`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            nodes: previewData.concepts,
+            concepts: previewData.concepts,
             edges: previewData.edges,
           }),
         }
       );
 
       if (!res.ok) {
-        let errBody: unknown;
-        try {
-          errBody = await res.json();
-        } catch {
-          errBody = null;
-        }
-        setErrorMessage(getErrorMessage(res.status, errBody));
+        const errorMsg = await readApiErrorMessage(res, "commit");
+        setErrorMessage(errorMsg);
         setState("error");
         return;
       }
 
-      const data = await res.json();
+      const data: unknown = await res.json();
+      const parsed = graphCommitResponseSchema.safeParse(data);
+      if (!parsed.success) {
+        setErrorMessage("Invalid server response");
+        setState("error");
+        return;
+      }
+
       setCommittedResult({
-        nodeCount:
-          typeof data?.nodeCount === "number"
-            ? data.nodeCount
-            : previewData.concepts.length,
-        edgeCount:
-          typeof data?.edgeCount === "number"
-            ? data.edgeCount
-            : previewData.edges.length,
+        nodeCount: parsed.data.nodeCount,
+        edgeCount: parsed.data.edgeCount,
       });
       setState("committed");
-    } catch (err) {
+    } catch (err: unknown) {
+      console.error("[SyllabusUpload] Commit failed", err);
       setErrorMessage(
         err instanceof Error
           ? err.message
@@ -297,12 +300,6 @@ export function SyllabusUpload(): React.JSX.Element {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            <Input
-              label="Course ID"
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-              description="Target course identifier (will be derived automatically once course context is wired)"
-            />
 
             <div
               onDragOver={handleDragOver}
