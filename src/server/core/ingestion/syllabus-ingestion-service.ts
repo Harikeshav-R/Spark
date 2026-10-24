@@ -9,7 +9,11 @@ import type {
 import { prerequisiteGraphExtractionResultSchema } from "../../../contracts/ai.js";
 import { AppError, DomainErrorCode } from "../../../contracts/errors.js";
 import { validateGraph } from "../graph/graph-validator.js";
-import { assertSyllabusSize, hashSyllabusPdf } from "./pdf-processor.js";
+import {
+  assertSyllabusSize,
+  hashSyllabusPdf,
+  MAX_SYLLABUS_PAGES,
+} from "./pdf-processor.js";
 
 export interface SyllabusGraphExtractor
   extends Pick<AiService, "extractPrerequisiteGraph"> {
@@ -20,6 +24,19 @@ const cacheEnvelopeSchema = z.object({
   integrationMode: z.enum(["fixture", "live"]),
   extraction: prerequisiteGraphExtractionResultSchema,
 });
+
+function hasValidPageMetadata(
+  metadata: Pick<
+    PrerequisiteGraphExtractionResult,
+    "totalPages" | "processedPages" | "truncated"
+  >,
+): boolean {
+  return (
+    metadata.totalPages > 0 &&
+    metadata.processedPages === Math.min(metadata.totalPages, MAX_SYLLABUS_PAGES) &&
+    metadata.truncated === (metadata.totalPages > MAX_SYLLABUS_PAGES)
+  );
+}
 
 export class SyllabusIngestionService {
   constructor(
@@ -105,13 +122,7 @@ export class SyllabusIngestionService {
 
         if (parsedEnvelope.data.integrationMode === this.ai.getIntegrationMode()) {
           const cached = parsedEnvelope.data.extraction;
-          const { totalPages, processedPages, truncated } = cached;
-          const validPages =
-            totalPages > 0 &&
-            processedPages === Math.min(totalPages, 10) &&
-            truncated === (totalPages > 10);
-
-          if (!validPages) {
+          if (!hasValidPageMetadata(cached)) {
             throw new AppError({
               code: DomainErrorCode.INTERNAL_SERVER_ERROR,
               statusCode: 500,
@@ -128,13 +139,7 @@ export class SyllabusIngestionService {
 
     const result = await this.ai.extractPrerequisiteGraph(pdfBytes);
 
-    const { totalPages, processedPages, truncated } = result;
-    const validPages =
-      totalPages > 0 &&
-      processedPages === Math.min(totalPages, 10) &&
-      truncated === (totalPages > 10);
-
-    if (!validPages) {
+    if (!hasValidPageMetadata(result)) {
       throw new AppError({
         code: DomainErrorCode.BAD_GATEWAY,
         statusCode: 502,
