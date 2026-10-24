@@ -221,6 +221,36 @@ interface StudyGroupUpdatedEvent {
 }
 ```
 
+#### `game:updated`
+Emitted privately to `student:<studentId>` when XP is awarded, a Daily Quest item is marked complete, or the quest clears.
+```typescript
+interface GameUpdatedEvent {
+  eventId: string;
+  occurredAt: string; // UTC ISO-8601
+  studentId: string;
+  updatedAt: string;  // Database commit-derived timestamp
+  summary: GameSummaryDTO;
+  dailyQuest: DailyQuestDTO | null;
+}
+```
+*Invariant*: Sockets emit `game:updated` ONLY after underlying database mutations to `xp_events`, `daily_quests`, or `student_mastery` have committed to PostgreSQL.
+
+#### `party:quest-updated`
+Broadcast to `study-group:<matchId>` when either peer completes a quiz for a shared concept or the party quest clears.
+```typescript
+interface PartyQuestUpdatedEvent {
+  eventId: string;
+  occurredAt: string; // UTC ISO-8601
+  matchId: string;
+  partyQuestId: string;
+  version: number;
+  status: "active" | "completed" | "cancelled";
+  completedPairs: number;
+  totalPairs: number;
+}
+```
+*Invariant*: Emitted only after `party_quest_progress` and any resulting `xp_events` are committed.
+
 ---
 
 ## 3. Attendance Tracking & Connection Lifecycle
@@ -258,6 +288,12 @@ Socket transport delivery is at-most-once. If a client disconnects, missed WebSo
          │ Rehydrates active poll, recent chunks, active concepts    │
          │<──────────────────────────────────────────────────────────│
 ```
+
+### 4.1 Game Progression & Study Group Snapshot Hydration
+Reconnecting student and peer clients MUST NOT infer committed learning or progression state from local animation timers or guessed increments. Upon reconnection:
+1. **Student Game State**: The client calls `GET /api/students/:studentId/game-summary` and `GET /api/students/:studentId/daily-quest` to rehydrate authoritative XP, streak, sky brightness, and Daily Quest completion subsets.
+2. **Peer Collaboration State**: Matched clients in an active study group call `GET /api/study-groups/:matchId/quests` and `GET /api/study-groups/:matchId/messages` to rehydrate current party quest completion and peer chat.
+3. **Tie-Breaking Concurrency**: If concurrent socket notifications arrive with equal timestamps, the client breaks ties by fetching the fresh authenticated HTTP snapshot.
 
 ---
 

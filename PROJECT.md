@@ -10,7 +10,7 @@ The project is an honest, production-ready TypeScript rewrite of the experimenta
 
 ## 2. Strategic Technical Decisions
 
-The system architecture is governed by eleven fundamental decisions documented in [docs/01-decisions.md](docs/01-decisions.md) and [docs/adr/](docs/adr/):
+The system architecture is governed by twelve fundamental decisions documented in [docs/01-decisions.md](docs/01-decisions.md) and [docs/adr/](docs/adr/):
 
 1. **Unified TypeScript Runtime ([ADR 0001](docs/adr/0001-typescript-single-runtime.md))**: Replaces the split Python Flask backend and Next.js frontend with a single Node.js runtime. All models, validations, and domain logic share identical TypeScript types and Zod schemas across the full stack.
 2. **Persistent Custom Server ([ADR 0002](docs/adr/0002-persistent-next-express-socketio.md))**: Hosts Express 5, Socket.IO 4, and Next.js 16 within a single persistent Node.js process (`server/index.ts`). Sockets, HTTP handlers, and background adapters share in-memory services directly via dependency injection, eliminating the need for Redis pub/sub in single-instance deployments.
@@ -23,6 +23,7 @@ The system architecture is governed by eleven fundamental decisions documented i
 9. **Consensual Peer Matchmaking ([ADR 0009](docs/adr/0009-consensual-peer-collaboration.md))**: Students match only when both have explicitly opted into the pool for overlapping concepts. Matching pairs students with complementary knowledge gaps (`score >= 0.30`), provides real in-app chat, and coordinates real Zoom meetings via OAuth.
 10. **Dual-Mode Integration Architecture ([ADR 0010](docs/adr/0010-explicit-demo-and-live-modes.md))**: Supports both `INTEGRATION_MODE=fixture` (zero-cost offline testing and repeatable demos) and `INTEGRATION_MODE=live` (real Anthropic, Perplexity, and Zoom APIs). Missing live credentials fail loudly rather than silently degrading into fake data.
 11. **Single-Writer Migrations & Integration ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md))**: Lane A serves as integration steward for database migrations, shared contracts, and configuration files, preventing merge conflicts across the four parallel streams.
+12. **Spark Experience Layer Over Canonical Engine ([ADR 0012](docs/adr/0012-spark-experience-over-canonical-engine.md))**: Adopts Spark mascot, Daily Quests, streak tracking, practice encounters with 3-tier hints, Eclipse review pressure, XP effort ledger, collaborative party quests, and Class Sky instructor view over the single-process TypeScript runtime, 4-band mastery engine, and D3-force graph visualizer.
 
 ---
 
@@ -45,12 +46,13 @@ The application is structured as a modular monolith:
 │   │   - CourseService       - ClassroomService          │   │
 │   │   - GraphService        - StudyGroupService         │   │
 │   │   - MasteryService      - LearningService           │   │
+│   │   - GameService         - EncounterService          │   │
 │   └──────────┬──────────────────────────────┬───────────┘   │
 │              │                              │               │
 │              ▼                              ▼               │
 │   ┌─────────────────────┐       ┌───────────────────────┐   │
 │   │ PostgreSQL Database │       │  External Integrations│   │
-│   │  (22 App Tables)    │       │  - Anthropic Claude   │   │
+│   │  (28 App Tables)    │       │  - Anthropic Claude   │   │
 │   │  (Supabase Auth)    │       │  - Perplexity Search  │   │
 │   │  (Transactional RPC)│       │  - Zoom RTMS / OAuth  │   │
 │   └─────────────────────┘       └───────────────────────┘   │
@@ -69,12 +71,12 @@ For granular specifications, consult the dedicated manuals:
 
 | Manual | Primary Contents |
 |---|---|
-| [docs/00-product.md](docs/00-product.md) | User personas, product feature inventory, journeys J01–J08, simulation rules |
-| [docs/01-decisions.md](docs/01-decisions.md) | Index and status of ADR 0001 through ADR 0011 |
+| [docs/00-product.md](docs/00-product.md) | User personas, product feature inventory, journeys J01–J11, Spark game loops, simulation rules |
+| [docs/01-decisions.md](docs/01-decisions.md) | Index and status of ADR 0001 through ADR 0012 |
 | [docs/02-architecture.md](docs/02-architecture.md) | Runtime architecture, folder layout, dependency graph, sequence flows |
 | [docs/03-invariants.md](docs/03-invariants.md) | Mastery formulas, prerequisite rules, poll lifecycle, matching algorithms |
 | [docs/04-build-plan.md](docs/04-build-plan.md) | Step-by-step implementation guide for all phases (P0 to P7) |
-| [docs/05-data-model.md](docs/05-data-model.md) | PostgreSQL table definitions, foreign keys, indexes, RPC stored procedures |
+| [docs/05-data-model.md](docs/05-data-model.md) | PostgreSQL table definitions (28 tables), foreign keys, indexes, RPC stored procedures |
 | [docs/06-http-api.md](docs/06-http-api.md) | REST API endpoints, DTOs, authorization rules, error envelope format |
 | [docs/07-realtime.md](docs/07-realtime.md) | WebSocket events, room security, presence tracking, reconnection protocols |
 | [docs/08-ai-pipelines.md](docs/08-ai-pipelines.md) | Prompt specifications, output Zod schemas, token budgets, and provider SLAs |
@@ -92,7 +94,7 @@ For granular specifications, consult the dedicated manuals:
 ## 5. Implementation Status
 
 - [x] Technical Documentation and Architecture Suite (Current Phase)
-- [ ] Phase 0: Foundations & Shared Contracts (Planned)
+- [x] Phase 0: Foundations & Shared Contracts (Completed)
 - [ ] Phase 1: Independent Vertical Foundations (Planned)
 - [ ] Phase 2: Course Setup & Prerequisite Graph (Planned)
 - [ ] Phase 3: Live Classroom & Transcript Streaming (Planned)

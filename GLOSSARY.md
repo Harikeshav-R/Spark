@@ -127,3 +127,57 @@ An execution mode connecting to authentic external APIs (Anthropic Claude, Perpl
 #### simulation
 An automated in-process generator that emits realistic lecture transcript chunks, simulated speech, or student actions for testing and demonstration purposes without human intervention.
 - _Avoid_: fake_lecture, bot_stream.
+
+---
+
+### Spark Experience & Product Presentation Layer
+
+#### Spark
+The product brand name and reactive SVG companion mascot. Guides learners through their academic quest line with expressive mood animations (`calm`, `think`, `cheer`, `oops`, `sleepy`) and evolutionary forms (`ember`, `spark`, `glow`, `nova`) derived strictly from whole-course sky brightness (average confidence). Spark never provides direct answers or overrides server evaluations.
+
+#### quest line
+The student-facing product presentation label for an academic `course`. Machine identifiers, database columns, route segments, and API contracts strictly remain `course` and `course_id`.
+- _Allowed product label_: quest line.
+- _Avoid_: skill tree, game world, campaign.
+
+#### star
+The student-facing visual representation of a curriculum `concept` node in the knowledge graph. Positioned dynamically via D3-force simulation; vertical SVG clip rectangle reflects `confidence` ($c \in [0.0, 1.0]$). Visual fill states map one-to-one to canonical bands: `gray` (Unassessed), `red` (Dim / Needs practice), `yellow` (Lit / Developing), `green` (Shining / Mastered). Machine identifiers strictly remain `concept` and `concept_id`.
+- _Allowed product label_: star.
+- _Avoid_: planet, node, skill badge.
+
+#### track
+The student-facing visual grouping for concepts sharing a curriculum `category`. Machine identifiers strictly remain `category`.
+- _Allowed product label_: track.
+- _Avoid_: transit lane, train line.
+
+#### Encounter
+The student-facing presentation and orchestration wrapper for a five-question, four-option practice quiz or live formative poll. Features mascot reactions, progressive tiered hints, and reward cards. Backed by `encounters` storage and evaluated through canonical `quiz_attempts` and `MasteryService.applyEvidence()`.
+- _Allowed product label_: Encounter.
+- _Avoid_: battle, mini-game, challenge.
+
+#### hint
+Progressive pedagogical assistance available during practice Encounters across three explicit server-controlled levels: Level 1 (Nudge), Level 2 (Bigger hint), Level 3 (Walkthrough). Hints teach reasoning without revealing correct answers, are released sequentially, and discount earned XP without altering quiz scoring or mastery evidence formulas.
+- _Avoid_: answer_reveal, cheat, clue.
+
+#### Daily Quest
+A daily review queue of up to three ready concepts (unreviewed, overdue >3 days, or $c < 0.70$) generated per student per UTC date. Clearing a nonempty quest increments the daily streak and awards 25 XP.
+- _Allowed product label_: Daily Quest.
+- _Avoid_: daily mission, chore, backlog.
+
+#### streak
+The count of consecutive UTC calendar days on which an enrolled student clears a nonempty Daily Quest. A missed calendar date resets the streak on the next clear. Streak tracking reflects habit and effort, never academic confidence.
+
+#### Eclipse
+A student-facing diagnostic indicator quantifying review pressure toward upcoming exams, targeting up to three lowest-confidence ready concepts. Strength ranges from 0 to 100 based on distance from mastery ($c = 0.70$). Eclipse is purely diagnostic and never decays confidence or locks content.
+
+#### XP (Experience Points)
+An append-only, server-authoritative ledger of student learning effort recorded in `xp_events`. XP is awarded for completed practice quizzes, Daily Quest clears, and completed Party quests. XP is strictly orthogonal to academic mastery and never mutates `student_mastery`.
+- _Avoid_: score, mastery points, level points.
+
+#### party
+The student-facing collaborative label for an authenticated two-student `match` from the study-group pool. Matched peers may activate a shared Party quest (1–3 concepts) to earn shared XP upon bilateral independent quiz completion. Machine identifiers strictly remain `study_group_matches` and `match_id`.
+- _Allowed product label_: party.
+- _Avoid_: clan, guild, squad, trios.
+
+#### Class Sky
+The instructor-facing aggregate knowledge graph visualization displaying mean class confidence across concepts, transcript-evidenced taught/untaught status, and an effort-vs-mastery roster quadrant without student-facing leaderboards. Machine data routes through `GameService.getCourseEffort()` and existing lecture/mastery repositories.

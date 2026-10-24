@@ -1,4 +1,4 @@
-# Data Model & Relational Schema: 22 Application Tables
+# Data Model & Relational Schema: 28 Application Tables
 
 This document defines the complete relational database schema for HackOHIO Classroom Companion. The database is hosted on Supabase PostgreSQL (PostgreSQL 15+) and managed through ordered migrations in `supabase/migrations/`.
 
@@ -6,12 +6,13 @@ This document defines the complete relational database schema for HackOHIO Class
 
 ## 1. Schema Overview & Relational Architecture
 
-The data model consists of **22 application tables** partitioned into four logical domains:
+The data model consists of **28 application tables** partitioned into six logical domains:
 1. **Core & Membership (5 tables)**: `teachers`, `courses`, `students`, `concept_nodes`, `concept_edges`
 2. **Mastery & Ingestion (4 tables)**: `student_mastery`, `mastery_evidence`, `pdf_cache`, `quiz_attempts`
 3. **Classroom & Formative Assessment (6 tables)**: `lecture_sessions`, `transcript_chunks`, `transcript_concepts`, `poll_questions`, `poll_responses`, `concept_quiz_questions`
-4. **Learning & Peer Collaboration (7 tables)**: `tutoring_sessions`, `tutoring_messages`, `concept_learning_pages`, `study_group_pool`, `study_group_matches`, `student_availability`, `study_group_messages`
-
+4. **Spark Learning & Autonomous Practice (5 tables)**: `tutoring_sessions`, `tutoring_messages`, `concept_learning_pages`, `encounters`, `daily_quests`
+5. **Effort Ledger (1 table)**: `xp_events`
+6. **Peer Collaboration & Party Goals (7 tables)**: `study_group_pool`, `study_group_matches`, `student_availability`, `study_group_messages`, `study_group_invitations`, `party_quests`, `party_quest_progress`
 ---
 
 ## 2. Comprehensive Table Definitions
@@ -44,6 +45,7 @@ CREATE TABLE courses (
     description TEXT,
     join_code VARCHAR(8) UNIQUE NOT NULL,
     pdf_cache_hash VARCHAR(64),
+    exam_at TIMESTAMPTZ,             -- Optional teacher-managed upcoming exam date
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_courses_join_code ON courses(join_code);
@@ -163,6 +165,7 @@ CREATE TABLE quiz_attempts (
     correct_count INT NOT NULL,
     total_questions INT NOT NULL DEFAULT 5,
     submitted_answers JSONB NOT NULL,
+    encounter_id UUID UNIQUE REFERENCES encounters(id) ON DELETE SET NULL,
     submitted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_quiz_attempts_student_concept ON quiz_attempts(student_id, concept_id);
@@ -258,6 +261,7 @@ CREATE TABLE concept_quiz_questions (
     option_d TEXT NOT NULL,
     correct_answer INT NOT NULL CHECK (correct_answer BETWEEN 0 AND 3),
     explanation TEXT NOT NULL,
+    hints JSONB CHECK (hints IS NULL OR jsonb_array_length(hints) = 3), -- [nudge, bigger_hint, walkthrough]
     question_order INT NOT NULL DEFAULT 0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -378,6 +382,118 @@ CREATE TABLE study_group_messages (
 CREATE INDEX idx_study_group_messages_match ON study_group_messages(match_id, created_at);
 ```
 
+#### `study_group_invitations` (Deliberate Addition 5)
+Direct invitations sent between opted-in eligible candidates in the study pool.
+```sql
+CREATE TABLE study_group_invitations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    inviter_student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    invitee_student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    concept_ids UUID[] NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'accepted', 'declined', 'expired')),
+    resulting_match_id UUID REFERENCES study_group_matches(id) ON DELETE SET NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_invitations_course ON study_group_invitations(course_id);
+CREATE INDEX idx_invitations_invitee ON study_group_invitations(invitee_student_id);
+```
+
+#### `party_quests` (Deliberate Addition 6)
+Collaborative practice goals undertaken by matched study-group peers targeting 1–3 shared concepts.
+```sql
+CREATE TABLE party_quests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id UUID NOT NULL REFERENCES study_group_matches(id) ON DELETE CASCADE,
+    concept_ids UUID[] NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'cancelled')),
+    version INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    completed_at TIMESTAMPTZ
+);
+CREATE INDEX idx_party_quests_match ON party_quests(match_id);
+```
+
+#### `party_quest_progress` (Deliberate Addition 7)
+Tracks individual peer verification for each concept in a shared party quest.
+```sql
+CREATE TABLE party_quest_progress (
+    party_quest_id UUID NOT NULL REFERENCES party_quests(id) ON DELETE CASCADE,
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    concept_id UUID NOT NULL REFERENCES concept_nodes(id) ON DELETE CASCADE,
+    quiz_attempt_id UUID NOT NULL REFERENCES quiz_attempts(id) ON DELETE RESTRICT,
+    completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (party_quest_id, student_id, concept_id)
+);
+CREATE INDEX idx_party_progress_student ON party_quest_progress(student_id);
+```
+
+---
+
+### 2.5 Spark Learning & Progression Tables
+
+#### `encounters` (Deliberate Addition 8)
+Orchestrates five-question practice quiz encounters with Spark reactions and server-controlled hints.
+```sql
+CREATE TABLE encounters (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    concept_id UUID NOT NULL REFERENCES concept_nodes(id) ON DELETE CASCADE,
+    source VARCHAR(32) NOT NULL CHECK (source IN ('star', 'daily', 'eclipse', 'party')),
+    quest_id UUID REFERENCES daily_quests(id) ON DELETE SET NULL,
+    party_quest_id UUID, -- Foreign key to party_quests(id) added in Phase 6 migration 0005
+    status VARCHAR(32) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'completed', 'abandoned')),
+    question_ids UUID[] NOT NULL,
+    option_permutations JSONB NOT NULL,
+    hints_used JSONB NOT NULL DEFAULT '{"1":0,"2":0,"3":0,"4":0,"5":0}'::jsonb,
+    version INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX idx_encounters_student ON encounters(student_id);
+CREATE INDEX idx_encounters_concept ON encounters(concept_id);
+CREATE INDEX idx_encounters_status ON encounters(status);
+```
+*Note*: `party_quest_id` is created nullable without a foreign key in Phase 1 migration 0003; Phase 6 migration 0005 adds the foreign key constraint once `party_quests` exists. Prior to Phase 6, requests with `source = 'party'` are rejected with `503 SERVICE_UNAVAILABLE`.
+
+#### `daily_quests` (Deliberate Addition 9)
+Persistent daily review queue (0–3 ready concepts) generated per student per UTC date.
+```sql
+CREATE TABLE daily_quests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    quest_date DATE NOT NULL,
+    concept_ids UUID[] NOT NULL,
+    completed_ids UUID[] NOT NULL DEFAULT '{}',
+    cleared_at TIMESTAMPTZ,
+    version INT NOT NULL DEFAULT 1,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(student_id, quest_date)
+);
+CREATE INDEX idx_daily_quests_student_date ON daily_quests(student_id, quest_date);
+```
+
+#### `xp_events` (Deliberate Addition 10)
+Append-only server-authoritative ledger recording student effort points.
+```sql
+CREATE TABLE xp_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    amount INT NOT NULL CHECK (amount > 0),
+    reason VARCHAR(32) NOT NULL CHECK (reason IN ('encounter', 'quest_cleared', 'party')),
+    source_id UUID NOT NULL,
+    award_date DATE NOT NULL,
+    concept_id UUID REFERENCES concept_nodes(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(student_id, reason, source_id, award_date)
+);
+CREATE UNIQUE INDEX idx_xp_daily_practice ON xp_events(student_id, concept_id, award_date) WHERE reason = 'encounter';
+CREATE INDEX idx_xp_events_student ON xp_events(student_id);
+```
+
 ---
 
 ## 3. Transactional Stored Procedures (RPCs)
@@ -490,8 +606,30 @@ $$;
 
 ## 4. Authorization & Security Boundaries
 
-1. **No Anonymous Client Access**: Public (`anon`) table access is revoked for all 22 tables. All reads and writes must pass through the Express backend.
+1. **No Anonymous Client Access**: Public (`anon`) table access is revoked for all 28 tables. All reads and writes must pass through the Express backend.
 2. **Explicit Course/Role Check**: Because the backend uses `SUPABASE_SERVICE_ROLE_KEY` (which bypasses RLS), every repository query MUST enforce ownership filters:
    - Teachers can only access courses where `teacher_id` matches their verified teacher ID.
    - Students can only access courses where an active `students` row exists for their verified `auth_id`.
 3. **Encrypted Zoom Credentials**: Teacher Zoom credentials (`zoom_client_id`, `zoom_client_secret`, `zoom_refresh_token`) are encrypted with AES-256-GCM using `CREDENTIAL_ENCRYPTION_KEY` before insertion and decrypted only within `src/server/zoom/`.
+
+---
+
+## 5. Chronological Database Migrations Roadmap
+
+All relational changes follow a strict chronological, single-writer migration sequence:
+
+1. **`20261020000001_initial_schema.sql`** (Phase 0 — *Completed History*):
+   - Creates initial 18 base tables, constraints, foreign keys, and indexes.
+2. **`20261020000002_mastery_rpc.sql`** (Phase 1 — *Target*):
+   - Implements atomic `apply_mastery_evidence` PostgreSQL stored procedure with row-level locks.
+3. **`20261021000003_spark_learning.sql`** (Phase 1 — *Target*):
+   - Creates `encounters`, `daily_quests`, and `xp_events` tables.
+   - Adds `courses.exam_at` (TIMESTAMPTZ NULL).
+   - Adds `concept_quiz_questions.hints` (JSONB NULL) with 3-element length validation.
+   - Adds `quiz_attempts.encounter_id` (UUID NULL UNIQUE REFERENCES `encounters(id)`).
+4. **`20261022000004_study_groups.sql`** (Phase 6 — *Target*, rescheduled from old 0003):
+   - Creates base collaboration tables: `study_group_pool`, `study_group_matches`, `student_availability`, `study_group_messages`.
+   - Implements atomic `claim_and_create_match` stored procedure.
+5. **`20261022000005_spark_collaboration.sql`** (Phase 6 — *Target*):
+   - Creates `study_group_invitations`, `party_quests`, and `party_quest_progress` tables.
+   - Adds foreign key constraint from `encounters.party_quest_id` to `party_quests(id)`.

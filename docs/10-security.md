@@ -35,6 +35,14 @@ Because server repositories use `SUPABASE_SERVICE_ROLE_KEY` to interact with Pos
 | `POST /api/tutoring/sessions` | Deny (`401`) | **Allow** | Deny (`403`) | Deny (`403`) | Deny (`403`) |
 | `POST /api/study-groups/opt-in`| Deny (`401`) | **Allow** | Deny (`403`) | Deny (`403`) | Deny (`403`) |
 | `study-group:<matchId>` Socket| Deny (`401`) | **Allow (Matched Pair)** | Deny (`403`) | Deny (`403`) | Deny (`403`) |
+| `PUT /api/courses/:id/exam` | Deny (`401`) | Deny (`403`) | Deny (`403`) | **Allow** | Deny (`403`) |
+| `GET /api/courses/:id/students/effort` | Deny (`401`) | Deny (`403`) | Deny (`403`) | **Allow** | Deny (`403`) |
+| `GET /api/students/:id/daily-quest` | Deny (`401`) | **Allow (Self Only)** | Deny (`403`) | Deny (`403`) | Deny (`403`) |
+| `GET /api/students/:id/game-summary`| Deny (`401`) | **Allow (Self Only)** | Deny (`403`) | Deny (`403`) | Deny (`403`) |
+| `POST /api/students/:id/encounters` | Deny (`401`) | **Allow (Self Only)** | Deny (`403`) | Deny (`403`) | Deny (`403`) |
+| `POST /api/encounters/:id/hints` | Deny (`401`) | **Allow (Owner Only)** | Deny (`403`) | Deny (`403`) | Deny (`403`) |
+| `POST /api/encounters/:id/submit`| Deny (`401`) | **Allow (Owner Only)** | Deny (`403`) | Deny (`403`) | Deny (`403`) |
+| `POST /api/study-groups/:id/quests`| Deny (`401`) | **Allow (Matched Pair)** | Deny (`403`) | Deny (`403`) | Deny (`403`) |
 
 ---
 
@@ -61,6 +69,7 @@ Zoom webhook deliveries (`POST /webhook/zoom/:teacherId`) are protected against 
 2. **Markdown & Math Sanitization**: All AI-generated content (learning pages, tutoring messages, poll questions) rendered in the browser is sanitized via `DOMPurify` before insertion into the DOM to prevent Cross-Site Scripting (XSS).
 3. **No Expected Answer Leaks**: Poll question broadcast events (`poll:new-question`) and quiz question queries (`GET /api/concepts/:id/quiz`) explicitly strip expected answers, rubrics, and correct answer indices from the payload.
 4. **Server-Side Grading Integrity**: Student poll and quiz grading is executed exclusively on the server against pre-stored rubrics. Client-submitted score deltas are discarded.
+5. **No Hint Answer Leaks**: Encounter hint endpoints release pedagogical nudges and walkthroughs without revealing the correct option index or exact option string.
 
 ---
 
@@ -69,3 +78,5 @@ Zoom webhook deliveries (`POST /webhook/zoom/:teacherId`) are protected against 
 1. **No Learner Data in Public Caches**: Endpoints returning personal confidence, student answers, or chat messages include `Cache-Control: private, no-store`.
 2. **Minimization of AI Context**: Transcripts and student answers sent to Anthropic Claude are stripped of student emails and real full names; only synthetic or anonymized student tokens (e.g., `student_1`, `student_2`) are included in misconception analysis prompts.
 3. **Synthetic Demo Data**: Demonstration scripts and seed fixtures use synthetic personas (Hari, Rahul, Praj, Vamshi) with `@example.test` email domains and locally generated test passwords.
+4. **Teacher-Only Effort Quadrant & Class Sky**: Student XP, effort percentiles, and `high_effort_low_mastery` flags are visible exclusively to the course teacher. Student-facing leaderboards or public XP comparisons are strictly prohibited.
+5. **Selected-Concept-Only Study Pool Disclosure**: Study pool candidate listings (`GET /api/courses/:courseId/study-groups/candidates`) disclose only requested concept IDs, confidence bands on those specific concepts, and fit classification. Non-requested concept mastery is never exposed to prospective peers.

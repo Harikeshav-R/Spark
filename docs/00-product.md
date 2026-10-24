@@ -68,11 +68,21 @@ HackOHIO Classroom Companion is an educational intelligence system designed to e
 - **F-D05: Dual-Consent Acceptance**: Mandatory bilateral acceptance of a proposed study slot before meeting confirmation.
 - **F-D06: Genuine Zoom Scheduling**: Authentic Zoom meeting generation using the owning teacher's authorized Zoom credentials, returning genuine join URLs and meeting IDs.
 
+### Feature Family E: Spark Learning Experience & Habit Loops
+- **F-E01: Star Experience & Dynamic Vessel Visualizer**: Represents concept nodes as interactive stars positioned by D3-force with vertical clip-rectangle fill proportional to confidence ($c \in [0.0, 1.0]$). Visual fill states map one-to-one to canonical bands: `gray` (Unassessed), `red` (Dim / Needs practice), `yellow` (Lit / Developing), `green` (Shining / Mastered).
+- **F-E02: Reactive Mascot (Spark)**: Embedded SVG companion mascot with expressive mood states (`calm`, `think`, `cheer`, `oops`, `sleepy`) and evolutionary forms (`ember`, `spark`, `glow`, `nova`) derived strictly from whole-course sky brightness (average confidence). Spark offers warm, adult, non-shaming coaching without leaking solutions.
+- **F-E03: Daily Quest & Streak Loop**: Automatically generates a persistent daily queue of up to three ready concepts (unreviewed, overdue >3 days, or confidence $< 0.70$) per student per UTC date. Clearing a nonempty quest advances the streak and awards 25 XP.
+- **F-E04: Practice Encounters & Tiered Hints**: Surfaces five-question practice quizzes in an engaging inline panel with Spark reactions and exactly three progressive server-released hint tiers (Level 1: Nudge, Level 2: Bigger hint, Level 3: Walkthrough). Hints discount earned XP without altering quiz scoring or mastery evidence formulas.
+- **F-E05: Eclipse Review-Pressure Diagnostic**: Computes course-wide review pressure targeting up to three lowest-confidence ready concepts. Strength is computed as $\text{round}(100 \times \sum \max(0, 0.70 - c_i) / (n \times 0.70))$ alongside an optional teacher-managed upcoming exam countdown. Purely diagnostic; never decays confidence.
+- **F-E06: Append-Only XP Effort Ledger**: Tracks student study effort in an append-only server-authoritative ledger (`xp_events`). Practice encounters award $\max(8, 30 - 6 \times \text{hintsUsed})$ for correct answers and 8 XP for incorrect answers (max once per student/concept/date); Daily Quest clear awards 25 XP; Party quest clear awards 60 XP. XP never mutates `student_mastery`.
+- **F-E07: Collaborative Party Goals**: Enables matched study-group peers to embark on a shared Party quest targeting 1–3 shared concepts. Each peer independently completes the five-question quiz; bilateral completion awards 60 XP to each peer without bypassing individual mastery grading.
+- **F-E08: Instructor Class Sky & Effort Quadrant**: Provides instructors an aggregate knowledge graph showing class mean confidence per concept, transcript-evidenced taught status, and an effort-vs-mastery roster quadrant (identifying high-effort/low-mastery students who need pedagogical intervention) without student-facing leaderboards.
+
 ---
 
-## 3. End-to-End User Journeys (J01 – J08)
+## 3. End-to-End User Journeys (J01 – J11)
 
-The system behavior is formally validated against eight end-to-end user journeys. Every journey defines a strict acceptance contract:
+The system behavior is formally validated against eleven end-to-end user journeys (J01–J11). Every journey defines a strict acceptance contract:
 
 ### Journey J01: Course Creation & Syllabus Ingestion
 - **Persona**: Teacher (Prof. Chen).
@@ -193,13 +203,68 @@ The system behavior is formally validated against eight end-to-end user journeys
   - Fixture demo executes without external API keys or cloud dependencies.
   - Production deployment maintains persistent WebSocket connections and recovers state after server restarts.
 
+
+### Journey J09: Daily Review Quest, Progressive Hints & Effort Streak
+- **Persona**: Student (Rahul).
+- **Flow**:
+  1. Rahul opens the student dashboard on a new UTC calendar date.
+  2. System queries `GET /api/students/:studentId/daily-quest` and retrieves a persisted 3-item Daily Quest: "Backpropagation", "Derivatives", "Computational Graphs".
+  3. Rahul launches a practice Encounter for "Backpropagation".
+  4. On Question 1, Rahul requests Hint Level 1 (Nudge) via `POST /api/encounters/:encounterId/hints`; server returns contextual hint text.
+  5. Rahul requests Hint Level 2 (Bigger hint); server returns deeper conceptual guidance without leaking the answer.
+  6. Rahul completes and submits all 5 answers via `POST /api/encounters/:encounterId/submit`.
+  7. Server grades attempt ($4/5 = 80\%$), applies canonical quiz evidence ($+0.15$ confidence boost, moving $c$ from $0.20 \to 0.35$), computes earned XP accounting for used hints, records an append-only `xp_events` entry, and marks "Backpropagation" completed in Rahul's Daily Quest.
+  8. Rahul finishes the remaining two quest concepts; the Daily Quest clears (`clearedAt` is set), awarding 25 bonus XP and incrementing Rahul's daily streak from 2 to 3.
+- **Acceptance Criteria**:
+  - Hints are released strictly in sequential order ($1 \to 2 \to 3$); skipping returns `409 HINT_OUT_OF_SEQUENCE`.
+  - Hints reduce XP awarded but have zero effect on quiz scoring delta ($+0.15$) or mastery evidence.
+  - Daily quest queue order and completion status remain identical across page reloads.
+  - Repeating practice on the same concept on the same UTC date earns zero duplicate practice XP.
+  - Streak increments exactly once per UTC calendar day upon nonempty quest clear.
+
+### Journey J10: Eclipse Review Diagnostic & Mascot Evolution
+- **Persona**: Student (Hari) and Companion (Spark).
+- **Flow**:
+  1. Teacher sets upcoming midterm exam date: `PUT /api/courses/:courseId/exam` with `examAt = 2026-11-01T14:00:00Z`.
+  2. Hari navigates to dashboard; system requests `GET /api/students/:studentId/eclipse`.
+  3. Hari has 2 ready concepts below 0.70 ("Attention Mechanisms" at 0.35, "Transformers" at 0.50). Eclipse strength computes to $\text{round}(100 \times ((0.70 - 0.35) + (0.70 - 0.50)) / (2 \times 0.70)) = \text{round}(100 \times 0.55 / 1.40) = 39\%$.
+  4. UI displays Eclipse banner showing 39% review pressure and a 10-day exam countdown.
+  5. Mascot Spark currently renders in `glow` form (course average confidence = 0.58).
+  6. Hari completes practice encounters and live polls, raising whole-course mean confidence past 0.75.
+  7. Mascot Spark transitions with celebratory animation into `nova` form (`form = nova`, `formProgress = 1.0`).
+- **Acceptance Criteria**:
+  - Eclipse strength accurately computes based only on target concepts ($n \le 3$ lowest-confidence ready concepts).
+  - Zero weak concepts yields Eclipse strength 0% and an explicit "Clear skies" state.
+  - Mascot form derives strictly from whole-course average confidence ($<25\% \to$ Ember, $25-54\% \to$ Spark, $55-74\% \to$ Glow, $\ge 75\% \to$ Nova).
+  - Mascot mood animations do not obstruct user controls or falsify server state.
+
+### Journey J11: Collaborative Party Quest & Teacher Effort Visibility
+- **Persona**: Students (Hari, Rahul) and Teacher (Prof. Sarah Chen).
+- **Flow**:
+  1. Hari and Rahul are matched via complementary study pool matching for "Backpropagation".
+  2. Hari selects 2 shared concepts ("Backpropagation", "Computational Graphs") and activates a shared Party quest via `POST /api/study-groups/:matchId/quests`.
+  3. Both peers see the shared quest in their study-group view.
+  4. Rahul launches practice encounters and submits quizzes for both concepts; Hari independently launches practice encounters and submits quizzes for both concepts.
+  5. Upon both peers completing both concepts, the server marks the Party quest `completed`, emits `party:quest-updated` to the match socket room, and transactionally awards 60 XP to each student's `xp_events` ledger.
+  6. Prof. Chen opens `/professor/dashboard` and views the **Class Sky** tab.
+  7. Class Sky displays the knowledge graph with nodes colored by class mean confidence, with attention rings highlighting taught concepts with mean confidence $< 0.40$.
+  8. Prof. Chen sorts the student roster by effort (XP percentile) versus mastery (confidence percentile); Rahul is flagged with `high_effort_low_mastery` (XP percentile $\ge 75\%$, confidence percentile $\le 40\%$).
+  9. Prof. Chen uses this insight to send an encouraging check-in and targeted practice recommendation.
+- **Acceptance Criteria**:
+  - Party quests require bilateral participation; neither peer can complete the quest on behalf of the other.
+  - Party quest completion awards 60 XP to each participant exactly once without altering individual confidence directly.
+  - Class Sky graph displays class mean confidence using the four canonical mastery bands.
+  - High-effort/low-mastery flag triggers deterministically at XP percentile $\ge 75$ and confidence percentile $\le 40$.
+  - No student-facing leaderboards or public student XP comparisons are exposed.
 ---
 
 ## 4. Scope Exclusions & Simulation Disclosure
 
 ### Explicit Scope Exclusions
-- **Exam / Problem Set Ingestion**: The system explicitly does not support ingesting historical exams, homework assignments, or automated solution key generation. Syllabus and lecture transcript ingestion constitute the complete content ingestion boundary.
+- **Exam / Problem Set Ingestion**: The system explicitly does not support ingesting historical exams, homework assignments, or automated solution key generation. Syllabus and lecture transcript ingestion constitute the complete content ingestion boundary. Teachers may optionally record an upcoming exam date timestamp for countdown and review purposes.
 - **Calendar Provider Synchronization**: The system manages peer study scheduling using internal, stored UTC availability intervals. Google Calendar and Microsoft Outlook two-way sync are explicitly excluded.
+- **Student Leaderboards & Competitive Social Mechanics**: XP and streaks are strictly private student effort metrics and instructor diagnostic tools. Public leaderboards, rank badges, and peer XP comparisons are prohibited.
+- **Mastery Decay & Ease Scoring**: The mastery engine does not support automated confidence decay, spaced-repetition ease factor algorithms, or penalty-free poll retries.
 
 ### Explicit Simulation Disclosure
 - **Lecture Simulator**: In development, testing, and fixture demonstration modes, lecture transcripts may be generated via the internal lecture simulator (`LECTURE_SOURCE=simulator`). The user interface MUST display a prominent `[SIMULATED TRANSCRIPT]` indicator whenever simulated speech is active.

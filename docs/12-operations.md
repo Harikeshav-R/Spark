@@ -50,11 +50,11 @@ All project operations are executed through standard npm scripts defined in `pac
 | `npm test` | Runs isolated unit and contract tests in memory (`INTEGRATION_MODE=fixture`). |
 | `npm run test:contracts` | Validates Zod schemas, service ports, and boundary import rules. |
 | `npm run test:integration` | Runs PostgreSQL database integration tests against local Supabase. |
-| `npm run test:e2e` | Runs Playwright multi-browser end-to-end user journeys (J01–J08). |
+| `npm run test:e2e` | Runs Playwright multi-browser end-to-end user journeys (J01–J11). |
 | `npm run check` | Unified offline check: runs `typecheck`, `lint`, `test`, and `test:contracts`. |
 | `npm run doctor` | Validates required environment variables, database connectivity, and provider readiness. |
 | `npm run db:migrate` | Applies unapplied SQL migration files from `supabase/migrations/`. |
-| `npm run db:seed` | Seeds deterministic CS229 demo course (33 concepts, 34 edges, 4 students, 132 mastery rows). |
+| `npm run db:seed` | Seeds deterministic CS229 demo course (33 concepts, 34 edges, 4 students, 132 mastery rows, Daily Quests, XP events, party quests). |
 | `npm run demo -- --mode=fixture --seed=42` | Runs an automated offline demonstration using deterministic fixtures. |
 | `npm run demo -- --mode=live --seed=42` | Runs an automated live demonstration exercising authentic cloud APIs. |
 | `npm run demo:reset` | Wipes transient demo state and restores baseline seed in under 2 seconds for fresh presentation takes. |

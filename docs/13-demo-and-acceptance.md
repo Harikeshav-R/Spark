@@ -81,6 +81,16 @@ The seed script creates **1 teacher** and **4 enrolled students**, producing exa
 
 *Complementary Match Check*: Hari ($0.80$) and Rahul ($0.15$) on Backpropagation have gap $|0.80 - 0.15| = 0.65 \ge 0.30$, making them an ideal complementary study pair.
 
+
+### 2.3 Baseline Game Progression & Effort Seed State
+| Persona | Baseline XP | Streak | Sky Brightness | Mascot Form | Intervention Flag |
+|---|---|---|---|---|---|
+| **Hari** | 620 | 4 Days | 0.82 | `nova` | None |
+| **Rahul** | 508 | 3 Days | 0.38 | `spark` | `high_effort_low_mastery` |
+| **Praj** | 320 | 2 Days | 0.65 | `glow` | None |
+| **Vamshi** | 0 | 0 Days | 0.00 | `ember` | None (Unassessed) |
+
+*Rahul Daily Quest Seed*: 3 ready concepts: "Backpropagation" (overdue), "Derivatives" (unreviewed), "Computational Graphs" (current).
 ---
 
 ## 3. Demo Mode Implementation Architecture
@@ -182,8 +192,8 @@ Use this step-by-step storyboard for recording a demo video or delivering a pres
   2. Rahul asks: *"Why do we need activations for backprop?"*
   3. Claude responds Socratically, asking Rahul about the derivative of $x^2$.
   4. Rahul replies correctly: *"Oh, the gradient depends on the value of $x$ at that point!"*
-  5. Tutor recognizes breakthrough: Rahul's node advances $+0.20$ to yellow ($0.35$).
-  6. Rahul opens the generated concept learning page and completes a 5-question practice quiz, demonstrating mastery.
+  5. Tutor recognizes breakthrough: Rahul's confidence advances $+0.20$ within the red / Dim band ($0.15 \to 0.35$).
+  6. Rahul opens the generated concept learning page and completes a 5-question practice quiz ($4/5 \to +0.15$ delta), advancing confidence to $0.50$ in the yellow / Developing band.
 
 #### Scene 5: Consensual Peer Matching & Authentic Zoom Meeting (4:00 – 5:00)
 - **Visual**: Rahul and Hari peer collaboration.
@@ -207,3 +217,33 @@ For generating video files without manual screen recording:
 npm run demo:record
 ```
 - Produces a timestamped video file in `recordings/demo-walkthrough.webm` (1080p, 60fps) with automated mouse cursors, typing animations, and timed scene transitions.
+
+#### Scene 6: Spark Mascot, Daily Quests & Collaborative Party Goals (5:00 – 6:00)
+- **Visual**: Rahul dashboard with Spark mascot, Encounter drawer, and collaborative party quest.
+- **Action**:
+  1. Rahul views summary pill: 508 XP, 3-day streak, Mascot Spark in `think` mood.
+  2. Rahul clicks "Daily Quest": launches Encounter for Backpropagation.
+  3. Rahul requests Hint 1 (Nudge), then Hint 2 (Bigger hint); submits 5 answers.
+  4. Encounter feedback card awards 88 XP (discounted by hints), updates confidence, and triggers Mascot Spark bounce hop into `cheer` mood.
+  5. Rahul completes quest; receives +25 XP Daily Bonus; streak increments to 4.
+  6. Switch to **Prof. Chen**: Prof. Chen opens Class Sky on `/professor/dashboard`.
+  7. Class Sky displays concept stars colored by class mean confidence with attention rings on taught concepts below 0.40.
+  8. Roster highlights Rahul with `high_effort_low_mastery` warning badge.
+
+---
+
+## 6. End-to-End Journey Acceptance Protocols (J01 – J11)
+
+| Journey ID | Journey Name | Persona | Primary Verification Assertion |
+|---|---|---|---|
+| **J01** | Course Creation & Syllabus Ingestion | Prof. Chen | 10-page truncation disclosure; 33 concepts & 34 edges committed. |
+| **J02** | Student Onboarding & Prerequisite Navigation | Hari | Idempotent enrollment; 33 `gray` nodes; ancestor path lighting. |
+| **J03** | Live Lecture & Real-Time Attendance | Hari, Rahul, Prof. Chen | Speech streaming; chunk persistence; attendance evidence boost $\le 0.30$. |
+| **J04** | Formative Socratic Poll Cycle | Hari, Rahul, Prof. Chen | Open-ended question; server grading; atomic mastery update; heatmap refresh. |
+| **J05** | Mid-Lecture Pedagogical Interventions | Prof. Chen | Claude misconception clustering; 2 concrete instructional actions. |
+| **J06** | Socratic Tutoring & Autonomous Review | Rahul | Socratic dialogue; breakthrough $+0.20$; server quiz grading; cited Perplexity search. |
+| **J07** | Consensual Peer Matching & Zoom Scheduling | Hari, Rahul | Opt-in pool; gap $\ge 0.30$; in-app chat; mutual slot; authentic Zoom meeting. |
+| **J08** | Seeded Demonstration & Deployment | System Administrator | 33 concepts/34 edges/132 mastery rows; zero-cost fixture run; Render persistence. |
+| **J09** | Daily Review Quest, Hints & Effort Streak | Rahul | 3-item daily quest; sequential 3-tier hints; XP discount; streak increments upon clear. |
+| **J10** | Eclipse Review Diagnostic & Mascot Evolution | Hari, Spark | Eclipse strength calculation; exam countdown; mascot evolution (Ember $\to$ Nova). |
+| **J11** | Collaborative Party Quest & Class Sky Visibility | Hari, Rahul, Prof. Chen | Bilateral party quest completion; 60 XP each; Class Sky mean stars; effort roster flag. |

@@ -72,13 +72,13 @@ src/
   contracts/                    # Frozen public Zod schemas, DTOs, and event types
   server/
     platform/                   # Database client, token verification, logging, errors
-    core/                       # Course lifecycle, enrollment, graph, and mastery engine
+    core/                       # Course lifecycle, enrollment, graph, mastery, and game progression (GameService)
     classroom/                  # Lecture lifecycle, transcript, poll, and summary logic
     realtime/                   # Authenticated WebSocket rooms, presence, and publishing
     zoom/                       # Zoom OAuth 2.0, webhook HMAC, and RTMS client
     study-groups/               # Opt-in pool, matchmaking, availability, peer chat
     ai/                         # Anthropic Claude and Perplexity pipeline adapters
-    learning/                   # Socratic tutoring, learning pages, quizzes, resources
+    learning/                   # Socratic tutoring, learning pages, quizzes, encounters (EncounterService)
   features/
     auth/                       # Sign-in, sign-up, session restoration UI
     courses/                    # Course creation, syllabus upload, enrollment UI
@@ -88,6 +88,7 @@ src/
     tutor/                      # Socratic tutoring chat interface (Lane C export)
     learning/                   # Learning pages, practice quizzes, cited resources (Lane C)
     study-groups/               # Study pool opt-in, peer chat, scheduling UI (Lane C)
+    encounters/                 # Practice encounter modal, tiered hints, Spark reactions (Lane C export)
   components/
     ui/                         # Shared design primitives (Button, Modal, Card, Badge)
   lib/
@@ -231,4 +232,39 @@ sequenceDiagram
     Study->>Sockets: emit("study-group:updated", matchDataWithZoom)
     Sockets-->>S1: Display real Zoom join button
     Sockets-->>S2: Display real Zoom join button
+```
+
+### 4.5 Practice Encounter with Tiered Hints & XP Progression
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Student as Student (Rahul)
+    participant Express as Express (/api/encounters)
+    participant Encounters as EncounterService
+    participant Game as GameService
+    participant Mastery as MasteryService
+    participant DB as PostgreSQL (xp_events, quiz_attempts, daily_quests)
+    participant Sockets as Socket.IO (student:<id>)
+
+    Student->>Express: POST /api/students/:id/encounters { conceptId, source: "daily", questId }
+    Express->>Encounters: createEncounter(actor, studentId, input)
+    Encounters->>DB: INSERT encounters (status: 'active', questions: 5)
+    Encounters-->>Student: EncounterDTO (5 questions, options permuted, 0 hints used)
+
+    Student->>Express: POST /api/encounters/:id/hints { questionId: Q1, level: 1 }
+    Express->>Encounters: getHint(actor, encounterId, Q1, level: 1)
+    Encounters->>DB: Verify level sequence (level 1 after 0); UPDATE encounters released hints
+    Encounters-->>Student: { questionId: Q1, level: 1, text: "Consider the chain rule..." }
+
+    Student->>Express: POST /api/encounters/:id/submit { answers: [{ questionId, selectedOption }, ...] }
+    Express->>Encounters: submitEncounter(actor, encounterId, answers)
+    Encounters->>DB: Grade answers against stored keys; calculate score (4/5 = 80%)
+    Encounters->>Mastery: applyEvidence(studentId, conceptId, { type: "quiz", score: 0.80 })
+    Mastery->>DB: Execute apply_mastery_evidence (+0.15 delta -> confidence 0.35)
+    Encounters->>Game: recordPracticeReward(studentId, conceptId, answersWithHints)
+    Game->>DB: INSERT xp_events (UNIQUE key per student/concept/date; e.g., +88 XP)
+    Game->>DB: UPDATE daily_quests (mark concept completed; check if all clear)
+    Note over Game,DB: If all items completed, set cleared_at, award +25 XP, increment streak
+    Encounters->>Sockets: emitToStudent(studentId, "game:updated", { summary, dailyQuest })
+    Encounters-->>Student: EncounterResultDTO { score, confidence, band, xpAwarded, summary, dailyQuest }
 ```
