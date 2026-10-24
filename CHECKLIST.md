@@ -2,7 +2,7 @@
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
-> **Status Notice**: Phase 0 is complete as verified by foundational contracts and toolchains. Phase 1 onward represents active planned engineering. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), feature pull requests do not check these boxes directly; Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
+> **Status Notice**: Phase 0 is complete. Phase 1 active engineering is in progress with foundational platform auth, course management, enrollment mastery initialization, lecture lifecycle, ephemeral study pool, and App Router shells merged into `main` (P1-A-01, P1-A-02, P1-A-03, P1-B-01, P1-B-02, P1-D-01). Atomic mastery engine (P1-A-04) and warm theme tokens (P1-D-02) are implemented and merged in PRs #26 and #29 on feature branches awaiting integration into `main`. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
 
 ---
 
@@ -19,18 +19,18 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 
 ## Phase 1: Independent Vertical Foundations
 
-- [ ] P1-A-01 — Supabase JWT Token Verification & ActorContext Middleware
-- [ ] P1-A-02 — Course Service & Join Code Generator
-- [ ] P1-A-03 — Enrollment & Mastery Initialization Service
-- [ ] P1-A-04 — Atomic Mastery Engine & PostgreSQL RPC
-- [ ] P1-B-01 — Lecture Session Lifecycle & State Machine
-- [ ] P1-B-02 — Ephemeral Study Group Pool Repository
+- [x] P1-A-01 — Supabase JWT Token Verification & ActorContext Middleware
+- [x] P1-A-02 — Course Service & Join Code Generator
+- [x] P1-A-03 — Enrollment & Mastery Initialization Service
+- [ ] P1-A-04 — Atomic Mastery Engine & PostgreSQL RPC (PR #26 merged to feature branch; pending merge to main)
+- [x] P1-B-01 — Lecture Session Lifecycle & State Machine
+- [x] P1-B-02 — Ephemeral Study Group Pool Repository
 - [ ] P1-C-01 — OpenRouter Typed Client Adapter (Anthropic & Perplexity Models)
 - [ ] P1-C-02 — Socratic Tutoring Session Engine
-- [ ] P1-D-01 — App Router Shells & Navigation Layout
+- [x] P1-D-01 — App Router Shells & Navigation Layout
 - [ ] P1-A-05 — Shared Game, Encounter & Party Extension Contracts and Fixtures
 - [ ] P1-A-06 — Additive Spark Learning Relational Migration 0003
-- [ ] P1-D-02 — Warm Palette Design Tokens & Theme Follow-on
+- [ ] P1-D-02 — Warm Palette Design Tokens & Theme Follow-on (PR #29 merged to feature branch; pending merge to main)
 
 ---
 
