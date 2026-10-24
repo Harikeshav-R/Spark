@@ -1,5 +1,7 @@
+"use client";
+
 import React from "react";
-import { cn } from "../../lib/client/utils.js";
+import { cn } from "@/lib/client/utils";
 
 export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
