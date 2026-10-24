@@ -1,6 +1,6 @@
 # Testing Strategy & Quality Assurance
 
-This document defines the testing methodology, suite structure, boundary verification rules, and automated regression scenarios for HackOHIO Classroom Companion.
+This document defines the testing methodology, suite structure, boundary verification rules, and automated regression scenarios for Spark.
 
 ---
 

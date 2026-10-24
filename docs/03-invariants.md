@@ -1,6 +1,6 @@
 # Formal System Invariants & Mathematical Rules
 
-This document specifies the authoritative mathematical formulas, state machine invariants, domain constraints, and failure counterexamples governing HackOHIO Classroom Companion. All services, database triggers, RPCs, and UI components MUST adhere strictly to these rules.
+This document specifies the authoritative mathematical formulas, state machine invariants, domain constraints, and failure counterexamples governing Spark. All services, database triggers, RPCs, and UI components MUST adhere strictly to these rules.
 
 ---
 
@@ -19,7 +19,7 @@ This document specifies the authoritative mathematical formulas, state machine i
   \text{yellow} & \text{if } 0.40 \le c < 0.70 \\
   \text{green} & \text{if } c \ge 0.70 
   \end{cases}$$
-- *Historical Note*: Prototype cosmetic sub-tiers (`orange` and `lime`) are consolidated: `orange` ($0 < c < 0.40$) maps to `red`; `lime` ($0.55 \le c < 0.70$) maps to `yellow`.
+- *Historical Note*: Non-canonical cosmetic sub-tiers ('orange' and 'lime') are consolidated: 'orange' ($0 < c < 0.40$) maps to 'red'; 'lime' ($0.55 \le c < 0.70$) maps to 'yellow'.
 
 ### 1.3 Evidence-Driven Mutation Formulas
 Confidence is mutated exclusively through the pure function `applyMasteryEvidence(current, evidence)`. Direct confidence assignment by client request is forbidden.
@@ -186,7 +186,7 @@ stateDiagram-v2
   \text{Lit / Developing (yellow)} & \text{if } 0.40 \le c < 0.70 \\
   \text{Shining / Mastered (green)} & \text{if } c \ge 0.70
   \end{cases}$$
-- *Invariant*: Prototype cosmetic 60/85 thresholds are strictly prohibited. Mastery bands are semantic states, not arbitrary colors.
+- *Invariant*: Cosmetic 60/85 thresholds are strictly prohibited. Mastery bands are semantic states, not arbitrary colors.
 
 ### 7.2 Effort Orthogonality & Mastery Protection
 - **Domain Invariant (INV-XP02)**: Experience Points (XP), hint releases, streaks, party collaboration, mascot animations, and quest completions MUST NEVER mutate `student_mastery.confidence` directly. All confidence mutations MUST route exclusively through `MasteryService.applyEvidence()` with one of the four canonical evidence types (INV-M01–INV-M03). Automated confidence decay, spaced-repetition ease factor algorithms, and decay timers are strictly prohibited.

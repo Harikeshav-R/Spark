@@ -4,10 +4,10 @@
 Accepted
 
 ## Context
-Educational platforms leveraging Large Language Models (LLMs) often exhibit brittle prompt integrations, unvalidated JSON parsing, and dishonest failure fallbacks. For instance, in the prototype:
-- Malformed JSON responses from poll evaluations or concept detections often defaulted silently to partial credit or empty state without informing the instructor.
-- Mockups sometimes displayed static, hardcoded intervention cards when AI generation was unavailable.
-- Unbounded API calls caused request timeouts and frozen UI states.
+Educational platforms leveraging Large Language Models (LLMs) often exhibit brittle prompt integrations, unvalidated JSON parsing, and dishonest failure fallbacks:
+- Malformed JSON responses from poll evaluations or concept detections risk defaulting silently to partial credit or empty state without informing the instructor.
+- Naive fallbacks can display static, hardcoded intervention cards when AI generation is unavailable, misleading users.
+- Unbounded API calls cause request timeouts and frozen UI states.
 
 ## Decision
 We enforce strict schema validation, bounded execution timeouts, and honest failure reporting across all 13 AI capabilities:

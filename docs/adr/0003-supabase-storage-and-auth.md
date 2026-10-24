@@ -6,7 +6,7 @@ Accepted
 ## Context
 The platform requires durable relational storage with referential integrity for 22 application tables, transactional stored procedures (RPCs) for atomic mastery updates, and secure user authentication. 
 
-In the prototype, the browser client sometimes accessed Supabase tables directly via the anonymous key, while the backend used the service-role key without enforcing user-level course authorization checks. Furthermore, an unverified JWT fallback in the Python backend created an authentication vulnerability.
+Allowing browser clients to access database tables directly via anonymous keys bypasses user-level course authorization checks, and unverified JWT fallbacks create severe authentication vulnerabilities.
 
 ## Decision
 We utilize Supabase PostgreSQL and Supabase Auth under a strict server-gateway model:

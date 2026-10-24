@@ -2,7 +2,7 @@
 
 ## 1. Runtime Design & Server Composition
 
-HackOHIO Classroom Companion is designed as a unified, single-process TypeScript application hosted on Node.js 24 LTS. It replaces the split Python (Flask) and Node.js (Next.js) architecture of the sibling prototype with a cohesive, contract-driven modular monolith.
+Spark is designed as a unified, single-process TypeScript application hosted on Node.js 24 LTS. It avoids split Python and Node.js architectures in favor of a cohesive, contract-driven modular monolith.
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -57,7 +57,7 @@ HackOHIO Classroom Companion is designed as a unified, single-process TypeScript
 ### Custom Server Tradeoffs & Justification
 As documented in [ADR 0002](adr/0002-persistent-next-express-socketio.md), the application runs via a custom server (`server/index.ts`).
 - **Official Guidance**: Next.js documents custom server constraints at <https://github.com/vercel/next.js/blob/v16.1.6/docs/01-app/02-guides/custom-server.mdx>, noting that custom servers bypass certain serverless optimizations (such as automatic edge slicing and Vercel-specific serverless routing).
-- **Architectural Rationale**: Classroom Companion requires persistent in-memory WebSocket connections, stateful lecture presence tracking, and long-lived Zoom RTMS socket streams. A persistent single-process server allows Express, Socket.IO, and Next.js to share direct in-memory service instances and event emitters without requiring an external Redis broker for single-node deployments.
+- **Architectural Rationale**: Spark requires persistent in-memory WebSocket connections, stateful lecture presence tracking, and long-lived Zoom RTMS socket streams. A persistent single-process server allows Express, Socket.IO, and Next.js to share direct in-memory service instances and event emitters without requiring an external Redis broker for single-node deployments.
 
 ---
 

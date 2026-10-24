@@ -1,6 +1,6 @@
 # Architecture Decisions Index
 
-This document catalogues all Architecture Decision Records (ADRs) governing the design and implementation of HackOHIO Classroom Companion.
+This document catalogues all Architecture Decision Records (ADRs) governing the design and implementation of Spark.
 
 Per the domain documentation guidelines in `docs/agents/domain.md`, all technical proposals, PRs, and agent tasks MUST comply with accepted ADRs. Proposing changes to an accepted ADR requires opening a formal GitHub issue with justification and submitting a superseding ADR.
 

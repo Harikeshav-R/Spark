@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-The sibling prototype (`../prereq/`) employed a dual-language architecture: a Python Flask backend serving REST endpoints alongside a Node.js/Next.js frontend running an ephemeral Socket.IO server. This separation resulted in:
+Dual-language architectures combining a Python Flask backend serving REST endpoints alongside a Node.js/Next.js frontend running an ephemeral Socket.IO server introduce significant liabilities:
 1. **Model Drift**: Duplicate data types maintained in Python (`dataclasses`/dicts) and TypeScript (`interfaces`), causing serialization mismatches and unverified payload schemas.
 2. **Operational Fragility**: Two separate application processes required coordination, independent deployment pipelines, and separate runtime environments.
 3. **Authentication Disconnect**: The Python backend decoded JWTs with an unverified fallback, while the Node.js frontend accepted client-asserted identity in query parameters.

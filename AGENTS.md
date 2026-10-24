@@ -1,4 +1,4 @@
-# Autonomous Agent Operational Guide: HackOHIO-2026
+# Autonomous Agent Operational Guide: Spark
 
 This document is the authoritative operational manual for autonomous AI coding agents operating in this repository.
 

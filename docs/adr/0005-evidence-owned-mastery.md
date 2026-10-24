@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-In the prototype, student confidence was updated through disparate HTTP endpoints, sometimes allowing arbitrary delta values or direct score overwrites. Attempt counters were inconsistently incremented across polls, attendance, and practice quizzes. Furthermore, the backend defined 5 mastery color tiers (`gray`, `orange`, `yellow`, `lime`, `green`) while the frontend and graph visualizers defined 4 tiers.
+Updating student confidence through disparate HTTP endpoints risks arbitrary delta values or direct score overwrites. Attempt counters can become inconsistently incremented across polls, attendance, and practice quizzes, while conflicting mastery color tiers create confusion across client and server.
 
 ## Decision
 We consolidate all student confidence calculation into a single, evidence-owned domain engine managed by Lane A (`MasteryService`):

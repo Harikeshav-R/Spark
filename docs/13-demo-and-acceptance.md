@@ -156,7 +156,7 @@ Use this step-by-step storyboard for recording a demo video or delivering a pres
 
 #### Scene 1: The Disconnect & Prerequisite Graph (0:00 – 1:00)
 - **Visual**: Start on `/professor/upload`.
-- **Narration**: *"In technical courses like machine learning, students struggle when foundational prerequisites are shaky. Instructors have no real-time visibility into confusion until it's too late. HackOHIO Classroom Companion bridges this gap."*
+- **Narration**: *"In technical courses like machine learning, students struggle when foundational prerequisites are shaky. Instructors have no real-time visibility into confusion until it's too late. Spark bridges this gap."*
 - **Action**:
   1. Upload syllabus PDF (`main_notes.pdf`).
   2. Show the instant extraction preview: 33 concepts, 34 edges, with clear notice that the first 10 pages were processed.

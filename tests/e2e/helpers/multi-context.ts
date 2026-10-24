@@ -28,19 +28,19 @@ export async function createMultiUserHarness(
 ): Promise<MultiUserHarness> {
   const teacherContext = await browser.newContext({
     ...options,
-    userAgent: "HackOHIO-E2E-Teacher",
+    userAgent: "Spark-E2E-Teacher",
   });
   const teacherPage = await teacherContext.newPage();
 
   const hariContext = await browser.newContext({
     ...options,
-    userAgent: "HackOHIO-E2E-Student-Hari",
+    userAgent: "Spark-E2E-Student-Hari",
   });
   const hariPage = await hariContext.newPage();
 
   const rahulContext = await browser.newContext({
     ...options,
-    userAgent: "HackOHIO-E2E-Student-Rahul",
+    userAgent: "Spark-E2E-Student-Rahul",
   });
   const rahulPage = await rahulContext.newPage();
 

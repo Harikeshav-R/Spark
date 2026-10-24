@@ -1,35 +1,35 @@
-# Source Audit & Prototype Discrepancy Resolution
+# Specification Audit & Discrepancy Resolution
 
-This document audits the original prototype implementation in the sibling `prereq` repository, records verified discrepancies between its documentation and actual source code, and details the deliberate corrections implemented in this TypeScript recreation.
+This document audits early system drafts and specifications, records verified discrepancies between initial draft manuals and actual system requirements, and details the deliberate corrections implemented in Spark.
 
 ---
 
 ## 1. Discrepancy Inventory & Resolutions
 
-During the architectural audit of `../prereq/`, several contradictions and security vulnerabilities were identified between the prototype code and its recreation manuals. The table below documents each discrepancy and the authoritative resolution enforced in this repository.
+During the architectural audit of early drafts, several contradictions and security vulnerabilities were identified between legacy draft code and system specifications. The table below documents each discrepancy and the authoritative resolution enforced in this repository.
 
-| # | Topic | Prototype Observation (`../prereq/`) | Documented Claim in Recreation Manuals | Authoritative Target Resolution |
+| # | Topic | Early Draft Observation | Documented Claim in Specifications | Authoritative Target Resolution |
 |---|---|---|---|---|
-| **D01** | **Seed Graph Concept Count** | `scripts/seed_demo.py` lines 146–189 define exactly **33 concept nodes** across 8 categories. | Recreation manuals claimed 35 concepts. | **33 concepts** is canonical. Seed and tests must assert exactly 33 concepts. |
-| **D02** | **Seed Graph Edge Count** | `scripts/seed_demo.py` lines 208–244 define exactly **34 prerequisite edges**. | Recreation manuals claimed 36 edges. | **34 edges** is canonical. All 34 edges verified as a valid acyclic DAG. |
-| **D03** | **Seed Mastery Rows** | 4 demo students (Hari, Rahul, Praj, Vamshi) $\times$ 33 concepts = **132 mastery rows**. | Manuals implied 140 rows ($4 \times 35$). | Exactly **132 mastery rows** must be seeded and verified. |
-| **D04** | **Database Schema Tables** | `scripts/schema.sql` defines **18 distinct tables** (including auth extensions and learning tables). | Recreation manuals inconsistently stated 16 or 22 tables. | Target data model defines **28 application tables** (18 base tables + 3 Spark progression tables + 3 collaboration extension tables + 4 relational tables). |
-| **D05** | **Mastery Color & Band Model** | `api/src/routes/students.py` lines 15–25 defined 5 color tiers (`gray`, `orange`, `yellow`, `lime`, `green`). `frontend/src/lib/colors.ts` and `graph.py` defined 4 tiers. | Manuals mixed 4-tier and 5-tier logic. | Consolidated into a single canonical **4-band semantic model**: `gray` ($c=0$), `red` ($0<c<0.40$), `yellow` ($0.40\le c<0.70$), `green` ($c\ge 0.70$). |
-| **D06** | **JWT Authentication Bypass** | `api/src/middleware/auth.py` contained an unverified fallback that decoded JWT payloads without checking digital signatures if validation failed. | Manuals assumed standard Supabase JWT validation. | **Eliminated completely**. Server validates every bearer token with Supabase `auth.getUser(token)`. Anonymous database access is disabled. |
-| **D07** | **Socket Identity Trust** | `frontend/server/socket.ts` accepted client-supplied `role` and `studentId` query parameters during WebSocket handshakes. | Manuals assumed authenticated sockets. | **Eliminated completely**. Handshakes require a valid Supabase JWT. Server derives user identity and course enrollments strictly from the token. |
-| **D08** | **Peer Matchmaking Integrity** | `study_groups.py` matched random, non-opted-in classmates from the course roster and returned a static personal meeting link. | Manuals described intelligent peer study groups. | **Replaced with honest consensual matching**: ephemeral 5-minute pool, explicit concept selection, complementary score $\ge 0.30$, and real mutual availability overlap. |
-| **D09** | **Peer Chat Impersonation** | Peer chat feature secretly used an LLM to impersonate an offline student when the peer was unavailable. | Manuals did not disclose bot impersonation. | **Eliminated completely**. In-app chat is strictly human-to-human between matched students. No bot simulation or fake responses. |
-| **D10** | **Pedagogical Interventions** | Frontend UI displayed hardcoded static intervention cards regardless of actual poll results. | Manuals described AI-driven lecture interventions. | **Replaced with live AI pipeline**: Anthropic Claude analyzes real aggregate poll evaluations and student response clusters. |
-| **D11** | **PDF Extraction Truncation** | `api/src/services/create_kg.py` line 16 silently extracted only the first 10 pages of any uploaded PDF. | Manuals described full syllabus processing. | **Documented and surfaced**: Ingestion bounds extraction to `min(pageCount, 10)`, but explicitly returns `totalPages`, `processedPages`, and `truncated: true` for teacher UI disclosure. |
-| **D12** | **Graph Importance Formula** | `create_kg.py` lines 135–154 counted `in_degree` (incoming edges) but docstring claimed "how many nodes depend on this". | Comments conflicted with the mathematical formula. | **Formalized as incoming-prerequisite weighting**: Formula is $\text{sigmoid}(\text{round}(\text{in\_degree} / \text{max\_in}, 3) + 1)$. Acknowledged as weighting nodes by the number of their prerequisites. |
+| **D01** | **Seed Graph Concept Count** | Initial seed drafts define exactly **33 concept nodes** across 8 categories. | Specifications occasionally claimed 35 concepts. | **33 concepts** is canonical. Seed and tests must assert exactly 33 concepts. |
+| **D02** | **Seed Graph Edge Count** | Initial seed drafts define exactly **34 prerequisite edges**. | Specifications occasionally claimed 36 edges. | **34 edges** is canonical. All 34 edges verified as a valid acyclic DAG. |
+| **D03** | **Seed Mastery Rows** | 4 demo students (Hari, Rahul, Praj, Vamshi) $\times$ 33 concepts = **132 mastery rows**. | Early notes implied 140 rows ($4 \times 35$). | Exactly **132 mastery rows** must be seeded and verified. |
+| **D04** | **Database Schema Tables** | Initial database drafts defined **18 distinct tables** (including auth extensions and learning tables). | Documentation inconsistently stated 16 or 22 tables. | Target data model defines **28 application tables** (18 base tables + 3 Spark progression tables + 3 collaboration extension tables + 4 relational tables). |
+| **D05** | **Mastery Color & Band Model** | Early code defined 5 color tiers (`gray`, `orange`, `yellow`, `lime`, `green`). Frontend and graph visualizers defined 4 tiers. | Manuals mixed 4-tier and 5-tier logic. | Consolidated into a single canonical **4-band semantic model**: `gray` ($c=0$), `red` ($0<c<0.40$), `yellow` ($0.40\le c<0.70$), `green` ($c\ge 0.70$). |
+| **D06** | **JWT Authentication Bypass** | Legacy auth middleware contained an unverified fallback that decoded JWT payloads without checking digital signatures if validation failed. | Specifications assumed standard Supabase JWT validation. | **Eliminated completely**. Server validates every bearer token with Supabase `auth.getUser(token)`. Anonymous database access is disabled. |
+| **D07** | **Socket Identity Trust** | Early socket handlers accepted client-supplied `role` and `studentId` query parameters during WebSocket handshakes. | Specifications assumed authenticated sockets. | **Eliminated completely**. Handshakes require a valid Supabase JWT. Server derives user identity and course enrollments strictly from the token. |
+| **D08** | **Peer Matchmaking Integrity** | Early draft matching picked random, non-opted-in classmates from the course roster and returned a static personal meeting link. | Specifications described intelligent peer study groups. | **Replaced with honest consensual matching**: ephemeral 5-minute pool, explicit concept selection, complementary score $\ge 0.30$, and real mutual availability overlap. |
+| **D09** | **Peer Chat Impersonation** | Early draft chat feature simulated offline peers using an LLM when the peer was unavailable. | Specifications did not disclose bot impersonation. | **Eliminated completely**. In-app chat is strictly human-to-human between matched students. No bot simulation or fake responses. |
+| **D10** | **Pedagogical Interventions** | Early UI displayed hardcoded static intervention cards regardless of actual poll results. | Specifications described AI-driven lecture interventions. | **Replaced with live AI pipeline**: Anthropic Claude analyzes real aggregate poll evaluations and student response clusters. |
+| **D11** | **PDF Extraction Truncation** | Early syllabus service silently extracted only the first 10 pages of any uploaded PDF. | Specifications described full syllabus processing. | **Documented and surfaced**: Ingestion bounds extraction to `min(pageCount, 10)`, but explicitly returns `totalPages`, `processedPages`, and `truncated: true` for teacher UI disclosure. |
+| **D12** | **Graph Importance Formula** | Early implementation counted `in_degree` (incoming edges) but comments claimed "how many nodes depend on this". | Comments conflicted with the mathematical formula. | **Formalized as incoming-prerequisite weighting**: Formula is $\text{sigmoid}(\text{round}(\text{in\_degree} / \text{max\_in}, 3) + 1)$. Acknowledged as weighting nodes by the number of their prerequisites. |
 
 ---
 
 ## 2. Feature Coverage & Traceability Matrix
 
-Every feature from the prototype and every recreation manual maps directly to target documentation, an owning engineering lane, a planned build task, and an acceptance journey:
+Every core feature and requirement maps directly to target documentation, an owning engineering lane, a planned build task, and an acceptance journey:
 
-| Prototype Module / Recreation Area | Target Document | Lane | Build Task ID | Acceptance ID | Target Implementation Notes |
+| Feature Area | Target Document | Lane | Build Task ID | Acceptance ID | Target Implementation Notes |
 |---|---|---|---|---|---|
 | **Course Creation & Join Codes** | `docs/05-data-model.md`, `docs/06-http-api.md` | Lane A | `P1-A-02` | `J01` | Unique 8-character uppercase join code; idempotent enrollment. |
 | **PDF Syllabus Ingestion** | `docs/08-ai-pipelines.md`, `docs/06-http-api.md` | Lane C | `P2-C-01` | `J01` | TypeScript `pdf-lib` extracts up to 10 pages; Anthropic document API. |
@@ -69,16 +69,16 @@ Every feature from the prototype and every recreation manual maps directly to ta
 ## 3. Reference Cleanup & Sanitization
 
 To ensure that this repository is completely self-contained and secure, the following sanitization policies are enforced:
-- **No Shared Credentials**: All hardcoded passwords, JWT secrets, and test user tokens from the prototype have been purged. Testing uses synthetic email addresses (`@example.test`) and locally supplied environment secrets.
-- **No Personal Meeting URLs**: All static personal meeting room links used in prototype mockups have been removed. Meeting generation must connect to genuine Zoom API endpoints or remain explicitly marked as unavailable.
-- **No Claims of Measured Latency**: Historical claims regarding prototype response times (e.g., "1.2 second average poll grading") are classified as historical observations, not engineering SLAs. Target SLAs are defined as strict bounding timeouts in [docs/08-ai-pipelines.md](08-ai-pipelines.md).
+- **No Shared Credentials**: All hardcoded passwords, JWT secrets, and test user tokens from early test spikes have been purged. Testing uses synthetic email addresses (`@example.test`) and locally supplied environment secrets.
+- **No Personal Meeting URLs**: All static personal meeting room links used in early mockups have been removed. Meeting generation must connect to genuine Zoom API endpoints or remain explicitly marked as unavailable.
+- **No Claims of Measured Latency**: Historical claims regarding early benchmark response times (e.g., "1.2 second average poll grading") are classified as historical observations, not engineering SLAs. Target SLAs are defined as strict bounding timeouts in [docs/08-ai-pipelines.md](08-ai-pipelines.md).
 
 ---
 
 ## 4. Spark Proposal Provenance & Architectural Boundary Record
 
 ### 4.1 Provenance Baseline
-On October 21, 2026, commit `7cce61cfa6c699148dfc30512f84c215642d8c7b` introduced `SPARK_DESIGN.md` and `SPARK_TECHNICAL.md` to explore gamified engagement mechanics for the HackOHIO platform.
+On October 21, 2026, commit `7cce61cfa6c699148dfc30512f84c215642d8c7b` introduced `SPARK_DESIGN.md` and `SPARK_TECHNICAL.md` to explore gamified engagement mechanics for the Spark platform.
 
 ### 4.2 Audit of Accepted vs Rejected Proposals
 The following table records the authoritative architectural decisions governing each proposed element:
@@ -101,5 +101,5 @@ The following table records the authoritative architectural decisions governing 
 ### 4.3 Self-Sufficiency & Deletion Safety Guarantee
 With the completion of this integration, the canonical documentation suite (`docs/` and root files) is **100% self-contained**:
 1. No canonical manual, specification, or test plan relies on `SPARK_DESIGN.md` or `SPARK_TECHNICAL.md`.
-2. No canonical document requires access to `spark.html` or external prototype assets.
+2. No canonical document requires access to external draft assets.
 3. The user may delete `SPARK_DESIGN.md` and `SPARK_TECHNICAL.md` at any time without creating dangling links, missing requirements, or specification ambiguities.

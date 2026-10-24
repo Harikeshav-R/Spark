@@ -1,8 +1,8 @@
-# Product Specification: HackOHIO Classroom Companion
+# Product Specification: Spark
 
 ## 1. Product Vision & Personas
 
-HackOHIO Classroom Companion is an educational intelligence system designed to eliminate the passive disconnect between live classroom instruction, individual student mastery, and peer study. The platform transforms course syllabi into living prerequisite knowledge graphs, streams live lecture transcripts to detect concepts on the fly, executes AI-driven formative evaluations, and arranges targeted, consensual peer study sessions.
+Spark is an educational intelligence system designed to eliminate the passive disconnect between live classroom instruction, individual student mastery, and peer study. The platform transforms course syllabi into living prerequisite knowledge graphs, streams live lecture transcripts to detect concepts on the fly, executes AI-driven formative evaluations, and arranges targeted, consensual peer study sessions.
 
 ### Primary Personas
 

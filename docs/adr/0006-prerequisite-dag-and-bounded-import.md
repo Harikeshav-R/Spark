@@ -4,10 +4,10 @@
 Accepted
 
 ## Context
-The prototype extracted prerequisite knowledge graphs from PDF documents. However:
-1. `create_kg.py` silently extracted only the first 10 pages without notifying the user.
-2. The graph prompt requested 30–40 concepts, but the backend performed no server-side validation against cycles, self-edges, or missing endpoints.
-3. Code comments claimed that node importance represented "how many nodes depend on this node," but the actual mathematical formula counted incoming edges (`in_degree`), effectively measuring how many prerequisites a node requires.
+Automated extraction of prerequisite knowledge graphs from PDF documents presents key reliability and integrity challenges:
+1. Syllabus extraction without clear pagination bounds can silently truncate pages without notifying the user.
+2. LLM graph generation requires server-side validation against cycles, self-edges, and missing endpoints to ensure topological consistency.
+3. Node importance calculations must be unambiguously formalized to reflect incoming-prerequisite depth.
 
 ## Decision
 We enforce formal graph and ingestion constraints:

@@ -14,7 +14,7 @@ If you discover a security vulnerability within this repository, please do not f
 
 Please report vulnerabilities privately by contacting the project lead:
 - **Email**: `r.harikeshav@gmail.com`
-- **Subject**: `[SECURITY VULNERABILITY] HackOHIO-2026`
+- **Subject**: `[SECURITY VULNERABILITY] Spark`
 
 Please include:
 1. Description of the vulnerability and its potential impact.

@@ -38,7 +38,7 @@ export async function startServer(port = Number(process.env.PORT) || 3000): Prom
   const { promise, resolve } = Promise.withResolvers<ServerInstance>();
 
   instance.httpServer.listen(port, () => {
-    console.log(`[server] Classroom Companion composition root running on http://localhost:${port}`);
+    console.log(`[server] Spark composition root running on http://localhost:${port}`);
     resolve(instance);
   });
 
