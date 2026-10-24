@@ -83,11 +83,10 @@ All skills live in `.agents/skills/` and are accessible to any compatible AI ass
 | `context7` | stdio | `npx -y @upstash/context7-mcp` | Up-to-date documentation for React, Next.js, Supabase, Express, Tailwind | None |
 | `shadcn` | stdio | `npx -y shadcn@latest mcp` | Search Shadcn UI component registry and examples | None |
 | `motion` | HTTP | `https://mcp.motion.dev` | Motion animation documentation and patterns | None |
+| `supabase` | HTTP | `http://127.0.0.1:54321/mcp` | Local / self-hosted Supabase schema and data management | None (Local Supabase running) |
 | `chrome-devtools`| stdio | `npx -y chrome-devtools-mcp@latest` | Browser console, network, a11y snapshots, screenshots | None |
 | `playwright` | stdio | `npx -y @playwright/mcp@latest --isolated` | Isolated browser automation and E2E testing | None |
 | `fetch` | stdio | `uvx mcp-server-fetch` | Fast web page fetch and markdown extraction | Python / `uv` |
-| `github` | HTTP | `https://api.githubcopilot.com/mcp/` | GitHub PRs, issues, code search | `GITHUB_TOKEN` |
-| `postgres` | stdio (Docker) | `crystaldba/postgres-mcp` | Direct PostgreSQL schema & data queries | `DATABASE_URI` + Docker |
 | `codebase-memory-mcp` | stdio | `codebase-memory-mcp` | Structural knowledge graph search | Local binary in PATH |
 | `agentation` | stdio | `npx -y agentation-mcp@latest server` | Browser design annotations server | None (Node.js / npx) |
 
@@ -212,17 +211,9 @@ If `codebase-memory-mcp` or `agentation-mcp` fails with `command not found` or `
 
 ## 7. Teammate Setup Guide by Client
 
-### Environment Variables
-Export the following in your shell (`~/.zshrc`, `~/.bashrc`, or `.env.local`):
-```bash
-# Required for GitHub MCP server:
-export GITHUB_TOKEN="ghp_yourPersonalAccessTokenHere"
-
-# Optional: Required if using Postgres MCP with local Supabase:
-export DATABASE_URI="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
-```
-
 ### Setup by Client
+> **Windows Environment:** On Windows, run all commands and coding agents inside **WSL (Windows Subsystem for Linux)**.
+
 
 #### 1. Claude Code
 Claude Code automatically discovers skills in `.claude/skills` (symlinked to `.agents/skills`) and MCP servers in `.claude/mcp.json`.

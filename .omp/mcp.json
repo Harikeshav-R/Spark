@@ -20,6 +20,10 @@
       "type": "http",
       "url": "https://mcp.motion.dev"
     },
+    "supabase": {
+      "type": "http",
+      "url": "http://127.0.0.1:54321/mcp"
+    },
     "chrome-devtools": {
       "command": "npx",
       "args": [
@@ -41,25 +45,6 @@
       "command": "uvx",
       "args": [
         "mcp-server-fetch"
-      ]
-    },
-    "github": {
-      "url": "https://api.githubcopilot.com/mcp/",
-      "headers": {
-        "Authorization": "Bearer ${GITHUB_TOKEN}"
-      }
-    },
-    "postgres": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "--add-host=host.docker.internal:host-gateway",
-        "-e",
-        "DATABASE_URI",
-        "crystaldba/postgres-mcp",
-        "--access-mode=unrestricted"
       ]
     },
     "codebase-memory-mcp": {

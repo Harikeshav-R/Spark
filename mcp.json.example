@@ -22,6 +22,11 @@
       "url": "https://mcp.motion.dev",
       "_description": "Motion animation examples, patterns, and documentation"
     },
+    "supabase": {
+      "type": "http",
+      "url": "http://127.0.0.1:54321/mcp",
+      "_description": "Local/self-hosted Supabase MCP endpoint (default http://127.0.0.1:54321/mcp from local supabase start or custom self-hosted gateway)"
+    },
     "chrome-devtools": {
       "command": "npx",
       "args": [
@@ -47,27 +52,6 @@
         "mcp-server-fetch"
       ],
       "_description": "Web fetch and markdown extraction"
-    },
-    "github": {
-      "url": "https://api.githubcopilot.com/mcp/",
-      "headers": {
-        "Authorization": "Bearer ${GITHUB_TOKEN}"
-      },
-      "_description": "GitHub Copilot API / PR / Issues MCP (Set GITHUB_TOKEN in your environment)"
-    },
-    "postgres": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "--add-host=host.docker.internal:host-gateway",
-        "-e",
-        "DATABASE_URI",
-        "crystaldba/postgres-mcp",
-        "--access-mode=unrestricted"
-      ],
-      "_description": "PostgreSQL schema inspection (requires Docker and DATABASE_URI)"
     },
     "codebase-memory-mcp": {
       "command": "codebase-memory-mcp",
