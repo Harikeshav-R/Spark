@@ -48,27 +48,6 @@
       ],
       "_description": "Web fetch and markdown extraction"
     },
-    "github": {
-      "url": "https://api.githubcopilot.com/mcp/",
-      "headers": {
-        "Authorization": "Bearer ${GITHUB_TOKEN}"
-      },
-      "_description": "GitHub Copilot API / PR / Issues MCP (Set GITHUB_TOKEN in your environment)"
-    },
-    "postgres": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "--add-host=host.docker.internal:host-gateway",
-        "-e",
-        "DATABASE_URI",
-        "crystaldba/postgres-mcp",
-        "--access-mode=unrestricted"
-      ],
-      "_description": "PostgreSQL schema inspection (requires Docker and DATABASE_URI)"
-    },
     "codebase-memory-mcp": {
       "command": "codebase-memory-mcp",
       "args": [],

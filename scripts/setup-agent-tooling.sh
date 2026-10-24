@@ -19,7 +19,7 @@ mkdir -p "${HOME}/.local/bin"
 export PATH="${HOME}/.local/bin:${PATH}"
 
 # 2. Verify and repair symlinks for agent harnesses
-echo -e "\n${BOLD}[1/5] Verifying Skill Directory Symlinks...${RESET}"
+echo -e "\n${BOLD}[1/4] Verifying Skill Directory Symlinks...${RESET}"
 mkdir -p .agents/skills .claude .omp
 
 if [ ! -d ".agents/skills" ]; then
@@ -39,7 +39,7 @@ for client in ".claude" ".omp"; do
 done
 
 # 3. Check and install codebase-memory-mcp
-echo -e "\n${BOLD}[2/5] Verifying codebase-memory-mcp...${RESET}"
+echo -e "\n${BOLD}[2/4] Verifying codebase-memory-mcp...${RESET}"
 if command -v codebase-memory-mcp >/dev/null 2>&1; then
     echo -e "${GREEN}✓ codebase-memory-mcp binary found:${RESET} $(command -v codebase-memory-mcp) ($(codebase-memory-mcp --version 2>/dev/null || echo 'installed'))"
 else
@@ -55,7 +55,7 @@ else
 fi
 
 # 4. Check uv/uvx for fetch MCP
-echo -e "\n${BOLD}[3/5] Verifying uv / uvx (for fetch MCP)...${RESET}"
+echo -e "\n${BOLD}[3/4] Verifying uv / uvx (for fetch MCP)...${RESET}"
 if command -v uvx >/dev/null 2>&1; then
     echo -e "${GREEN}✓ uvx found:${RESET} $(command -v uvx)"
 else
@@ -70,28 +70,14 @@ else
 fi
 
 # 5. Check Node & npx (for context7, shadcn, chrome-devtools, playwright, agentation)
-echo -e "\n${BOLD}[4/5] Verifying Node.js & npx...${RESET}"
+echo -e "\n${BOLD}[4/4] Verifying Node.js & npx...${RESET}"
 if command -v npx >/dev/null 2>&1; then
     echo -e "${GREEN}✓ npx found:${RESET} $(npx --version)"
 else
     echo -e "${RED}✗ npx not found in PATH. Node.js is required for Spark.${RESET}"
 fi
 
-# 6. Check optional environment credentials
-echo -e "\n${BOLD}[5/5] Checking Environment Credentials...${RESET}"
-if [ -n "${GITHUB_TOKEN:-}" ]; then
-    echo -e "${GREEN}✓ GITHUB_TOKEN is set${RESET}"
-else
-    echo -e "${YELLOW}! GITHUB_TOKEN is unset. The 'github' MCP server requires a token in ~/.zshrc or ~/.bashrc.${RESET}"
-fi
-
-if [ -n "${DATABASE_URI:-}" ]; then
-    echo -e "${GREEN}✓ DATABASE_URI is set${RESET}"
-else
-    echo -e "${YELLOW}! DATABASE_URI is unset. (Only required if querying PostgreSQL directly via postgres MCP).${RESET}"
-fi
-
-# 7. Validate project MCP and skill configs
+# 6. Validate project MCP and skill configs
 echo -e "\n${BOLD}[Verification] Checking Project MCP and Skills Configs...${RESET}"
 node -e '
 const fs = require("fs");
