@@ -18,6 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    env:
+      CI: true
+      INTEGRATION_MODE: fixture
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
