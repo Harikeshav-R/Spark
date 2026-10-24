@@ -2,7 +2,7 @@
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
-> **Status Notice**: Phase 0 is complete. Phase 1 active engineering is in progress with foundational platform auth, course management, enrollment mastery initialization, lecture lifecycle, ephemeral study pool, App Router shells, and warm theme tokens merged into `main` (P1-A-01, P1-A-02, P1-A-03, P1-B-01, P1-B-02, P1-D-01, P1-D-02). Atomic mastery engine (P1-A-04) is implemented and merged in PR #26 on a feature branch awaiting integration into `main`. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
+> **Status Notice**: Phase 0 is complete. Phase 1 active engineering is in progress with foundational platform auth, course management, enrollment mastery initialization, atomic mastery engine, lecture lifecycle, ephemeral study pool, App Router shells, and warm theme tokens merged into `main` (P1-A-01, P1-A-02, P1-A-03, P1-A-04, P1-B-01, P1-B-02, P1-D-01, P1-D-02). In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
 
 ---
 
@@ -22,7 +22,7 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [x] P1-A-01 — Supabase JWT Token Verification & ActorContext Middleware
 - [x] P1-A-02 — Course Service & Join Code Generator
 - [x] P1-A-03 — Enrollment & Mastery Initialization Service
-- [ ] P1-A-04 — Atomic Mastery Engine & PostgreSQL RPC (PR #26 merged to feature branch; pending merge to main)
+- [x] P1-A-04 — Atomic Mastery Engine & PostgreSQL RPC
 - [x] P1-B-01 — Lecture Session Lifecycle & State Machine
 - [x] P1-B-02 — Ephemeral Study Group Pool Repository
 - [ ] P1-C-01 — OpenRouter Typed Client Adapter (Anthropic & Perplexity Models)
