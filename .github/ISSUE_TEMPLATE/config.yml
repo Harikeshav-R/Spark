@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Architecture & Invariants Documentation
+    url: https://github.com/Harikeshav-R/HackOHIO-2026/tree/main/docs
+    about: Read system architecture, invariants, and build plan before creating issues.
+  - name: Operational Agent Guide
+    url: https://github.com/Harikeshav-R/HackOHIO-2026/blob/main/AGENTS.md
+    about: Review hard architectural gates and Definition of Done.

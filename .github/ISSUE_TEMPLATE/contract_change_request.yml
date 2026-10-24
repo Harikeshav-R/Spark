@@ -1,0 +1,47 @@
+name: Contract Change Request
+description: Propose a change to shared Zod schemas, service ports, or event interfaces
+title: "[Contract Change]: <Interface or schema name>"
+labels: ["contract-change", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Cross-Lane Contract Change Protocol
+        Per `OWNERSHIP.md` Section 4, modifying any contract under `src/contracts/` requires consensus across all producer and consumer lanes, updating fixtures in `docs/contracts/examples.md`, and coordinating an atomic PR cutover.
+
+  - type: dropdown
+    id: proposing_lane
+    attributes:
+      label: Proposing Lane
+      options:
+        - "Lane A: Platform & Core"
+        - "Lane B: Classroom & Collaboration"
+        - "Lane C: AI & Autonomous Learning"
+        - "Lane D: Core Experience & UI"
+    validations:
+      required: true
+
+  - type: textarea
+    id: affected_contracts
+    attributes:
+      label: Affected Contract Files & Interfaces
+      description: Specific files in `src/contracts/` (e.g. `src/contracts/classroom.ts`, `src/contracts/mastery.ts`).
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_changes
+    attributes:
+      label: Proposed TypeScript / Zod Changes
+      description: Exact interface or Zod schema changes proposed.
+      render: typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: consumer_lanes
+    attributes:
+      label: Consumer Lanes & Impact Analysis
+      description: Which lanes consume this contract and how will breaking changes be mitigated?
+    validations:
+      required: true
