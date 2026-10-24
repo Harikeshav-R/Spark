@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Production build outputs
+dist/
+.next/
+out/
+
+# Environment & secrets
+.env
+.env*.local
+*.pem
+
+# Local tooling & editor state
+.omp/
+.DS_Store
+*.log
+coverage/
+recordings/
