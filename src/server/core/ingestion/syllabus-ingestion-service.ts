@@ -23,7 +23,7 @@ const cacheEnvelopeSchema = z.object({
 
 export class SyllabusIngestionService {
   constructor(
-    private readonly client: Pick<SupabaseClient, "from">,
+    private readonly client: SupabaseClient | Pick<SupabaseClient, "from">,
     private readonly courses: Pick<CourseService, "getCourse">,
     private readonly ai: SyllabusGraphExtractor,
   ) {}
