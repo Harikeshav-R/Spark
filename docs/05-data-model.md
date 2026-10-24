@@ -500,59 +500,63 @@ CREATE INDEX idx_xp_events_student ON xp_events(student_id);
 
 The database exposes privileged PostgreSQL functions callable exclusively by the backend service-role:
 
-### 3.1 `apply_mastery_evidence`
-Atomically records evidence and updates confidence and version in `student_mastery`:
+### 3.1 `enroll_student` and `initialize_student_mastery`
+Atomically creates or resolves a course enrollment by join code and initializes default mastery records for all course concepts:
 ```sql
-CREATE OR REPLACE FUNCTION apply_mastery_evidence(
+CREATE OR REPLACE FUNCTION initialize_student_mastery(
     p_student_id UUID,
-    p_concept_id UUID,
-    p_evidence_type VARCHAR(20),
-    p_source_id UUID,
-    p_new_confidence FLOAT,
-    p_increment_attempt BOOLEAN
+    p_course_id UUID
 )
-RETURNS TABLE (new_confidence FLOAT, new_attempts INT, new_version INT)
+RETURNS INTEGER
 LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-    v_old_conf FLOAT := 0.0;
-    v_old_attempts INT := 0;
-    v_old_version INT := 1;
-BEGIN
-    -- Select with row lock
-    SELECT confidence, attempts, version 
-    INTO v_old_conf, v_old_attempts, v_old_version
-    FROM student_mastery
-    WHERE student_id = p_student_id AND concept_id = p_concept_id
-    FOR UPDATE;
+SECURITY INVOKER
+SET search_path = '';
 
-    IF NOT FOUND THEN
-        RAISE EXCEPTION 'Mastery record not found for student % and concept %', p_student_id, p_concept_id;
-    END IF;
-
-    -- Record immutable evidence
-    INSERT INTO mastery_evidence (
-        student_id, concept_id, evidence_type, source_id, prior_confidence, new_confidence
-    ) VALUES (
-        p_student_id, p_concept_id, p_evidence_type, p_source_id, v_old_conf, p_new_confidence
-    );
-
-    -- Update mastery state
-    UPDATE student_mastery
-    SET confidence = p_new_confidence,
-        attempts = v_old_attempts + (CASE WHEN p_increment_attempt THEN 1 ELSE 0 END),
-        version = v_old_version + 1,
-        last_updated = NOW()
-    WHERE student_id = p_student_id AND concept_id = p_concept_id
-    RETURNING confidence, attempts, version INTO new_confidence, new_attempts, new_version;
-
-    RETURN NEXT;
-END;
-$$;
+CREATE OR REPLACE FUNCTION enroll_student(
+    p_auth_id UUID,
+    p_join_code TEXT,
+    p_name TEXT,
+    p_email TEXT
+)
+RETURNS SETOF public.students
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = '';
 ```
 
-### 3.2 `claim_and_create_match`
+### 3.2 `apply_mastery_evidence`
+Atomically records evidence and computes confidence and version updates under a row lock in `student_mastery`:
+```sql
+CREATE OR REPLACE FUNCTION apply_mastery_evidence(
+    p_actor_auth_id UUID,
+    p_student_id UUID,
+    p_concept_id UUID,
+    p_evidence JSONB
+)
+RETURNS TABLE (
+    new_confidence DOUBLE PRECISION,
+    new_attempts INTEGER,
+    new_version INTEGER
+)
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = '';
+```
+
+### 3.3 `get_student_mastery`
+Authorized read RPC returning all mastery records for a student ordered by concept ID:
+```sql
+CREATE OR REPLACE FUNCTION get_student_mastery(
+    p_actor_auth_id UUID,
+    p_student_id UUID
+)
+RETURNS SETOF public.student_mastery
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = '';
+```
+
+### 3.4 `claim_and_create_match`
 Atomically claims two waiting pool entries and creates a canonically ordered match:
 ```sql
 CREATE OR REPLACE FUNCTION claim_and_create_match(

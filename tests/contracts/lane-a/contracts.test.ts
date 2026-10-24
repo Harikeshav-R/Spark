@@ -256,6 +256,10 @@ describe("Lane A: Shared Contracts & Zod Domain Schemas (P0-A-03)", () => {
     });
 
     it("enforces INV-M02: confidenceToBand deterministic mapping", () => {
+      const inputs = [0, 0.3999, 0.4, 0.6999, 0.7, 1];
+      const expected = ["gray", "red", "yellow", "yellow", "green", "green"];
+      expect(inputs.map(confidenceToBand)).toEqual(expected);
+
       expect(confidenceToBand(0.0)).toBe("gray");
       expect(confidenceToBand(0.01)).toBe("red");
       expect(confidenceToBand(0.399)).toBe("red");
@@ -263,6 +267,12 @@ describe("Lane A: Shared Contracts & Zod Domain Schemas (P0-A-03)", () => {
       expect(confidenceToBand(0.699)).toBe("yellow");
       expect(confidenceToBand(0.70)).toBe("green");
       expect(confidenceToBand(1.0)).toBe("green");
+
+      expect(() => confidenceToBand(-0.01)).toThrow();
+      expect(() => confidenceToBand(1.01)).toThrow();
+      expect(() => confidenceToBand(NaN)).toThrow();
+      expect(() => confidenceToBand(Infinity)).toThrow();
+      expect(() => confidenceToBand(-Infinity)).toThrow();
     });
 
     it("validates StudentMastery schema", () => {
@@ -422,6 +432,37 @@ describe("Lane A: Shared Contracts & Zod Domain Schemas (P0-A-03)", () => {
           confidence: 0.50,
           band: "yellow",
         });
+      });
+
+      it("rejects invalid current confidence or invalid evidence with ZodError", () => {
+        const validPoll = {
+          type: "poll" as const,
+          outcome: "correct" as const,
+          sourceId: "11111111-1111-4111-8111-111111111111",
+        };
+        expect(() => applyMasteryEvidence(-0.01, validPoll)).toThrow();
+        expect(() => applyMasteryEvidence(1.01, validPoll)).toThrow();
+        expect(() => applyMasteryEvidence(NaN, validPoll)).toThrow();
+        expect(() =>
+          applyMasteryEvidence(0.5, {
+            type: "quiz",
+            score: -0.1,
+            sourceId: "11111111-1111-4111-8111-111111111111",
+          }),
+        ).toThrow();
+        expect(() =>
+          applyMasteryEvidence(0.5, {
+            type: "quiz",
+            score: 1.1,
+            sourceId: "11111111-1111-4111-8111-111111111111",
+          }),
+        ).toThrow();
+        expect(() =>
+          applyMasteryEvidence(0.5, {
+            type: "invalid" as unknown as "poll",
+            sourceId: "11111111-1111-4111-8111-111111111111",
+          } as unknown as Parameters<typeof applyMasteryEvidence>[1]),
+        ).toThrow();
       });
     });
   });
