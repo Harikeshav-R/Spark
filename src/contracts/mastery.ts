@@ -69,9 +69,10 @@ export const confidenceSchema = z
   });
 
 export function confidenceToBand(c: number): MasteryBand {
-  if (c === 0.0) return "gray";
-  if (c < 0.4) return "red";
-  if (c < 0.7) return "yellow";
+  const validC = confidenceSchema.parse(c);
+  if (validC === 0.0) return "gray";
+  if (validC < 0.4) return "red";
+  if (validC < 0.7) return "yellow";
   return "green";
 }
 
@@ -79,39 +80,41 @@ export function applyMasteryEvidence(
   current: number,
   evidence: MasteryEvidence
 ): { confidence: number; band: MasteryBand } {
+  const validCurrent = confidenceSchema.parse(current);
+  const validEvidence = masteryEvidenceSchema.parse(evidence);
   let newConfidence: number;
 
-  switch (evidence.type) {
+  switch (validEvidence.type) {
     case "poll": {
-      if (evidence.outcome === "correct") {
-        newConfidence = Math.max(current, 0.85);
-      } else if (evidence.outcome === "partial") {
-        newConfidence = Math.max(current, 0.5);
+      if (validEvidence.outcome === "correct") {
+        newConfidence = Math.max(validCurrent, 0.85);
+      } else if (validEvidence.outcome === "partial") {
+        newConfidence = Math.max(validCurrent, 0.5);
       } else {
-        newConfidence = current === 0.0 ? 0.2 : Math.min(current, 0.2);
+        newConfidence = validCurrent === 0.0 ? 0.2 : Math.min(validCurrent, 0.2);
       }
       break;
     }
     case "tutor": {
-      newConfidence = Math.min(current + 0.2, 1.0);
+      newConfidence = Math.min(validCurrent + 0.2, 1.0);
       break;
     }
     case "quiz": {
       let delta: number;
-      if (evidence.score >= 0.8) {
+      if (validEvidence.score >= 0.8) {
         delta = 0.15;
-      } else if (evidence.score >= 0.6) {
+      } else if (validEvidence.score >= 0.6) {
         delta = 0.1;
-      } else if (evidence.score >= 0.4) {
+      } else if (validEvidence.score >= 0.4) {
         delta = 0.05;
       } else {
         delta = 0.02;
       }
-      newConfidence = Math.min(current + delta, 1.0);
+      newConfidence = Math.min(validCurrent + delta, 1.0);
       break;
     }
     case "attendance": {
-      newConfidence = current < 0.3 ? Math.min(current + 0.05, 0.3) : current;
+      newConfidence = validCurrent < 0.3 ? Math.min(validCurrent + 0.05, 0.3) : validCurrent;
       break;
     }
   }
