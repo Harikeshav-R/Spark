@@ -27,7 +27,9 @@ export class MasteryService
 
   private checkActorAuthorization(actor: ActorContext, studentId: UUID): void {
     if (actor.role === "student") {
-      const isEnrolled = actor.enrolledCourses.some((e) => e.studentId === studentId);
+      const isEnrolled =
+        Array.isArray(actor.enrolledCourses) &&
+        actor.enrolledCourses.some((e) => e.studentId === studentId);
       if (!isEnrolled) {
         throw new AppError({
           code: "FORBIDDEN",
@@ -110,7 +112,7 @@ export class MasteryService
 
     this.checkActorAuthorization(actor, studentId);
 
-    return this.repository.applyEvidence(actor, studentId, conceptId, evidence);
+    return this.repository.applyEvidence(actor, studentId, conceptId, evidenceParsed.data);
   }
 
   async initializeStudentMastery(studentId: UUID, courseId: UUID): Promise<number> {
