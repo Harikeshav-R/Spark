@@ -33,7 +33,7 @@ Level 4: Execution & Historical Record
   ├── OWNERSHIP.md                (Lane assignments, path ownership, steward rules)
   ├── CHECKLIST.md                (Master task completion matrix)
   ├── docs/04-build-plan.md       (Step-by-step task instructions and checkpoints)
-  └── docs/14-source-audit.md     (Prototype discrepancy resolution and provenance)
+  └── docs/14-source-audit.md     (Specification audit and discrepancy resolution)
 ```
 
 *Rule: If an implementation task or UI component proposes an API signature that conflicts with `docs/contracts/service-ports.md` or a formula that conflicts with `docs/03-invariants.md`, Level 1 authority prevails. Changing Level 1 documents requires an issue proposal and cross-lane review.*
@@ -58,7 +58,7 @@ Level 4: Execution & Historical Record
 | [11-testing.md](11-testing.md) | Testing Strategy & Assurance | Unit, contract, integration, and Playwright E2E suites; offline fixture policies. |
 | [12-operations.md](12-operations.md) | Operations & Deployment | Local developer setup, Docker Supabase, migrations, persistent host configuration (Render). |
 | [13-demo-and-acceptance.md](13-demo-and-acceptance.md) | Seed Data & Acceptance Protocols | Canonical 33-concept / 34-edge seed graph, 4 student profiles, acceptance test runbooks J01–J11. |
-| [14-source-audit.md](14-source-audit.md) | Reference Audit & Discrepancies | Analysis of sibling prototype, resolved inconsistencies, and deliberate engineering corrections. |
+| [14-source-audit.md](14-source-audit.md) | Reference Audit & Discrepancies | Analysis of early specifications, resolved inconsistencies, and deliberate engineering corrections. |
 | [contracts/service-ports.md](contracts/service-ports.md) | Canonical Service Ports | TypeScript interfaces for all domain services, repositories, and third-party adapters. |
 | [contracts/examples.md](contracts/examples.md) | Shared JSON Fixtures | Concrete JSON examples for all request, response, and event payloads referenced by manuals. |
 

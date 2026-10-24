@@ -9,7 +9,7 @@ A TypeScript-only, real-time classroom intelligence, gamified learning, and peer
 
 ## 1. Product Summary
 
-Spark is an independent, production-grade TypeScript recreation and enhancement of the sibling `prereq` prototype. It replaces a split Flask/Next.js prototype with a single unified Node.js runtime, honest third-party integrations, and rigorous invariant enforcement.
+Spark is an independent, production-grade TypeScript platform. It eliminates split-runtime architectures with a single unified Node.js runtime, honest third-party integrations, and rigorous invariant enforcement.
 
 ### Core Capabilities
 
@@ -33,7 +33,7 @@ Depending on your role and immediate objective, consult the following documentat
 2. [docs/02-architecture.md](docs/02-architecture.md) — Unified TypeScript runtime, server composition, and state boundaries.
 3. [docs/01-decisions.md](docs/01-decisions.md) & [docs/adr/](docs/adr/) — Accepted Architecture Decision Records (ADR 0001–0012).
 4. [docs/03-invariants.md](docs/03-invariants.md) — Mathematical formulas, state machine invariants, and failure counterexamples.
-5. [docs/14-source-audit.md](docs/14-source-audit.md) — Audit of the sibling prototype, discrepancies resolved, and deliberate corrections.
+5. [docs/14-source-audit.md](docs/14-source-audit.md) — Architectural audit, specification discrepancies resolved, and deliberate corrections.
 
 ### For Implementers & Subagents
 1. [AGENTS.md](AGENTS.md) — Operational instructions, workflow gates, escalation policies, and definitions of done.
@@ -99,7 +99,7 @@ For Phase 1 and subsequent implementation phases, the project requires the follo
 │   ├── 11-testing.md          # Testing strategy, fixture policies, regression suites
 │   ├── 12-operations.md       # Bootstrapping, configuration, migrations, host deployment
 │   ├── 13-demo-and-acceptance.md # Seed data specification and journey acceptance tests
-│   ├── 14-source-audit.md     # Provenance audit and discrepancy resolution record
+│   ├── 14-source-audit.md     # Architectural audit and discrepancy resolution record
 │   ├── adr/                   # Accepted Architecture Decision Records (0001–0012)
 │   ├── agents/                # Repo issue tracker and triage documentation
 │   └── contracts/             # Shared TypeScript service ports and JSON fixtures

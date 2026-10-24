@@ -4,7 +4,7 @@
 
 Spark is an AI-augmented educational platform that connects classroom instruction with student mastery and peer collaboration. It bridges the gap between passive lecture listening and active concept retention through automated syllabus structuring, live lecture comprehension monitoring, targeted formative assessments, and intelligent peer matchmaking.
 
-The project is an honest, production-ready TypeScript rewrite of the experimental prototype developed in the sibling `prereq` repository. It eliminates architectural drift, fragile microservice boundaries, unverified authentication fallbacks, and simulated external integrations in favor of a single unified Node.js runtime, strict domain invariants, and verified third-party integrations.
+The project is an honest, production-ready TypeScript platform. It eliminates architectural drift, fragile microservice boundaries, unverified authentication fallbacks, and simulated external integrations in favor of a single unified Node.js runtime, strict domain invariants, and verified third-party integrations.
 
 ---
 
@@ -85,7 +85,7 @@ For granular specifications, consult the dedicated manuals:
 | [docs/11-testing.md](docs/11-testing.md) | Testing pyramid: unit, contract, integration, and Playwright E2E suites |
 | [docs/12-operations.md](docs/12-operations.md) | Developer onboarding, Docker Supabase setup, environment configuration, deploy |
 | [docs/13-demo-and-acceptance.md](docs/13-demo-and-acceptance.md) | Reproducible demo scripts, seed data (33 concepts, 34 edges), validation checklists |
-| [docs/14-source-audit.md](docs/14-source-audit.md) | Analysis of the sibling prototype, discrepancies resolved, and corrections made |
+| [docs/14-source-audit.md](docs/14-source-audit.md) | Architectural audit, specification discrepancies resolved, and corrections made |
 | [docs/contracts/service-ports.md](docs/contracts/service-ports.md) | Shared TypeScript service interfaces, parameter DTOs, and error types |
 | [docs/contracts/examples.md](docs/contracts/examples.md) | Validated JSON request, response, and WebSocket event payloads |
 

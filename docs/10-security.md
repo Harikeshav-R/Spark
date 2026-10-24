@@ -8,7 +8,7 @@ This document details the security controls, access control matrices, authentica
 
 ### 1.1 Supabase JWT Validation
 - **Server-Side Token Verification**: Every incoming HTTP request (with `Authorization: Bearer <token>`) and WebSocket connection handshake is verified by calling Supabase Auth's `auth.getUser(token)` endpoint using a dedicated, non-privileged authentication client.
-- **No Unverified Fallbacks**: If JWT signature verification or token expiry checks fail, the request MUST be terminated immediately with `401 Unauthorized`. The insecure prototype fallback that decoded JWT payloads without signature checking is strictly eliminated.
+- **No Unverified Fallbacks**: If JWT signature verification or token expiry checks fail, the request MUST be terminated immediately with `401 Unauthorized`. Insecure fallbacks that decode JWT payloads without signature checking are strictly prohibited.
 - **Session Expiry**: Access tokens expire per Supabase configuration (typically 3,600 seconds). Clients refresh tokens using standard refresh tokens before making authenticated API calls.
 - **No LocalStorage Identity Trust**: Client requests never supply raw `studentId` or `role` headers as proof of identity. The server extracts the verified `auth.users.id` from the verified token and queries trusted database enrollment records to derive the `ActorContext`.
 

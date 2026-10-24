@@ -66,7 +66,7 @@ The application uses a warm, editorial, non-distracting visual palette that repl
 ### 2.2 Contrast & Accessibility Invariants
 1. **Body Text Contrast**: All body text MUST use `ink` or `charcoal` on `paper`/`panel` surfaces ($\ge 10:1$). Auxiliary captions use `muted` ($\ge 4.5:1$). Accent text MUST use `orange-text` (`#a9481a`), never raw `orange` (`#ed793c`), ensuring $\ge 4.5:1$ compliance.
 2. **Interactive Boundaries & Focus Rings**: Because decorative `line` (`#e6d8bd`) is subtle, all keyboard focus rings, active button borders, and input strokes use `charcoal` or `orange-deep` with measured $\ge 3:1$ contrast against neighboring surfaces.
-3. **No Unprovided Dark Palette**: The platform renders on the warm light paper palette. Default dark canvas styles from earlier prototypes are replaced with this warm paper palette.
+3. **No Unprovided Dark Palette**: The platform renders on the warm light paper palette. Default dark canvas styles from earlier drafts are replaced with this warm paper palette.
 4. **Non-Color Semantic Indicators**: Star nodes and cards MUST never rely solely on color. Every star and badge displays explicit text alternatives (e.g., "Dim / Needs practice (20%)", "Shining / Mastered (85%)") and distinct geometric stroke/fill patterns.
 
 ---

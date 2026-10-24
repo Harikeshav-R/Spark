@@ -50,7 +50,7 @@ A discrete semantic categorization of confidence into one of four mutually exclu
 3. `yellow`: $0.40 \le c < 0.70$ (developing / partial comprehension)
 4. `green`: $c \ge 0.70$ (mastered / confident)
 - _Avoid_: mastery_tier, proficiency_bucket.
-- _Avoid_: lime, orange (these were legacy cosmetic subdivisions in the prototype, not canonical semantic bands).
+- _Avoid_: lime, orange (these are legacy cosmetic subdivisions, not canonical semantic bands).
 
 #### mastery evidence
 A discrete, verifiable event that triggers an update to a student's confidence for a concept. Encapsulated as a discriminated union of four types:

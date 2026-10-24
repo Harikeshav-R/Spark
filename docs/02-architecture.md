@@ -2,7 +2,7 @@
 
 ## 1. Runtime Design & Server Composition
 
-Spark is designed as a unified, single-process TypeScript application hosted on Node.js 24 LTS. It replaces the split Python (Flask) and Node.js (Next.js) architecture of the sibling prototype with a cohesive, contract-driven modular monolith.
+Spark is designed as a unified, single-process TypeScript application hosted on Node.js 24 LTS. It avoids split Python and Node.js architectures in favor of a cohesive, contract-driven modular monolith.
 
 ```text
 ┌────────────────────────────────────────────────────────────────────────┐

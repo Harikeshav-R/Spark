@@ -4,10 +4,10 @@
 Accepted
 
 ## Context
-The prototype's peer study feature suffered from significant product and ethical compromises:
-1. `study_groups.py` paired students by selecting random classmates from the roster without verifying consent, opt-in status, or availability.
-2. The prototype generated static, hardcoded personal meeting room links rather than authentic video meetings.
-3. When a human peer was unavailable, the chat feature secretly used an LLM to impersonate the student without disclosure.
+Peer study features in educational platforms frequently face significant product and ethical challenges:
+1. Paired study systems often select random classmates from the roster without verifying consent, opt-in status, or mutual availability.
+2. Video meeting systems often generate static, unauthenticated personal room links rather than authentic scheduled meetings.
+3. Chat systems that secretly simulate or impersonate offline peers using AI bots violate student trust.
 
 ## Decision
 We enforce genuine, consensual, and transparent peer collaboration:

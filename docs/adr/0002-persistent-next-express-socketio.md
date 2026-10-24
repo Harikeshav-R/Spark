@@ -6,7 +6,7 @@ Accepted
 ## Context
 Educational collaboration requires continuous, low-latency, bidirectional communication: streaming lecture transcript chunks, synchronizing formative poll states, broadcasting concept detection highlights, and maintaining presence in peer study rooms. 
 
-Serverless deployment targets (such as Vercel serverless functions) do not support persistent WebSocket connections, stateful in-memory presence tracking, or long-lived streaming sockets from Zoom RTMS. In the prototype, this was awkwardly addressed by running an independent Node server script alongside the frontend.
+Serverless deployment targets (such as Vercel serverless functions) do not support persistent WebSocket connections, stateful in-memory presence tracking, or long-lived streaming sockets from Zoom RTMS. Running independent server processes alongside the frontend introduces unnecessary orchestration overhead.
 
 ## Decision
 We host Express 5, Socket.IO 4, and Next.js 16 within a single persistent Node.js process managed by a custom entry point at `server/index.ts`. Express mounts all `/api/*` endpoints; Socket.IO binds to the underlying Node `http.Server`; and Next.js handles all frontend page rendering via `app.getRequestHandler()`. Shared services and event emitters are wired via constructor dependency injection at server startup.
