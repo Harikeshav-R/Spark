@@ -2,7 +2,7 @@
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
-> **Status Notice**: Phase 0 is complete. Phase 1 active engineering is in progress with foundational platform auth, course management, enrollment mastery initialization, atomic mastery engine, lecture lifecycle, ephemeral study pool, App Router shells, and warm theme tokens merged into `main` (P1-A-01, P1-A-02, P1-A-03, P1-A-04, P1-B-01, P1-B-02, P1-D-01, P1-D-02). In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
+> **Status Notice**: Phase 0 and Phase 1 are complete. All Phase 1 foundational vertical tasks (P1-A-01 through P1-A-06, P1-B-01, P1-B-02, P1-C-01, P1-C-02, P1-D-01, P1-D-02) are implemented, verified, and merged into `main`. The dependency frontier is now at Phase 2 (Course Setup & Prerequisite Graph). In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
 
 ---
 
@@ -25,11 +25,11 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [x] P1-A-04 — Atomic Mastery Engine & PostgreSQL RPC
 - [x] P1-B-01 — Lecture Session Lifecycle & State Machine
 - [x] P1-B-02 — Ephemeral Study Group Pool Repository
-- [ ] P1-C-01 — OpenRouter Typed Client Adapter (Anthropic & Perplexity Models)
-- [ ] P1-C-02 — Socratic Tutoring Session Engine
+- [x] P1-C-01 — OpenRouter Typed Client Adapter (Anthropic & Perplexity Models)
+- [x] P1-C-02 — Socratic Tutoring Session Engine
 - [x] P1-D-01 — App Router Shells & Navigation Layout
-- [ ] P1-A-05 — Shared Game, Encounter & Party Extension Contracts and Fixtures
-- [ ] P1-A-06 — Additive Spark Learning Relational Migration 0003
+- [x] P1-A-05 — Shared Game, Encounter & Party Extension Contracts and Fixtures
+- [x] P1-A-06 — Additive Spark Learning Relational Migration 0003
 - [x] P1-D-02 — Warm Palette Design Tokens & Theme Follow-on
 
 ---
