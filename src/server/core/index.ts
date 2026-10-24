@@ -28,6 +28,11 @@ export {
 } from "./mastery/mastery-service";
 
 export {
+  type AttendanceEvidenceResult,
+  AttendanceEvidenceService,
+} from "./mastery/attendance-evidence";
+
+export {
   type GraphNodeInput,
   topologicalSort,
   validateGraph,

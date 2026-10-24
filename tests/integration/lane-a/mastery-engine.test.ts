@@ -151,7 +151,8 @@ describe.skipIf(isFixtureMode)(
         .select("*")
         .eq("student_id", student.id)
         .eq("concept_id", targetConcept)
-        .order("created_at", { ascending: true });
+        .order("created_at", { ascending: true })
+        .order("prior_confidence", { ascending: true });
 
       expect(auditRows).toHaveLength(2);
       const confidences = auditRows!.map((r) => [r.prior_confidence, r.new_confidence]);
@@ -475,13 +476,23 @@ describe.skipIf(isFixtureMode)(
 
       const ev: MasteryEvidence = { type: "tutor", sourceId: randomUUID() };
 
+      const dbContainer = process.env.SUPABASE_DB_CONTAINER ?? (
+        (() => {
+          try {
+            execFileSync("docker", ["inspect", "supabase_db_spark"], { stdio: "ignore" });
+            return "supabase_db_spark";
+          } catch {
+            return "supabase_db_HackOHIO-2026";
+          }
+        })()
+      );
+
       try {
         execFileSync(
           "docker",
-          ["exec", "-i", "supabase_db_HackOHIO-2026", "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"],
+          ["exec", "-i", dbContainer, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"],
           { input: installSql },
         );
-
         // Expect failure
         await expect(
           masteryService.applyEvidence(enrolledActor, student.id, targetConcept, ev),
@@ -511,7 +522,7 @@ describe.skipIf(isFixtureMode)(
         `;
         execFileSync(
           "docker",
-          ["exec", "-i", "supabase_db_HackOHIO-2026", "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"],
+          ["exec", "-i", dbContainer, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"],
           { input: cleanupSql },
         );
       }
