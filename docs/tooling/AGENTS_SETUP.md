@@ -52,6 +52,10 @@ All skills live in `.agents/skills/` and are accessible to any compatible AI ass
 - `improve-codebase-architecture`: High-level structural refactoring patterns.
 - `setup-ts-deep-modules`: TypeScript export ergonomics and module boundaries.
 
+### Supabase & Database Architecture (All Lanes)
+- `supabase`: Official core guidance covering Database, Auth, Edge Functions, Realtime, Storage, Vectors, and SSR client integrations.
+- `supabase-postgres-best-practices`: Official PostgreSQL performance, schema design, RLS policy enforcement, and indexing guide.
+
 ### Testing & TDD (All Lanes)
 - `tdd`: Red-green-refactor workflows, writing failing tests first.
 - `migrate-to-shoehorn`: Type assertion safety, eliminating unsafe `as` casts in test suites.
@@ -83,7 +87,7 @@ All skills live in `.agents/skills/` and are accessible to any compatible AI ass
 | `context7` | stdio | `npx -y @upstash/context7-mcp` | Up-to-date documentation for React, Next.js, Supabase, Express, Tailwind | None |
 | `shadcn` | stdio | `npx -y shadcn@latest mcp` | Search Shadcn UI component registry and examples | None |
 | `motion` | HTTP | `https://mcp.motion.dev` | Motion animation documentation and patterns | None |
-| `supabase` | HTTP | `http://127.0.0.1:54321/mcp` | Local / self-hosted Supabase schema and data management | None (Local Supabase running) |
+| `supabase` | stdio | `node scripts/supabase-mcp-bridge.mjs` | Local self-hosted Supabase schema, SQL, and migration tools | None (bridges to local Studio port 54323) |
 | `chrome-devtools`| stdio | `npx -y chrome-devtools-mcp@latest` | Browser console, network, a11y snapshots, screenshots | None |
 | `playwright` | stdio | `npx -y @playwright/mcp@latest --isolated` | Isolated browser automation and E2E testing | None |
 | `fetch` | stdio | `uvx mcp-server-fetch` | Fast web page fetch and markdown extraction | Python / `uv` |
@@ -188,6 +192,29 @@ import { Agentation } from 'agentation';
 )}
 ```
 
+
+### C. Local Supabase MCP Server (`supabase`)
+Connects coding agents directly to the local or self-hosted Supabase instance.
+
+#### Architecture
+- Local Supabase Studio exposes a StreamableHTTP MCP endpoint at `http://127.0.0.1:54323/api/mcp`.
+- Because most coding agent harnesses (Claude Code, Cursor, OMP) communicate over `stdio`, the repository includes a lightweight bridge: `scripts/supabase-mcp-bridge.mjs`.
+- The bridge pipes JSON-RPC stdin/stdout messages directly to the local Studio endpoint with the required headers.
+
+#### Provided MCP Tools (11 Tools)
+- `list_tables`: Inspect public and schema tables, row counts, and RLS state.
+- `execute_sql`: Run SQL queries against the local PostgreSQL database.
+- `list_migrations` & `apply_migration`: Inspect and apply database migrations.
+- `list_extensions`: Check installed PostgreSQL extensions.
+- `get_advisors`: Performance and security recommendations.
+- `generate_typescript_types`: Generate database TypeScript types.
+- `get_project_url` & `get_publishable_keys`: Inspect local API endpoints and keys.
+
+#### Custom Endpoints
+If running self-hosted Supabase on a remote server or non-standard port:
+```bash
+export SUPABASE_MCP_URL="http://your-server:54323/api/mcp"
+```
 ---
 
 ## 6. Autonomous Agent Instructions
