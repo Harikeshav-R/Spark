@@ -9,3 +9,6 @@ export {
   CAPABILITY_POLICIES,
   DEFAULT_MODELS,
 } from "./providers/openrouter-client.js";
+
+export { SocraticTutorAi } from "./tutoring-ai.js";
+export { fixtureSocraticTutorTurn } from "./fixtures/tutoring-turn.js";
