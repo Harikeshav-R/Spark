@@ -2,7 +2,7 @@
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
-> **Status Notice**: Phase 0 and Phase 1 are complete. All Phase 1 foundational vertical tasks (P1-A-01 through P1-A-06, P1-B-01, P1-B-02, P1-C-01, P1-C-02, P1-D-01, P1-D-02) are implemented, verified, and merged into `main`. The dependency frontier is now at Phase 2 (Course Setup & Prerequisite Graph). In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
+> **Status Notice**: Phase 0 and Phase 1 are complete. Phase 2 active engineering is in progress: P2-A-01 (Prerequisite DAG Validation Engine) is implemented, verified, and merged into `main` (PR #42). P2-A-02 (Graph Persistence & Transactional Node/Edge Commit) is implemented and verified with PR #44 open to `main` (following merge of PR #43 into the feature branch). The dependency frontier is now at Phase 2 course setup (P2-C-01, P2-D-01, P2-D-02, P2-D-03). In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
 
 ---
 
@@ -36,7 +36,7 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 
 ## Phase 2: Course Setup & Prerequisite Graph
 
-- [ ] P2-A-01 — Prerequisite DAG Validation Engine & Cycle Detector
+- [x] P2-A-01 — Prerequisite DAG Validation Engine & Cycle Detector
 - [ ] P2-A-02 — Graph Persistence & Transactional Node/Edge Commit
 - [ ] P2-C-01 — Syllabus PDF Bounded Ingestion & Graph Extraction Pipeline
 - [ ] P2-D-01 — Syllabus Upload & Graph Preview UI
