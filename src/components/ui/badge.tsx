@@ -1,6 +1,8 @@
+"use client";
+
 import React from "react";
-import type { MasteryBand } from "../../contracts/common.js";
-import { cn } from "../../lib/client/utils.js";
+import type { MasteryBand } from "@/contracts/common";
+import { cn } from "@/lib/client/utils";
 
 export type BadgeVariant = "default" | "secondary" | "outline" | "soft" | "solid";
 
