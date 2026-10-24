@@ -21,8 +21,10 @@
       "url": "https://mcp.motion.dev"
     },
     "supabase": {
-      "type": "http",
-      "url": "http://127.0.0.1:54321/mcp"
+      "command": "node",
+      "args": [
+        "scripts/supabase-mcp-bridge.mjs"
+      ]
     },
     "chrome-devtools": {
       "command": "npx",

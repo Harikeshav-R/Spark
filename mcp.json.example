@@ -23,9 +23,11 @@
       "_description": "Motion animation examples, patterns, and documentation"
     },
     "supabase": {
-      "type": "http",
-      "url": "http://127.0.0.1:54321/mcp",
-      "_description": "Local/self-hosted Supabase MCP endpoint (default http://127.0.0.1:54321/mcp from local supabase start or custom self-hosted gateway)"
+      "command": "node",
+      "args": [
+        "scripts/supabase-mcp-bridge.mjs"
+      ],
+      "_description": "Local/self-hosted Supabase MCP bridge (bridges stdio to local Supabase Studio at http://127.0.0.1:54323/api/mcp; customize with SUPABASE_MCP_URL if using a remote self-hosted gateway)"
     },
     "chrome-devtools": {
       "command": "npx",
