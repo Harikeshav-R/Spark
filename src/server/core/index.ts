@@ -36,3 +36,11 @@ export {
 export {
   calculateNodeImportance,
 } from "./graph/importance-calculator";
+
+export {
+  GraphRepository,
+} from "./graph/graph-repository";
+
+export {
+  GraphService,
+} from "./graph/graph-service";
