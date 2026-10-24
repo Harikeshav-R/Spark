@@ -1,14 +1,14 @@
 "use client";
 
 import React from "react";
-import { cn } from "@/lib/client/utils";
+import { cn } from "../../lib/client/utils";
 
 export const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
       className={cn(
-        "rounded-xl border border-gray-200 bg-white text-gray-900 shadow-sm transition-shadow dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100",
+        "rounded-xl border border-[#e6d8bd] bg-[#fffdf8] text-[#2b2a2e] shadow-sm transition-shadow",
         className
       )}
       {...props}
@@ -32,7 +32,7 @@ export const CardTitle = React.forwardRef<HTMLHeadingElement, CardTitleProps>(
   ({ className, as: Component = "h3", ...props }, ref) => (
     <Component
       ref={ref}
-      className={cn("text-xl font-semibold leading-none tracking-tight text-gray-900 dark:text-gray-100", className)}
+      className={cn("text-xl font-semibold leading-none tracking-tight text-[#2b2a2e]", className)}
       {...props}
     />
   )
@@ -43,7 +43,7 @@ export const CardDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p ref={ref} className={cn("text-sm text-gray-600 dark:text-gray-400", className)} {...props} />
+  <p ref={ref} className={cn("text-sm text-[#5f5b54]", className)} {...props} />
 ));
 CardDescription.displayName = "CardDescription";
 
