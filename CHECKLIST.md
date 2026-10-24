@@ -2,18 +2,18 @@
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
-> **Status Notice**: All items are currently planned and unchecked. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), feature pull requests do not check these boxes directly; Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
+> **Status Notice**: Phase 0 is complete as verified by foundational contracts and toolchains. Phase 1 onward represents active planned engineering. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), feature pull requests do not check these boxes directly; Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
 
 ---
 
 ## Phase 0: Foundations & Shared Contracts
 
 - [x] P0-A-01 — Repository Preflight, Toolchain Setup & Project Skeleton
-- [ ] P0-A-02 — Supabase Local Instance & Migration 0001 Foundation
-- [ ] P0-A-03 — Shared Contracts & Zod Domain Schemas
-- [ ] P0-B-01 — Classroom & Collaboration Contract Stubs & Realtime Fixtures
-- [ ] P0-C-01 — AI & Learning Service Ports & Deterministic Fixtures
-- [ ] P0-D-01 — UI Component Tokens, Route Shells & Test Harness Setup
+- [x] P0-A-02 — Supabase Local Instance & Migration 0001 Foundation
+- [x] P0-A-03 — Shared Contracts & Zod Domain Schemas
+- [x] P0-B-01 — Classroom & Collaboration Contract Stubs & Realtime Fixtures
+- [x] P0-C-01 — AI & Learning Service Ports & Deterministic Fixtures
+- [x] P0-D-01 — UI Component Tokens, Route Shells & Test Harness Setup
 
 ---
 
@@ -28,6 +28,9 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [ ] P1-C-01 — Anthropic & Perplexity Typed Client Adapters
 - [ ] P1-C-02 — Socratic Tutoring Session Engine
 - [ ] P1-D-01 — App Router Shells & Navigation Layout
+- [ ] P1-A-05 — Shared Game, Encounter & Party Extension Contracts and Fixtures
+- [ ] P1-A-06 — Additive Spark Learning Relational Migration 0003
+- [ ] P1-D-02 — Warm Palette Design Tokens & Theme Follow-on
 
 ---
 
@@ -38,6 +41,7 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [ ] P2-C-01 — Syllabus PDF Bounded Ingestion & Graph Extraction Pipeline
 - [ ] P2-D-01 — Syllabus Upload & Graph Preview UI
 - [ ] P2-D-02 — Interactive D3-Force Knowledge Graph Visualizer
+- [ ] P2-D-03 — SVG Companion Mascot Spark, Mood Expressions & Form Transitions
 
 ---
 
@@ -65,6 +69,8 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [ ] P4-C-03 — Real-Time Misconception Clustering & Pedagogical Interventions
 - [ ] P4-D-01 — Formative Poll Teacher Dashboard & Live Response Heatmap
 - [ ] P4-D-02 — Student Active Poll Modal & Evaluation Card
+- [ ] P4-A-03 — Class Sky Aggregate Confidence & Course Effort Service
+- [ ] P4-D-03 — Instructor Class Sky Visualization & Effort/Mastery Roster
 
 ---
 
@@ -78,17 +84,24 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [ ] P5-C-05 — TutorFeature, LearningFeature & StudyGroupFeature UI Modules
 - [ ] P5-D-01 — Student Concept Learning & Quiz Route Shell Mounting
 - [ ] P5-D-02 — Student Tutoring & Lecture Summaries Shell Mounting
+- [ ] P5-A-02 — Daily Quests, Streak Calculation, XP Ledger & Eclipse Service
+- [ ] P5-C-06 — Hint-Capable Question Generation & Practice Encounter Orchestration
+- [ ] P5-C-07 — Exported EncounterFeature Component & Hint Drawer
+- [ ] P5-D-03 — Student Quests, Eclipse, Mascot Shell Mounting & Encounter Integration
 
 ---
 
 ## Phase 6: Consensual Peer Collaboration & Zoom Scheduling
 
-- [ ] P6-A-01 — Study Group Relational Schema, Availability & Lock RPCs
+- [ ] P6-A-01 — Study Group Relational Schema (Migration 0004), Availability & Lock RPCs
 - [ ] P6-B-01 — Consensual Complementary Matchmaking Engine
 - [ ] P6-B-02 — Secure Peer Messaging & Room Broadcaster
 - [ ] P6-B-03 — Mutual Availability Overlap Detector & Scheduling State Machine
 - [ ] P6-B-04 — Authentic Zoom OAuth 2.0 Client & Meeting Adapter
 - [ ] P6-D-01 — Peer Study Group Route Shell & Chat Interface
+- [ ] P6-A-02 — Additive Collaboration Migration 0005 & Party Quest Constraints
+- [ ] P6-B-05 — Collaborative Party Quests, Candidate Invitations & Reward Distribution
+- [ ] P6-C-01 — Extended StudyGroupFeature with Invitations, Fit Badges & Party Goals
 
 ---
 
@@ -99,5 +112,6 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [ ] P7-B-01 — Live Zoom RTMS & Webhook Production Verification
 - [ ] P7-C-01 — Live Anthropic & Perplexity Production Verification
 - [ ] P7-D-01 — Multi-Browser End-to-End Playwright Journey Suite
+- [ ] P7-D-04 — Journeys J09–J11 Playwright End-to-End Test Suite
 - [ ] P7-D-02 — Responsive Layout & Accessibility Audit Verification
 - [ ] P7-D-03 — Final Classroom Milestone & Complete Product Acceptance

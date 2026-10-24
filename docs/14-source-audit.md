@@ -13,7 +13,7 @@ During the architectural audit of `../prereq/`, several contradictions and secur
 | **D01** | **Seed Graph Concept Count** | `scripts/seed_demo.py` lines 146–189 define exactly **33 concept nodes** across 8 categories. | Recreation manuals claimed 35 concepts. | **33 concepts** is canonical. Seed and tests must assert exactly 33 concepts. |
 | **D02** | **Seed Graph Edge Count** | `scripts/seed_demo.py` lines 208–244 define exactly **34 prerequisite edges**. | Recreation manuals claimed 36 edges. | **34 edges** is canonical. All 34 edges verified as a valid acyclic DAG. |
 | **D03** | **Seed Mastery Rows** | 4 demo students (Hari, Rahul, Praj, Vamshi) $\times$ 33 concepts = **132 mastery rows**. | Manuals implied 140 rows ($4 \times 35$). | Exactly **132 mastery rows** must be seeded and verified. |
-| **D04** | **Database Schema Tables** | `scripts/schema.sql` defines **18 distinct tables** (including auth extensions and learning tables). | Recreation manuals inconsistently stated 16 tables. | Target data model defines **22 application tables** (18 base tables + 4 new relational tables). |
+| **D04** | **Database Schema Tables** | `scripts/schema.sql` defines **18 distinct tables** (including auth extensions and learning tables). | Recreation manuals inconsistently stated 16 or 22 tables. | Target data model defines **28 application tables** (18 base tables + 3 Spark progression tables + 3 collaboration extension tables + 4 relational tables). |
 | **D05** | **Mastery Color & Band Model** | `api/src/routes/students.py` lines 15–25 defined 5 color tiers (`gray`, `orange`, `yellow`, `lime`, `green`). `frontend/src/lib/colors.ts` and `graph.py` defined 4 tiers. | Manuals mixed 4-tier and 5-tier logic. | Consolidated into a single canonical **4-band semantic model**: `gray` ($c=0$), `red` ($0<c<0.40$), `yellow` ($0.40\le c<0.70$), `green` ($c\ge 0.70$). |
 | **D06** | **JWT Authentication Bypass** | `api/src/middleware/auth.py` contained an unverified fallback that decoded JWT payloads without checking digital signatures if validation failed. | Manuals assumed standard Supabase JWT validation. | **Eliminated completely**. Server validates every bearer token with Supabase `auth.getUser(token)`. Anonymous database access is disabled. |
 | **D07** | **Socket Identity Trust** | `frontend/server/socket.ts` accepted client-supplied `role` and `studentId` query parameters during WebSocket handshakes. | Manuals assumed authenticated sockets. | **Eliminated completely**. Handshakes require a valid Supabase JWT. Server derives user identity and course enrollments strictly from the token. |
@@ -56,6 +56,13 @@ Every feature from the prototype and every recreation manual maps directly to ta
 | **Authentic Zoom Integration** | `docs/06-http-api.md`, `docs/10-security.md` | Lane B | `P6-B-04` | `J07` | Teacher OAuth 2.0 flow; creates genuine Zoom meeting via REST API. |
 | **Deterministic Seed & Demo** | `docs/13-demo-and-acceptance.md`, `docs/12-operations.md` | Lane A | `P1-A-04`, `P7-A-02` | `J08` | 33 concepts, 34 edges, 4 students, 132 mastery rows; zero cloud cost. |
 | **Persistent Host Deployment** | `docs/02-architecture.md`, `docs/12-operations.md` | Lane A | `P7-A-01` | `J08` | Single-process Node.js deployment on Render; HTTPS/WSS; health checks. |
+| **Warm Star Vessel Visualizer** | `docs/09-frontend.md` | Lane D | `P2-D-02`, `P1-D-02` | `J02` | D3-force layout; SVG star vessels with bottom-up vertical confidence fill; canonical bands. |
+| **Spark Mascot & Moods** | `docs/09-frontend.md` | Lane D | `P2-D-03` | `J10` | Embedded SVG mascot; 5 moods (`calm`, `think`, `cheer`, `oops`, `sleepy`); 4 forms (`ember` to `nova`). |
+| **Daily Quests & Streak Ledger** | `docs/03-invariants.md`, `docs/05-data-model.md` | Lane A | `P5-A-02` | `J09` | 3 ready review concepts; overdue priority; streak increments on clear; 25 XP bonus. |
+| **Practice Encounters & Hints** | `docs/08-ai-pipelines.md`, `docs/06-http-api.md` | Lane C | `P5-C-06`, `P5-C-07` | `J09` | 5-question quiz wrapper; sequential 3-tier hints; XP discount; canonical quiz evidence. |
+| **Eclipse Review Pressure** | `docs/03-invariants.md`, `docs/09-frontend.md` | Lane A / Lane D | `P5-A-02`, `P5-D-03` | `J10` | Distance from 0.70 mastery across up to 3 ready concepts; exam countdown. |
+| **Collaborative Party Quests** | `docs/05-data-model.md`, `docs/06-http-api.md` | Lane B / Lane C | `P6-A-02`, `P6-B-05`, `P6-C-01` | `J11` | Matched peers; candidate invites; bilateral independent quiz verification; 60 XP each. |
+| **Class Sky & Effort Roster** | `docs/03-invariants.md`, `docs/09-frontend.md` | Lane A / Lane D | `P4-A-03`, `P4-D-03` | `J11` | Class mean stars; taught attention rings; `high_effort_low_mastery` flag at XP $\ge 75\%$ & conf $\le 40\%$. |
 
 ---
 
@@ -65,3 +72,34 @@ To ensure that this repository is completely self-contained and secure, the foll
 - **No Shared Credentials**: All hardcoded passwords, JWT secrets, and test user tokens from the prototype have been purged. Testing uses synthetic email addresses (`@example.test`) and locally supplied environment secrets.
 - **No Personal Meeting URLs**: All static personal meeting room links used in prototype mockups have been removed. Meeting generation must connect to genuine Zoom API endpoints or remain explicitly marked as unavailable.
 - **No Claims of Measured Latency**: Historical claims regarding prototype response times (e.g., "1.2 second average poll grading") are classified as historical observations, not engineering SLAs. Target SLAs are defined as strict bounding timeouts in [docs/08-ai-pipelines.md](08-ai-pipelines.md).
+
+---
+
+## 4. Spark Proposal Provenance & Architectural Boundary Record
+
+### 4.1 Provenance Baseline
+On October 21, 2026, commit `7cce61cfa6c699148dfc30512f84c215642d8c7b` introduced `SPARK_DESIGN.md` and `SPARK_TECHNICAL.md` to explore gamified engagement mechanics for the HackOHIO platform.
+
+### 4.2 Audit of Accepted vs Rejected Proposals
+The following table records the authoritative architectural decisions governing each proposed element:
+
+| Proposed Spark Element | Proposed Direction in Draft | Authoritative Status in Canonical Suite | Canonical Authority Reference |
+|---|---|---|---|
+| **Companion Mascot (Spark)** | SVG reactive mascot with 5 moods and 4 evolution forms | **Accepted**: Implemented as pure SVG component with deterministic copy and reduced-motion compliance. | `docs/09-frontend.md` Section 4, `P2-D-03` |
+| **Daily Review Quests** | Daily queue of review topics with streak tracking | **Accepted**: Persisted queue of up to 3 ready concepts per UTC date; streak increments upon clear. | `docs/03-invariants.md` Section 7.4, `P5-A-02` |
+| **Progressive Tiered Hints** | 3 hint levels (Nudge, Bigger hint, Walkthrough) | **Accepted**: Server-stored and sequentially unlocked ($1 \to 2 \to 3$); discounts XP without altering quiz scoring. | `docs/03-invariants.md` Section 7.5, `P5-C-06` |
+| **Eclipse Diagnostic** | Visual indicator of exam review pressure | **Accepted**: Mathematical formula based on distance to $c=0.70$ on up to 3 ready concepts; never decays confidence. | `docs/03-invariants.md` Section 7.7, `P5-A-02` |
+| **XP Effort Ledger** | Gamified experience points | **Accepted as Orthogonal Metric**: Server-authoritative append-only `xp_events` ledger; strictly decoupled from mastery. | `docs/03-invariants.md` Section 7.6, `P5-A-02` |
+| **Collaborative Party Goals** | Cooperative quests for matched peers | **Accepted over Consensual Pairs**: 2-student matches embark on 1–3 shared concepts; bilateral quiz verification; 60 XP each. | `docs/03-invariants.md` Section 7.9, `P6-B-05` |
+| **Class Sky & Effort Roster** | Instructor graph and effort quadrant | **Accepted**: Aggregate mean confidence stars, taught attention rings, and `high_effort_low_mastery` percentile flag. | `docs/03-invariants.md` Section 7.10, `P4-A-03`, `P4-D-03` |
+| **Python Flask Dual Runtime** | Revert to split Flask + Next.js architecture | **Rejected**: Preserved single-process TypeScript Node.js 24 runtime with Express 5 and Next.js 16. | ADR 0001, ADR 0002, ADR 0012 |
+| **Static Transit-Map Layout** | Hardcoded grid/lane knowledge graph engine | **Rejected**: Preserved D3-force dynamic physics simulation with prerequisite depth stratification. | ADR 0006, `docs/09-frontend.md` Section 3 |
+| **60/85 Mastery Thresholds** | Replace 4 bands with 3 arbitrary percentage buckets | **Rejected**: Preserved 4 canonical bands (`gray`, `red`, `yellow`, `green`) with star fill height proportional to confidence. | ADR 0005, ADR 0012, INV-M02, INV-XP01 |
+| **Mastery Confidence Decay** | Automated time-decay on student confidence | **Rejected**: Confidence decays only through negative poll evaluation; automated decay is strictly prohibited. | ADR 0005, INV-M01, INV-XP02 |
+| **Unconstrained Group Matching** | 3+ student groups without gap scoring | **Rejected**: Preserved bilateral 2-student matching with complementary gap $\ge 0.30$ and bilateral scheduling consent. | ADR 0009, INV-C01–INV-C05 |
+
+### 4.3 Self-Sufficiency & Deletion Safety Guarantee
+With the completion of this integration, the canonical documentation suite (`docs/` and root files) is **100% self-contained**:
+1. No canonical manual, specification, or test plan relies on `SPARK_DESIGN.md` or `SPARK_TECHNICAL.md`.
+2. No canonical document requires access to `spark.html` or external prototype assets.
+3. The user may delete `SPARK_DESIGN.md` and `SPARK_TECHNICAL.md` at any time without creating dangling links, missing requirements, or specification ambiguities.

@@ -32,14 +32,23 @@ interface ApiError {
 | `401 Unauthorized` | Missing / Invalid Token | Bearer token missing, expired, or invalid. |
 | `403 Forbidden` | Authorization Denial | User lacks required role (`teacher` vs `student`) or course enrollment. |
 | `404 Not Found` | Entity Missing | Requested ID does not exist within the authorized scope. |
-| `409 Conflict` | State Machine Conflict | Active poll already exists, duplicate response submitted, or graph already committed. |
+| `409 Conflict` | State Machine Conflict | Active poll exists, duplicate response, graph exists, out-of-sequence hint, or duplicate encounter submit. |
 | `413 Payload Too Large` | Upload Limit Exceeded | Uploaded PDF syllabus exceeds 50 MiB limit. |
 | `422 Unprocessable` | Domain / Provider Error | Malformed AI output or cyclical graph structure detected. |
 | `502 Bad Gateway` | Upstream API Failure | Anthropic, Perplexity, or Zoom returned an upstream network error. |
 | `503 Service Unavailable` | Provider Not Configured | Capability disabled or API keys missing in live integration mode. |
 | `504 Gateway Timeout` | Timeout Exceeded | AI or Zoom pipeline exceeded per-capability SLA timeout. |
 
-### 1.4 Standard List Pagination
+### 1.4 Spark Progression & Encounter Error Codes
+| Code | HTTP Status | Domain Cause | Correct Client Action |
+|---|---|---|---|
+| `ENCOUNTER_ALREADY_SUBMITTED` | `409 Conflict` | Attempted to request hint or re-submit answers on completed Encounter. | Display existing result; do not allow additional submissions. |
+| `HINT_OUT_OF_SEQUENCE` | `409 Conflict` | Requested hint level without first unlocking the preceding tier ($1 \to 2 \to 3$). | Request next available sequential tier. |
+| `INVALID_HINT_LEVEL` | `400 Bad Request` | Requested hint level is outside $\{1, 2, 3\}$. | Request level 1, 2, or 3. |
+| `INVITATION_EXPIRED` | `409 Conflict` | Responded to an invitation whose 5-minute pool entry has expired. | Re-enter study pool to seek fresh match. |
+| `INVITATION_ALREADY_RESOLVED`| `409 Conflict` | Attempted to accept/decline an already resolved invitation. | Refresh study group status. |
+
+### 1.5 Standard List Pagination
 List responses return a cursor-paginated envelope:
 ```typescript
 interface PaginatedList<T> {
@@ -151,6 +160,15 @@ Default limit is 50 items; maximum allowed limit is 100 items.
 ### `GET /api/courses/:courseId/students/summary`
 - **Auth**: Course teacher.
 - **Response `200 OK`**: `{ totalEnrolled: number, activeInLecture: number, strugglingCount: number, developingCount: number, masteredCount: number }`
+
+### `PUT /api/courses/:courseId/exam`
+- **Auth**: Course teacher.
+- **Body**: `{ examAt: string | null }` (UTC ISO-8601 or null to clear)
+- **Response `200 OK`**: `{ success: true, examAt: string | null }`
+
+### `GET /api/courses/:courseId/students/effort`
+- **Auth**: Course teacher.
+- **Response `200 OK`**: `CourseEffortDTO[]` (Student effort XP, average confidence, and `high_effort_low_mastery` intervention flags)
 
 ### `GET /api/students/:studentId/mastery`
 - **Auth**: Student self or course teacher.
@@ -390,6 +408,54 @@ Default limit is 50 items; maximum allowed limit is 100 items.
 - **Auth**: Enrolled student.
 - **Response `200 OK`**: `{ inPool: boolean, poolStatus?: string, activeMatch?: StudyGroupMatchDTO }`
 
+### `GET /api/courses/:courseId/study-groups/candidates`
+- **Auth**: Enrolled student currently waiting in study pool.
+- **Response `200 OK`**:
+  ```typescript
+  {
+    candidates: {
+      studentId: string;
+      requestedConcepts: { conceptId: string; label: string; band: "gray" | "red" | "yellow" | "green" }[];
+      complementaryGap: number; // e.g. 0.45
+      fitKind: "reciprocal" | "mentor";
+    }[];
+  }
+  ```
+- *Note*: Only returns candidates who have explicitly opted into the pool within the 5-minute validity window and meet the $\ge 0.30$ knowledge gap threshold.
+
+### `POST /api/courses/:courseId/study-groups/invitations`
+- **Auth**: Enrolled student currently waiting in study pool.
+- **Body**: `{ inviteeId: string, conceptIds: string[] }`
+- **Response `201 Created`**: `{ invitationId: string, status: "pending", expiresAt: string }`
+
+### `POST /api/study-group-invitations/:invitationId/respond`
+- **Auth**: Target invitee student.
+- **Body**: `{ decision: "accepted" | "declined" }`
+- **Response `200 OK`**: `{ status: "accepted" | "declined", matchId?: string }`
+
+### `POST /api/study-groups/:matchId/quests`
+- **Auth**: Matched peer student.
+- **Body**: `{ conceptIds: string[] }` (Length 1–3)
+- **Response `201 Created`**: `{ partyQuestId: string, status: "active", conceptIds: string[] }`
+
+### `GET /api/study-groups/:matchId/quests`
+- **Auth**: Matched peer student.
+- **Response `200 OK`**:
+  ```typescript
+  {
+    partyQuests: {
+      partyQuestId: string;
+      conceptIds: string[];
+      status: "active" | "completed" | "cancelled";
+      progress: {
+        studentId: string;
+        conceptId: string;
+        completed: boolean;
+      }[];
+    }[];
+  }
+  ```
+
 ### `GET /api/study-groups/:matchId/messages`
 - **Auth**: Matched peer student.
 - **Response `200 OK`**: `StudyGroupMessageDTO[]`
@@ -433,3 +499,55 @@ Default limit is 50 items; maximum allowed limit is 100 items.
 ### `GET /auth/zoom/callback`
 - **Auth**: Zoom OAuth redirect handler with state verification.
 - **Response**: Redirects to teacher dashboard with connection status.
+
+---
+
+## 6. Family E: Spark Experience, Habits & Encounters
+
+### `GET /api/students/:studentId/daily-quest`
+- **Auth**: Enrolled student self.
+- **Response `200 OK`**: `DailyQuestDTO`
+
+### `GET /api/students/:studentId/game-summary`
+- **Auth**: Enrolled student self.
+- **Response `200 OK`**: `GameSummaryDTO`
+
+### `GET /api/students/:studentId/eclipse`
+- **Auth**: Enrolled student self.
+- **Response `200 OK`**: `EclipseDTO`
+
+### `POST /api/students/:studentId/encounters`
+- **Auth**: Enrolled student self.
+- **Body**: `CreateEncounterInput`
+  ```typescript
+  // Exactly one variant:
+  { conceptId: string, source: "star" | "eclipse" }
+  | { conceptId: string, source: "daily", questId: string }
+  | { conceptId: string, source: "party", partyQuestId: string }
+  ```
+- **Response `201 Created`**: `EncounterDTO` (Contains 5 questions, server-permuted options, 0 answer keys)
+
+### `GET /api/encounters/:encounterId`
+- **Auth**: Owning student.
+- **Response `200 OK`**: `{ encounter: EncounterDTO, result: EncounterResultDTO | null }`
+
+### `POST /api/encounters/:encounterId/hints`
+- **Auth**: Owning student.
+- **Body**: `{ questionId: string, level: 1 | 2 | 3 }`
+- **Response `200 OK`**: `{ questionId: string, level: 1 | 2 | 3, text: string }`
+- **Errors**:
+  - `409 HINT_OUT_OF_SEQUENCE`: Attempted to request level 2 before level 1, or level 3 before level 2.
+  - `400 INVALID_HINT_LEVEL`: Level outside $\{1, 2, 3\}$.
+  - `409 ENCOUNTER_ALREADY_SUBMITTED`: Encounter has already been submitted.
+
+### `POST /api/encounters/:encounterId/submit`
+- **Auth**: Owning student.
+- **Body**:
+  ```typescript
+  {
+    answers: { questionId: string; selectedOption: number }[]; // Exactly five answers
+  }
+  ```
+- **Response `200 OK`**: `EncounterResultDTO`
+- **Errors**:
+  - `409 ENCOUNTER_ALREADY_SUBMITTED`: Repeated conflicting submission. Identical re-submissions return existing result idempotently.

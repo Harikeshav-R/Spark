@@ -168,6 +168,12 @@ This document specifies the prompt engineering standards, output Zod schemas, to
 - **Model**: `ANTHROPIC_DEEP_MODEL`
 - **Timeout**: 60 seconds | **Max Tokens**: 2,500
 - **Input**: Concept label, description, and learning content.
+- **System Prompt**:
+  > Generate exactly 5 conceptual multiple-choice questions testing deep understanding of the concept. For each question, provide 4 options (A, B, C, D), the 0-indexed correct option, an explanation, and exactly three progressive hints:
+  > - Level 1 (Nudge): A subtle conceptual clue or principle reminder.
+  > - Level 2 (Bigger hint): A deeper reasoning step without revealing the answer.
+  > - Level 3 (Walkthrough): A methodological walkthrough of the problem without explicitly naming the correct option.
+  > Hints MUST NOT reveal the correct option index or literal answer text. Output ONLY valid JSON.
 - **Output Zod Schema**:
   ```typescript
   z.object({
@@ -178,10 +184,16 @@ This document specifies the prompt engineering standards, output Zod schemas, to
       optionC: z.string().min(1).max(200),
       optionD: z.string().min(1).max(200),
       correctAnswer: z.number().int().min(0).max(3),
-      explanation: z.string().min(10).max(500)
+      explanation: z.string().min(10).max(500),
+      hints: z.tuple([
+        z.string().min(5).max(300), // Level 1: Nudge
+        z.string().min(5).max(300), // Level 2: Bigger hint
+        z.string().min(5).max(300)  // Level 3: Walkthrough
+      ])
     })).length(5)
   })
   ```
+- *Mascot Dialogue Note*: Mascot copy reactions (`calm`, `think`, `cheer`, `oops`, `sleepy`) are strictly deterministic, client-side templates; they do not invoke LLM calls.
 
 ### 2.12 `searchAcademicResources`
 - **Provider**: Perplexity AI (`PERPLEXITY_MODEL`)

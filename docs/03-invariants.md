@@ -165,3 +165,123 @@ stateDiagram-v2
 | **Single Peer Opts In** | Match with a random student from the course roster. | Keep student in pool with status `waiting`. Match only if another student opts in with gap $\ge 0.30$. |
 | **Missing Zoom Credentials** | Generate a fake link like `https://zoom.us/j/fake123`. | Keep match active for messaging; set `meetingStatus = "unavailable"`; surface honest configuration notice. |
 | **Socket Disconnect on Multi-Tab** | Terminate lecture attendance when student closes one tab. | Reference count active connections per student; terminate attendance only when ref count drops to zero. |
+| **Post-Completion Hint Request** | Return hint text after encounter has been submitted. | Return `409 ENCOUNTER_ALREADY_SUBMITTED`; no hints after submission. |
+| **Skipped Hint Tier** | Return Level 3 hint when student only requested Level 1. | Return `409 HINT_OUT_OF_SEQUENCE`; enforce sequential $1 \to 2 \to 3$ reveal. |
+| **Duplicate Practice XP** | Award quiz XP again when student retakes concept quiz on same date. | Process quiz grading and mastery evidence normally; award 0 XP for duplicate attempt. |
+| **Empty Daily Quest Clear** | Award 25 XP bonus and increment streak when candidate queue is empty. | Display "No review needed"; award 0 XP bonus; leave streak unchanged. |
+| **Direct XP Write to Mastery** | Increment `student_mastery.confidence` when student gains 100 XP. | Strictly prohibited. XP lives in `xp_events`; mastery is updated solely via evidence formulas. |
+| **One Peer Finishes Party Quest** | Mark party quest completed and award 60 XP when only one student finished. | Keep party quest in `active` status; award XP only upon bilateral completion by both matched peers. |
+
+---
+
+## 7. Spark Experience & Game Progression Invariants
+
+### 7.1 Visual Star State Mapping
+- **Domain Invariant (INV-XP01)**: Confidence $c$ remains strictly confined to $[0.0, 1.0]$. The visual fill height of a concept star is exactly proportional to confidence:
+  $$\text{fillPercentage} = \text{round}(c \times 100, 1)\%$$
+  Visual star appearance maps deterministically and one-to-one to the four canonical mastery bands (INV-M02):
+  $$\text{starState}(c) = \begin{cases}
+  \text{Unassessed (gray)} & \text{if } c = 0.0 \\
+  \text{Dim / Needs practice (red)} & \text{if } 0.0 < c < 0.40 \\
+  \text{Lit / Developing (yellow)} & \text{if } 0.40 \le c < 0.70 \\
+  \text{Shining / Mastered (green)} & \text{if } c \ge 0.70
+  \end{cases}$$
+- *Invariant*: Prototype cosmetic 60/85 thresholds are strictly prohibited. Mastery bands are semantic states, not arbitrary colors.
+
+### 7.2 Effort Orthogonality & Mastery Protection
+- **Domain Invariant (INV-XP02)**: Experience Points (XP), hint releases, streaks, party collaboration, mascot animations, and quest completions MUST NEVER mutate `student_mastery.confidence` directly. All confidence mutations MUST route exclusively through `MasteryService.applyEvidence()` with one of the four canonical evidence types (INV-M01–INV-M03). Automated confidence decay, spaced-repetition ease factor algorithms, and decay timers are strictly prohibited.
+
+### 7.3 Prerequisite Readiness for Quests & Recommendations
+- **Domain Invariant (INV-XP03)**: A concept $v$ is *ready* for quest selection if and only if all direct prerequisite ancestors are mastered (`green` band, $c \ge 0.70$):
+  $$\text{isReady}(v) \iff \forall u \in \{u \in V \mid (u, v) \in E\}, \quad c(u) \ge 0.70$$
+  Root concepts (where $\text{in\_degree}(v) = 0$) are ready by definition.
+- *Non-Lockout Invariant*: Concept readiness governs automated quest generation and recommendations ONLY. Students retain full access to navigate syllabus concepts, view generated learning pages, chat with Socratic tutors, and take practice quizzes regardless of prerequisite readiness.
+
+### 7.4 Daily Quest Generation, Selection & Streak Rules
+- **Domain Invariant (INV-XP04)**: The Daily Quest queue is generated once per student per UTC calendar date (`quest_date`).
+  1. **Candidate Set**: Ready concepts in the course that are either under-confident ($c < 0.70$) OR *overdue* for review:
+     $$\text{candidates} = \{v \in V \mid \text{isReady}(v) \land (c(v) < 0.70 \lor \text{isOverdue}(v))\}$$
+  2. **Overdue Definition**: A concept is *overdue* if no server-graded quiz attempt or tutor understanding evidence has been recorded for that concept within the preceding 3 calendar days (72 hours). A concept with zero historical quiz or tutor evidence is unreviewed. Overdue status is an ephemeral scheduling priority tag and NEVER modifies confidence.
+  3. **Deterministic Queue Ordering**: Candidates are sorted by:
+     1. Review urgency: Overdue concepts first ($\text{isOverdue} = \text{true}$ precedes $\text{false}$).
+     2. Confidence ascending: Lowest confidence first ($c$ ascending).
+     3. Graph importance descending: Highest prerequisite importance first ($\text{importance}(v)$ descending via INV-G06).
+     4. Tie-breaking: Concept UUID lexicographically ascending.
+  4. **Queue Bounding & Persistence**: The queue contains $k = \min(3, |\text{candidates}|)$ concepts and is transactionally persisted in `daily_quests`. Reopening the view on the same UTC date returns the identical ordered list and completion subset.
+  5. **Concept Completion**: An item in the Daily Quest is marked complete when the student submits a fully server-graded five-question quiz for that concept.
+  6. **Quest Clear & Streak Invariant**: A Daily Quest clears when all $k$ items are completed.
+     - If $k = 0$, the UI displays an explicit "No review needed" state. An empty quest awards 0 XP bonus and does NOT increment the daily streak.
+     - If $k > 0$, completing all $k$ items sets `cleared_at = now()`, awards a one-time 25 XP bonus, and evaluates the streak:
+       - If student cleared a quest on UTC date $D - 1$, $\text{streak} = \text{streak} + 1$.
+       - If student already cleared a quest on date $D$ (duplicate submission), streak is unchanged.
+       - If student missed date $D - 1$, streak quietly resets to 1 upon clearing date $D$.
+
+### 7.5 Encounter Orchestration & Progressive Tiered Hints
+- **Domain Invariant (INV-XP05)**: Practice Encounters wrap the five-question, four-option practice quiz.
+  1. **Progressive Hint Tiers**: Each question provides exactly three progressive hint tiers: Level 1 (Nudge), Level 2 (Bigger hint), Level 3 (Walkthrough).
+  2. **Server-Side Enforcement**: Hints are stored in `concept_quiz_questions.hints` and released sequentially. Requesting Level $L$ when Level $L - 1$ has not been released returns `409 HINT_OUT_OF_SEQUENCE`. Requesting $L \notin \{1, 2, 3\}$ returns `400 INVALID_HINT_LEVEL`. Repeating an already-released level returns the cached hint without penalty. Requesting a hint on a completed Encounter returns `409 ENCOUNTER_ALREADY_SUBMITTED`.
+  3. **No Solution Leakage**: Hints teach underlying reasoning principles without revealing correct option indexes or exact solution text.
+  4. **Mastery Decoupling**: Hints reduce earned XP but have ZERO effect on quiz scoring ($s = \frac{\text{correctCount}}{5}$) or mastery evidence deltas ($\Delta(s)$ via INV-M01). Practice attempts MUST NOT increment `student_mastery.attempts` (INV-M03).
+
+### 7.6 XP Ledger & Exact-Once Award Constraints
+- **Domain Invariant (INV-XP06)**: XP is recorded in an append-only ledger (`xp_events`) with database unique constraints enforcing exact-once awards:
+  1. **Practice Encounter XP**: For each submitted answer $i \in \{1..5\}$:
+     $$\text{xp}_i = \begin{cases} \max(8, 30 - 6 \times \text{hintsUsed}_i) & \text{if answer is correct} \\ 8 & \text{if answer is incorrect} \end{cases}$$
+     $$\text{xp}_{\text{encounter}} = \sum_{i=1}^5 \text{xp}_i$$
+     Practice XP is awarded at most once per student per concept per UTC calendar date (`UNIQUE (student_id, concept_id, award_date, reason)` where `reason = 'encounter'`). Subsequent attempts on the same date update confidence via canonical quiz formulas but award 0 XP.
+  2. **Daily Quest Clear XP**: Nonempty quest clear awards 25 XP (`reason = 'quest_cleared'`), enforced unique per `(student_id, quest_date)`.
+  3. **Party Quest Clear XP**: Bilateral party quest completion awards 60 XP (`reason = 'party'`) to each peer, enforced unique per `(student_id, party_quest_id)`.
+  4. **Prohibited Awards**: XP is strictly prohibited for logins, reading pages, clicking stars, or passive attendance.
+
+### 7.7 Eclipse Review-Pressure Diagnostic Formula
+- **Domain Invariant (INV-XP07)**: Eclipse quantifies course-level review pressure toward upcoming exams across target concepts $T$:
+  1. **Target Selection**: $T$ contains up to 3 lowest-confidence ready concepts where $c < 0.70$, broken by concept UUID ascending ($n = |T| \le 3$).
+  2. **Strength Calculation**:
+     $$\text{strength} = \begin{cases}
+     0 & \text{if } n = 0 \\
+     \text{round}\left(100 \times \frac{\sum_{i=1}^n \max(0, 0.70 - c_i)}{n \times 0.70}\right) & \text{if } n > 0
+     \end{cases}$$
+     The denominator is $n \times 0.70$ (scaled to actual target count, never hardcoded to 3).
+  3. **Diagnostic Invariant**: Eclipse strength is an integer in $[0, 100]$. It is purely visual and diagnostic; it never modifies confidence.
+  4. **Exam Countdown**: If `courses.exam_at` is set, the UI displays an authentic countdown; if null, the UI surfaces general exam readiness.
+
+### 7.8 Companion Mascot Evolution & Mood Dynamics
+- **Domain Invariant (INV-XP08)**:
+  1. **Course Sky Brightness**: The arithmetic mean of student confidence across all $|V|$ concepts in the course, including unassessed concepts ($c = 0.0$):
+     $$\text{skyBrightness} = \begin{cases} \frac{1}{|V|} \sum_{v \in V} c(v) & \text{if } |V| > 0 \\ 0.0 & \text{if } |V| = 0 \end{cases}$$
+  2. **Mascot Evolutionary Forms**:
+     $$\text{form} = \begin{cases}
+     \text{ember} & \text{if } 0.0 \le \text{skyBrightness} < 0.25 \\
+     \text{spark} & \text{if } 0.25 \le \text{skyBrightness} < 0.55 \\
+     \text{glow} & \text{if } 0.55 \le \text{skyBrightness} < 0.75 \\
+     \text{nova} & \text{if } \text{skyBrightness} \ge 0.75
+     \end{cases}$$
+  3. **Form Progress**: Linear progress between form boundaries:
+     $$\text{formProgress} = \begin{cases}
+     \frac{\text{skyBrightness} - 0.0}{0.25} & \text{if ember} \\
+     \frac{\text{skyBrightness} - 0.25}{0.30} & \text{if spark} \\
+     \frac{\text{skyBrightness} - 0.55}{0.20} & \text{if glow} \\
+     1.0 & \text{if nova}
+     \end{cases}$$
+  4. **Mascot Moods**: Responsive presentation states (`calm`, `think`, `cheer`, `oops`, `sleepy`). Mood animations are client presentation only; they never obstruct user interaction or simulate server state.
+
+### 7.9 Collaborative Party Quests & Independence Invariant
+- **Domain Invariant (INV-XP09)**:
+  1. Matched peers ($S_1, S_2$) from an authenticated `study_group_matches` record may activate a Party quest targeting 1–3 shared concepts $K \subseteq \text{concepts}$.
+  2. Each peer MUST independently complete a five-question practice quiz for each target concept $k \in K$.
+  3. Individual quiz submissions apply canonical quiz mastery evidence independently to each student's personal `student_mastery` record.
+  4. Party quest status transitions to `completed` if and only if all $2 \times |K|$ quiz completions are recorded in `party_quest_progress`.
+  5. Bilateral completion awards 60 XP to each student's `xp_events` ledger exactly once.
+
+### 7.10 Class Sky & Instructor Effort Roster Invariants
+- **Domain Invariant (INV-XP10)**:
+  1. **Class Sky Mean Confidence**: Concept node color in Class Sky reflects cohort mean confidence:
+     $$\bar{c}(v) = \frac{1}{N} \sum_{i=1}^N c_i(v)$$
+     mapped to canonical mastery bands (`gray`, `red`, `yellow`, `green`).
+  2. **Taught Status**: Concept $v$ is *taught* if at least one committed transcript chunk has associated concept $v$. Taught concepts with $\bar{c}(v) < 0.40$ display a prominent attention ring indicator.
+  3. **Deterministic Cohort Percentile**: For student $s$ with metric $X_s$ in a cohort of $N$ students:
+     $$\text{percentile}(s) = \begin{cases} \text{round}\left(100 \times \frac{|\{j \in \text{cohort} \mid X_j < X_s\}|}{\max(1, N - 1)}\right) & \text{if } N > 1 \\ 0 & \text{if } N = 1 \end{cases}$$
+     Ties receive identical percentile rank.
+  4. **High-Effort Low-Mastery Flag**: Flagged deterministically on student $s$ if and only if:
+     $$\text{flag}(s) = \text{high\_effort\_low\_mastery} \iff \text{percentile}_{\text{XP}}(s) \ge 75 \land \text{percentile}_{\text{confidence}}(s) \le 40$$
+  5. **Privacy Guard**: Class Sky and student effort percentiles are strictly instructor-facing. Public leaderboards or peer XP comparisons are forbidden.

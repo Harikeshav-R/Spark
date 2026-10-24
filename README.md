@@ -1,9 +1,9 @@
-# HackOHIO Classroom Companion
+# HackOHIO Classroom Companion (Spark)
 
-A TypeScript-only, real-time classroom intelligence and peer-learning platform. The platform ingests course syllabi into prerequisite knowledge graphs, streams live lecture transcripts, detects discussed concepts in real time, generates Socratic polls with server-side evaluation, updates individual student mastery models, and coordinates consensual peer study groups with genuine Zoom meeting scheduling.
+A TypeScript-only, real-time classroom intelligence, gamified learning, and peer-collaboration platform. The platform ingests course syllabi into prerequisite knowledge graphs, streams live lecture transcripts, detects discussed concepts in real time, generates Socratic polls with server-side evaluation, updates individual student mastery models, and coordinates consensual peer study groups with genuine Zoom meeting scheduling. Learners journey through their curriculum with **Spark**—a reactive SVG companion mascot guiding daily review quests, practice encounters with tiered hints, review-pressure diagnostics, an effort-based XP ledger, and collaborative party goals.
 
-> **Current Repository Status: Documentation-Only**  
-> This repository currently contains the authoritative engineering specification, architecture decision records, data models, API contracts, execution checklist, and four-developer ownership plan. No application code, dependencies, or database migrations are deployed yet. Application paths and scripts referenced throughout the documentation define the future implementation contract.
+> **Current Repository Status: Phase 0 Complete — Phase 1+ Planned**  
+> Phase 0 shared contracts, toolchain skeletons, and foundational fixtures are completed. Phase 1 onward represents the active target implementation plan. All application paths, endpoints, and test suites referenced in documentation for Phase 1+ define the verified forward contract.
 
 ---
 
@@ -18,9 +18,10 @@ HackOHIO Classroom Companion is an independent, production-grade TypeScript recr
 - **Socratic Formative Assessment**: Generates open-ended poll questions aligned with active lecture concepts. The server grades student free-form responses against rubric criteria and updates student mastery atomically.
 - **Evidence-Based Mastery Engine**: Maintains personal concept confidence across four semantic bands (`gray`, `red`, `yellow`, `green`) driven exclusively by verifiable evidence: poll evaluations, Socratic tutoring dialogue, practice quiz submissions, and lecture attendance.
 - **Targeted Teacher Interventions**: Analyzes live aggregate student comprehension and misconceptions to suggest actionable, course-specific teaching adjustments during class.
-- **Autonomous Student Learning**: Generates comprehensive concept learning pages, server-graded practice quizzes, Socratic tutoring conversations, and cited web resources via Perplexity.
-- **Consensual Peer Collaboration**: Matches enrolled students who explicitly opt into a study pool based on complementary knowledge gaps. Facilitates real in-app messaging, mutual availability overlap scheduling, and authentic Zoom meeting creation.
-
+- **Autonomous Student Learning & Spark Quests**: Generates comprehensive concept learning pages, server-graded practice quizzes, Socratic tutoring conversations, and cited web resources via Perplexity. Guides learners with a reactive companion mascot (**Spark**), persistent Daily Quests, streak tracking, practice Encounters with three-tier progressive hints, and an Eclipse exam-readiness diagnostic.
+- **Effort-Based Progression**: Records student learning effort in an append-only server-authoritative XP ledger (`xp_events`) strictly decoupled from academic mastery confidence.
+- **Consensual Peer Collaboration & Party Quests**: Matches enrolled students who explicitly opt into a study pool based on complementary knowledge gaps. Facilitates real in-app messaging, collaborative two-student Party quests on shared concepts, mutual availability overlap scheduling, and authentic Zoom meeting creation.
+- **Instructor Class Sky**: Offers teachers an aggregate knowledge graph showing class mean confidence, transcript-evidenced taught status, and an effort-vs-mastery roster quadrant without student-facing leaderboards.
 ---
 
 ## 2. Reading Routes
@@ -30,7 +31,7 @@ Depending on your role and immediate objective, consult the following documentat
 ### For Engineering Leads & Architects
 1. [PROJECT.md](PROJECT.md) — Executive product and technical brief.
 2. [docs/02-architecture.md](docs/02-architecture.md) — Unified TypeScript runtime, server composition, and state boundaries.
-3. [docs/01-decisions.md](docs/01-decisions.md) & [docs/adr/](docs/adr/) — Accepted Architecture Decision Records (ADR 0001–0011).
+3. [docs/01-decisions.md](docs/01-decisions.md) & [docs/adr/](docs/adr/) — Accepted Architecture Decision Records (ADR 0001–0012).
 4. [docs/03-invariants.md](docs/03-invariants.md) — Mathematical formulas, state machine invariants, and failure counterexamples.
 5. [docs/14-source-audit.md](docs/14-source-audit.md) — Audit of the sibling prototype, discrepancies resolved, and deliberate corrections.
 
@@ -42,7 +43,7 @@ Depending on your role and immediate objective, consult the following documentat
 5. [docs/contracts/service-ports.md](docs/contracts/service-ports.md) & [docs/contracts/examples.md](docs/contracts/examples.md) — Frozen TypeScript service interfaces and JSON fixtures.
 
 ### For Domain & Feature Developers
-- **Data & Storage**: [docs/05-data-model.md](docs/05-data-model.md) (22 application tables, constraints, RPCs).
+- **Data & Storage**: [docs/05-data-model.md](docs/05-data-model.md) (28 application tables, constraints, RPCs).
 - **HTTP API**: [docs/06-http-api.md](docs/06-http-api.md) (REST endpoints, auth policies, error envelopes).
 - **Real-Time WebSockets**: [docs/07-realtime.md](docs/07-realtime.md) (Socket.IO events, room isolation, attendance tracking).
 - **AI Pipelines**: [docs/08-ai-pipelines.md](docs/08-ai-pipelines.md) (Claude and Perplexity prompts, schemas, budgets, and timeouts).
@@ -50,13 +51,13 @@ Depending on your role and immediate objective, consult the following documentat
 - **Security & Secrets**: [docs/10-security.md](docs/10-security.md) (Auth verification, RBAC, Zoom webhook HMAC, encryption at rest).
 - **Quality Assurance**: [docs/11-testing.md](docs/11-testing.md) (Unit, contract, integration, and Playwright E2E suites).
 - **Operations & Runbooks**: [docs/12-operations.md](docs/12-operations.md) (Local setup, Docker Supabase, migrations, deployment).
-- **Demonstration & Acceptance**: [docs/13-demo-and-acceptance.md](docs/13-demo-and-acceptance.md) (Seeded demo scenarios, J01–J08 acceptance criteria).
+- **Demonstration & Acceptance**: [docs/13-demo-and-acceptance.md](docs/13-demo-and-acceptance.md) (Seeded demo scenarios, J01–J11 acceptance criteria).
 
 ---
 
 ## 3. Future Quickstart Prerequisites
 
-When implementation begins in Phase 0, the project will require the following toolchains and services:
+For Phase 1 and subsequent implementation phases, the project requires the following toolchains and services:
 
 - **Node.js**: `24.x` (LTS)
 - **Package Manager**: `npm` (with committed `package-lock.json`)
@@ -99,7 +100,7 @@ When implementation begins in Phase 0, the project will require the following to
 │   ├── 12-operations.md       # Bootstrapping, configuration, migrations, host deployment
 │   ├── 13-demo-and-acceptance.md # Seed data specification and journey acceptance tests
 │   ├── 14-source-audit.md     # Provenance audit and discrepancy resolution record
-│   ├── adr/                   # Accepted Architecture Decision Records (0001–0011)
+│   ├── adr/                   # Accepted Architecture Decision Records (0001–0012)
 │   ├── agents/                # Repo issue tracker and triage documentation
 │   └── contracts/             # Shared TypeScript service ports and JSON fixtures
 ```

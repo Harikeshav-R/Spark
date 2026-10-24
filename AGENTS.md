@@ -17,10 +17,8 @@ Before reading files or making changes, every agent MUST consult:
 
 ## 2. Current Repository State
 
-> **CRITICAL**: The repository is currently in **Phase 0 Documentation-Only Status**.  
-> No application code, dependencies, or migrations are yet deployed in `src/`, `supabase/`, or `server/`. Application paths, npm commands, and test suites referenced in documentation describe the target contract. Agents MUST NOT assume proposed files exist or claim future checkpoints have passed until their respective tasks are actually implemented.
-
----
+> **CRITICAL**: The repository has completed **Phase 0 (Foundations & Shared Contracts)**.  
+> Phase 1 onward represents the active planned engineering sequence. All game, mascot, encounter, and collaboration follow-ons begin in Phase 1 and subsequent phases as documented in [CHECKLIST.md](CHECKLIST.md) and [docs/04-build-plan.md](docs/04-build-plan.md). UI and feature implementers MUST consult canonical product and frontend specifications ([docs/00-product.md](docs/00-product.md) and [docs/09-frontend.md](docs/09-frontend.md)). Agents MUST NOT claim future checkpoints have passed until their respective tasks are actually implemented.
 
 ## 3. Hard Architectural Gates
 
@@ -75,10 +73,10 @@ Follow this seven-step sequence for every assigned task:
 ## 8. Four-Person Ownership & Lane Boundaries
 
 Refer to [OWNERSHIP.md](OWNERSHIP.md) for full lane mappings:
-- **Lane A**: Platform, core database schema, migrations, auth verification, course lifecycle, knowledge graph, and mastery engine.
-- **Lane B**: Live lectures, transcript ingestion, real-time presence, formative polls, Zoom RTMS/OAuth, and peer collaboration.
-- **Lane C**: AI prompt pipelines, Socratic tutoring, learning guides, quizzes, academic search, and autonomous feature UI.
-- **Lane D**: Page shells, navigation, D3-force knowledge graph visualizer, lecture dashboards, and shared UI tokens.
+- **Lane A**: Platform, core database schema, migrations, auth verification, course lifecycle, knowledge graph, mastery engine, and game progression storage (quests, streaks, XP ledger, Eclipse).
+- **Lane B**: Live lectures, transcript ingestion, real-time presence, formative polls, Zoom RTMS/OAuth, peer collaboration, and party quests.
+- **Lane C**: AI prompt pipelines, Socratic tutoring, learning guides, quizzes, practice encounters with tiered hints, academic search, and autonomous feature UI.
+- **Lane D**: Page shells, navigation, D3-force knowledge graph visualizer, warm design tokens, SVG mascot Spark, lecture dashboards, Class Sky, and shared UI tokens.
 
 ---
 

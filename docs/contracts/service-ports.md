@@ -50,6 +50,7 @@ export interface Course {
   description?: string;
   joinCode: string;
   pdfCacheHash?: string;
+  examAt?: ISOTimestamp;
   createdAt: ISOTimestamp;
 }
 
@@ -222,13 +223,27 @@ export interface ClassroomService {
 export interface StudyGroupService {
   optIntoPool(actor: ActorContext, courseId: UUID, conceptIds: UUID[]): Promise<{ status: "waiting" | "matched"; matchId?: UUID; expiresAt: ISOTimestamp }>;
   optOutOfPool(actor: ActorContext, courseId: UUID): Promise<void>;
+  getCandidates(actor: ActorContext, courseId: UUID): Promise<{
+    studentId: UUID;
+    requestedConcepts: { conceptId: UUID; label: string; band: MasteryBand }[];
+    complementaryGap: number;
+    fitKind: "reciprocal" | "mentor";
+  }[]>;
+  sendInvitation(actor: ActorContext, courseId: UUID, inviteeId: UUID, conceptIds: UUID[]): Promise<{ invitationId: UUID; expiresAt: ISOTimestamp }>;
+  respondToInvitation(actor: ActorContext, invitationId: UUID, decision: "accepted" | "declined"): Promise<{ status: "accepted" | "declined"; matchId?: UUID }>;
   registerAvailability(actor: ActorContext, courseId: UUID, intervals: { startsAt: ISOTimestamp; endsAt: ISOTimestamp }[]): Promise<void>;
   getMatchMessages(actor: ActorContext, matchId: UUID): Promise<{ id: UUID; senderId: UUID; content: string; createdAt: ISOTimestamp }[]>;
   sendMessage(actor: ActorContext, matchId: UUID, content: string): Promise<{ id: UUID; senderId: UUID; content: string; createdAt: ISOTimestamp }>;
   proposeSchedule(actor: ActorContext, matchId: UUID): Promise<{ schedulingStatus: "proposed" | "no-overlap"; proposedSlot?: { startsAt: ISOTimestamp; endsAt: ISOTimestamp } }>;
   acceptSchedule(actor: ActorContext, matchId: UUID, slot: { startsAt: ISOTimestamp; endsAt: ISOTimestamp }): Promise<{ bothAccepted: boolean; zoomMeetingId?: string; zoomLink?: string }>;
+  createPartyQuest(actor: ActorContext, matchId: UUID, conceptIds: UUID[]): Promise<{ partyQuestId: UUID; status: "active"; conceptIds: UUID[] }>;
+  getPartyQuests(actor: ActorContext, matchId: UUID): Promise<{
+    partyQuestId: UUID;
+    conceptIds: UUID[];
+    status: "active" | "completed" | "cancelled";
+    progress: { studentId: UUID; conceptId: UUID; completed: boolean }[];
+  }[]>;
 }
-```
 
 ---
 
@@ -335,5 +350,111 @@ export interface ZoomAdapter {
     durationMinutes: number
   ): Promise<{ meetingId: string; joinUrl: string }>;
   validateWebhookSignature(rawBody: string, signature: string, timestamp: string): boolean;
+}
+```
+
+---
+
+## 7. Spark Experience & Game Progression Ports (Phase 1 Extensions)
+
+```typescript
+export type SparkForm = "ember" | "spark" | "glow" | "nova";
+export type EncounterSource = "star" | "daily" | "eclipse" | "party";
+export type HintLevel = 1 | 2 | 3;
+
+export interface DailyQuestDTO {
+  id: UUID;
+  studentId: UUID;
+  date: string; // YYYY-MM-DD, UTC
+  items: {
+    conceptId: UUID;
+    confidence: number;
+    band: MasteryBand;
+    reviewState: "unreviewed" | "overdue" | "current";
+    completed: boolean;
+  }[];
+  clearedAt: ISOTimestamp | null;
+  version: number;
+}
+
+export interface GameSummaryDTO {
+  studentId: UUID;
+  courseId: UUID;
+  xp: number;
+  streakDays: number;
+  skyBrightness: number; // 0..1, formatted as a percentage
+  form: SparkForm;
+  formProgress: number; // 0..1; Nova is 1
+  updatedAt: ISOTimestamp;
+}
+
+export interface EclipseDTO {
+  studentId: UUID;
+  strength: number; // integer 0..100
+  targets: { conceptId: UUID; confidence: number; band: MasteryBand }[];
+  examAt: ISOTimestamp | null;
+}
+
+export type CreateEncounterInput =
+  | { conceptId: UUID; source: "star" | "eclipse" }
+  | { conceptId: UUID; source: "daily"; questId: UUID }
+  | { conceptId: UUID; source: "party"; partyQuestId: UUID };
+
+export interface EncounterDTO {
+  id: UUID;
+  studentId: UUID;
+  conceptId: UUID;
+  source: EncounterSource;
+  questId: UUID | null;
+  partyQuestId: UUID | null;
+  status: "active" | "completed" | "abandoned";
+  questions: {
+    questionId: UUID;
+    question: string;
+    options: [string, string, string, string];
+    hintsUsed: number;
+  }[]; // exactly five
+  version: number;
+}
+
+export interface EncounterResultDTO {
+  encounterId: UUID;
+  attemptId: UUID;
+  score: number;
+  correctCount: number;
+  totalQuestions: 5;
+  newConfidence: number;
+  newBand: MasteryBand;
+  feedback: {
+    questionId: UUID;
+    correct: boolean;
+    correctOption: number;
+    explanation: string;
+  }[];
+  xpAwarded: number; // 0 if daily practice award was already used
+  summary: GameSummaryDTO;
+  dailyQuest: DailyQuestDTO | null;
+}
+
+export interface CourseEffortDTO {
+  studentId: UUID;
+  name: string;
+  xp: number;
+  averageConfidence: number;
+  flag: "high_effort_low_mastery" | null;
+}
+
+export interface GameService {
+  getDailyQuest(actor: ActorContext, studentId: UUID): Promise<DailyQuestDTO>;
+  getSummary(actor: ActorContext, studentId: UUID): Promise<GameSummaryDTO>;
+  getEclipse(actor: ActorContext, studentId: UUID): Promise<EclipseDTO>;
+  getCourseEffort(actor: ActorContext, courseId: UUID): Promise<CourseEffortDTO[]>;
+}
+
+export interface EncounterService {
+  createEncounter(actor: ActorContext, studentId: UUID, input: CreateEncounterInput): Promise<EncounterDTO>;
+  getEncounter(actor: ActorContext, encounterId: UUID): Promise<{ encounter: EncounterDTO; result: EncounterResultDTO | null }>;
+  getHint(actor: ActorContext, encounterId: UUID, questionId: UUID, level: HintLevel): Promise<{ questionId: UUID; level: HintLevel; text: string }>;
+  submitEncounter(actor: ActorContext, encounterId: UUID, answers: { questionId: UUID; selectedOption: number }[]): Promise<EncounterResultDTO>;
 }
 ```

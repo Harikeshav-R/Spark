@@ -23,10 +23,9 @@ tests/
 │   ├── auth-gateway.test.ts    # Token verification and RBAC matrix enforcement
 │   └── peer-matching.test.ts   # Concurrency tests for study group pool claiming
 └── e2e/                        # Multi-browser end-to-end journey tests (Playwright)
-    ├── j01-course-setup.spec.ts
-    ├── j03-live-lecture.spec.ts
-    ├── j04-formative-poll.spec.ts
-    └── j07-peer-collaboration.spec.ts
+    ├── j01-to-j08.spec.ts      # Core journeys (setup, lecture, polls, tutoring, peer match)
+    ├── j09-to-j11.spec.ts      # Spark journeys (daily quest, hints, eclipse, party quest, Class Sky)
+    └── a11y-audit.spec.ts      # Automated axe-core and viewport tests
 ```
 
 ---
@@ -80,3 +79,10 @@ All implementations must formally pass the following regression scenarios:
 - **SC-15: AI Evaluation Timeout**: When the AI evaluation pipeline exceeds 8 seconds, the response status is saved as `pending_evaluation`, confidence is not mutated, and the teacher receives an evaluation failure notice.
 - **SC-16: Live Mode Credential Gate**: In `INTEGRATION_MODE=live`, missing `ANTHROPIC_API_KEY` causes `/api/lectures/:id/poll/generate` to return `503 SERVICE_UNAVAILABLE` rather than falling back to fixture data.
 - **SC-17: Server-Side Quiz Grading**: Student submits practice quiz answers `[0, 2, 1, 3, 0]`. Server calculates score ($4/5 = 80\%$) and awards $+0.15$ delta. Client-submitted score deltas are ignored.
+
+### 4.6 Spark Progression, Encounter & Habit Scenarios
+- **SC-18: Hint Sequencing & Out-of-Sequence Rejection**: Requesting Level 1 hint returns text. Requesting Level 3 directly without Level 2 returns `409 HINT_OUT_OF_SEQUENCE`. Requesting level outside $\{1, 2, 3\}$ returns `400 INVALID_HINT_LEVEL`. Requesting hint after submission returns `409 ENCOUNTER_ALREADY_SUBMITTED`.
+- **SC-19: Practice Encounter Scoring & XP Discount**: 5 correct answers with 0 hints awards 150 XP ($5 \times 30$). 5 correct answers with 3 hints each awards 60 XP ($5 \times \max(8, 30 - 18) = 5 \times 12 = 60$). 5 incorrect answers awards 40 XP ($5 \times 8$). Repeating quiz on same concept on the same UTC date awards 0 XP while updating mastery confidence via canonical quiz formulas.
+- **SC-20: Daily Quest Clearing & Streak Evaluation**: Clearing all nonempty items in Daily Quest sets `cleared_at`, awards 25 XP, and increments streak. Empty quest clear displays "No review needed", awards 0 XP bonus, and leaves streak untouched.
+- **SC-21: Eclipse Review Pressure Calculation**: With 1 target at $c=0.0$, $\text{strength} = 100\%$. With 1 target at $c=0.35$, $\text{strength} = 50\%$. With all targets $\ge 0.70$, $\text{strength} = 0\%$. Empty targets returns 0% with "Clear skies".
+- **SC-22: Bilateral Party Quest Completion**: In a 2-student match, student 1 completes all concepts; party quest remains `active` (0 XP). When student 2 completes all concepts, party quest transitions to `completed` and awards 60 XP to each student's `xp_events` ledger.

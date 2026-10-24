@@ -1,6 +1,6 @@
 # Detailed Build Plan & Execution Instructions
 
-This build plan provides step-by-step engineering instructions, target paths, dependencies, contracts, and verifiable checkpoint commands for all 48 checklist tasks.
+This build plan provides step-by-step engineering instructions, target paths, dependencies, contracts, and verifiable checkpoint commands for all 72 checklist tasks.
 
 ---
 
@@ -252,7 +252,7 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Target Paths**: `src/app/layout.tsx`, `src/app/page.tsx`, `src/app/professor/dashboard/page.tsx`, `src/app/student/[studentId]/page.tsx`
 - **Dependencies**: `P0-D-01`
 - **Consumed / Produced Contracts**: Produces route structure adhering to `docs/09-frontend.md`.
-- **Implementation Instructions**: Build App Router shells with breadcrumbs, role badges, and responsive containers.
+- **Implementation Instructions**: Build App Router shells with breadcrumbs, role badges, and responsive containers. Connect shells to warm theme tokens configured in `P1-D-02`.
 - **Invariant / Error Cases**: Unauthenticated requests to protected paths show sign-in prompt.
 - **Fixture Path**: Next.js development server.
 - **Prerequisites & State**: Design system tokens available.
@@ -260,6 +260,56 @@ This build plan provides step-by-step engineering instructions, target paths, de
 #### CP-P1-D-01 — Route Shell Verification
 - **Command**: `npm run build`
 - **Expected State**: Next.js builds all static and dynamic route shells without layout errors.
+
+---
+### P1-A-05 — Shared Game, Encounter & Party Extension Contracts and Fixtures
+- **Lane**: Lane A
+- **Goal**: Codify canonical TypeScript interfaces, Zod schemas, and synthetic fixtures for Spark progression in `src/contracts/game.ts`.
+- **Target Paths**: `src/contracts/game.ts`, `src/contracts/index.ts`, `tests/fixtures/game.fixture.ts`
+- **Dependencies**: `P0-A-03`, `P0-B-01`, `P0-C-01`
+- **Consumed / Produced Contracts**: Produces `DailyQuestDTO`, `GameSummaryDTO`, `EclipseDTO`, `EncounterDTO`, `EncounterResultDTO`, `CourseEffortDTO`, `GameService`, `EncounterService` interfaces.
+- **Implementation Instructions**: Define Zod schemas and TypeScript types specified in `docs/contracts/service-ports.md` Section 7. Implement deterministic synthetic fixtures in `tests/fixtures/game.fixture.ts` matching `docs/contracts/examples.md` Section 5. Coordinate cross-lane approval gate.
+- **Invariant / Error Cases**: Assert that `hintsUsed` is bounded within $[0, 3]$, `skyBrightness` in $[0.0, 1.0]$, `strength` in $[0, 100]$.
+- **Fixture Path**: In-memory contract tests.
+- **Prerequisites & State**: Phase 0 shared contracts available.
+
+#### CP-P1-A-05 — Game Extension Contract Verification
+- **Command**: `npm test tests/contracts/lane-a/game-contracts.test.ts`
+- **Expected State**: Game and encounter schemas validate all fixtures in `docs/contracts/examples.md`.
+
+---
+
+### P1-A-06 — Additive Spark Learning Relational Migration 0003
+- **Lane**: Lane A
+- **Goal**: Author additive SQL migration creating `encounters`, `daily_quests`, and `xp_events` tables, and adding `courses.exam_at`, `concept_quiz_questions.hints`, and `quiz_attempts.encounter_id`.
+- **Target Paths**: `supabase/migrations/20261021000003_spark_learning.sql`
+- **Dependencies**: `P1-A-04`, `P1-A-05`
+- **Consumed / Produced Contracts**: Produces 3 new application tables (bringing schema to 21 tables) without rewriting Phase 0 migration history.
+- **Implementation Instructions**: Author SQL migration with unique constraint on `daily_quests(student_id, quest_date)`, append-only unique keys on `xp_events`, and 3-string check constraint on `concept_quiz_questions.hints`. Add `party_quest_id` as nullable UUID without foreign key (foreign key added in Phase 6 migration 0005).
+- **Invariant / Error Cases**: Ensure idempotency; reject tables without primary keys or missing foreign keys.
+- **Fixture Path**: Local Docker PostgreSQL.
+- **Prerequisites & State**: Migration 0002 applied.
+
+#### CP-P1-A-06 — Spark Schema Migration Verification
+- **Command**: `npm test tests/integration/lane-a/game-schema.test.ts`
+- **Expected State**: Tables `encounters`, `daily_quests`, and `xp_events` created cleanly in PostgreSQL.
+
+---
+
+### P1-D-02 — Warm Palette Design Tokens & Theme Follow-on
+- **Lane**: Lane D
+- **Goal**: Configure warm editorial palette tokens and surface themes adhering to `docs/09-frontend.md`.
+- **Target Paths**: `src/app/globals.css`, `src/components/ui/theme-provider.tsx`
+- **Dependencies**: `P0-D-01`, `P1-D-01`
+- **Consumed / Produced Contracts**: Produces warm light paper surfaces (`#faf6ee`), panel backgrounds (`#fffdf8`), and high-contrast text tokens (`#2b2a2e`, `#a9481a`).
+- **Implementation Instructions**: Update CSS root variables with canonical palette from `docs/09-frontend.md`. Replace default dark canvas styles with warm paper palette. Verify WCAG AA contrast for text ($\ge 4.5:1$) and non-text focus borders ($\ge 3:1$).
+- **Invariant / Error Cases**: Body text must meet $\ge 4.5:1$ contrast; focus outlines meet $\ge 3:1$.
+- **Fixture Path**: Headless CSS token test.
+- **Prerequisites & State**: Route shells available.
+
+#### CP-P1-D-02 — Warm Palette Verification
+- **Command**: `npm test tests/contracts/lane-d/spark-theme.test.ts`
+- **Expected State**: All design token classes compile cleanly; automated contrast audit confirms WCAG 2.1 AA compliance.
 
 ---
 
@@ -334,20 +384,37 @@ This build plan provides step-by-step engineering instructions, target paths, de
 
 ---
 
-### P2-D-02 — Interactive D3-Force Knowledge Graph Visualizer
+### P2-D-02 — Interactive D3-Force Knowledge Graph Visualizer & Star Vessels
 - **Lane**: Lane D
-- **Goal**: Build D3-force knowledge graph with topological levels, mastery colors, ancestor path highlighting, and a11y labels.
-- **Target Paths**: `src/features/graph/knowledge-graph.tsx`, `src/features/graph/d3-force-layout.ts`
-- **Dependencies**: `P0-D-01`, `P2-A-01`
-- **Consumed / Produced Contracts**: Renders graph payload from `GET /api/courses/:id/graph`.
-- **Implementation Instructions**: Compute topological ranks; run 300-tick precomputation simulation; render SVG nodes with color-coded confidence badges; highlight prerequisite paths on click.
-- **Invariant / Error Cases**: Support `prefers-reduced-motion` by disabling force physics.
+- **Goal**: Build D3-force knowledge graph with topological levels, star vessel rendering, vertical clip-rectangle confidence fill, ancestor path highlighting, and accessible text alternatives.
+- **Target Paths**: `src/features/graph/knowledge-graph.tsx`, `src/features/graph/d3-force-layout.ts`, `src/features/graph/star-vessel.tsx`
+- **Dependencies**: `P0-D-01`, `P2-A-01`, `P1-D-02`
+- **Consumed / Produced Contracts**: Renders graph payload from `GET /api/courses/:id/graph` using warm tokens and star vessels.
+- **Implementation Instructions**: Compute topological ranks; run 300-tick off-screen precomputation simulation; render SVG star vessels at D3 coordinates with bottom-up vertical clip rectangle proportional to confidence ($c \in [0.0, 1.0]$); map visual fill states 1:1 to canonical bands (`gray`, `red`, `yellow`, `green`); highlight prerequisite paths on click.
+- **Invariant / Error Cases**: Support `prefers-reduced-motion` by disabling force physics; ensure all stars have textual status badges.
 - **Fixture Path**: Precomputed CS229 graph fixture.
-- **Prerequisites & State**: Design system available.
+- **Prerequisites & State**: Warm design tokens and DAG validation ready.
 
 #### CP-P2-D-02 — Graph Visualizer Verification
 - **Command**: `npm test tests/unit/lane-d/knowledge-graph.test.ts`
-- **Expected State**: SVG renders 33 nodes; clicking node illuminates all ancestor prerequisite links.
+- **Expected State**: SVG renders 33 star vessels with vertical confidence fill; clicking node illuminates all ancestor prerequisite links.
+
+---
+
+### P2-D-03 — SVG Companion Mascot Spark, Mood Expressions & Form Transitions
+- **Lane**: Lane D
+- **Goal**: Implement responsive SVG companion mascot Spark with mood expressions and form evolution.
+- **Target Paths**: `src/features/mascot/spark-mascot.tsx`, `src/features/mascot/spark-moods.ts`
+- **Dependencies**: `P1-D-02`, `P1-A-05`
+- **Consumed / Produced Contracts**: Consumes `SparkForm`, `skyBrightness`, and client mood state; renders 132px / 84px / 32px SVG mascot.
+- **Implementation Instructions**: Build vector SVG anatomy (body flame, expressive eyes, radiating rays). Implement moods (`calm`, `think`, `cheer`, `oops`, `sleepy`). Implement evolutionary forms (Ember, Spark, Glow, Nova). Use CSS transform/opacity for ambient floating; disable all motion under `prefers-reduced-motion: reduce`.
+- **Invariant / Error Cases**: Mood animations must never obstruct UI controls or simulate server responses.
+- **Fixture Path**: Headless SVG rendering tests.
+- **Prerequisites & State**: Warm palette and game contracts available.
+
+#### CP-P2-D-03 — Spark Mascot Verification
+- **Command**: `npm test tests/unit/lane-d/spark-state.test.ts`
+- **Expected State**: Mascot renders correct SVG paths for all 4 forms and 5 moods; respects reduced-motion.
 
 ---
 
@@ -493,9 +560,9 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Lane**: Lane D
 - **Goal**: Build student live lecture sidebar and pulsing active concept overlay on knowledge graph.
 - **Target Paths**: `src/features/student/student-lecture-view.tsx`, `src/features/graph/active-concept-overlay.tsx`
-- **Dependencies**: `P2-D-02`, `P3-C-01`
+- **Dependencies**: `P2-D-02`, `P3-C-01`, `P2-D-03`
 - **Consumed / Produced Contracts**: Listens for `lecture:concept-detected`; mounts on `/student/[studentId]`.
-- **Implementation Instructions**: Listen for concept detection events; trigger pulsing amber ring on corresponding graph nodes using `motion/react`.
+- **Implementation Instructions**: Listen for concept detection events; trigger pulsing amber ring on corresponding graph nodes using `motion/react`. Trigger attentive `think` mood on mascot Spark via `P2-D-03`.
 - **Invariant / Error Cases**: Pulse animation respects `prefers-reduced-motion`.
 - **Fixture Path**: Mock socket events.
 - **Prerequisites & State**: Graph visualizer ready.
@@ -631,9 +698,9 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Lane**: Lane D
 - **Goal**: Build student poll pop-up modal, submission input, and private evaluation feedback card.
 - **Target Paths**: `src/features/student/active-poll-modal.tsx`, `src/features/student/evaluation-card.tsx`
-- **Dependencies**: `P1-D-01`, `P4-B-01`
+- **Dependencies**: `P1-D-01`, `P4-B-01`, `P2-D-03`
 - **Consumed / Produced Contracts**: Listens for `poll:new-question`; calls `POST /api/polls/:id/respond`.
-- **Implementation Instructions**: Animate modal entrance via `motion/react`; accept text response; display loading spinner; render evaluation outcome (`correct` green badge, `wrong` red badge) and feedback.
+- **Implementation Instructions**: Animate modal entrance via `motion/react`; accept text response; display loading spinner; render evaluation outcome (`correct` green badge, `wrong` red badge) and feedback. Trigger Spark mascot mood reaction (`cheer` on correct, `oops` on wrong) using `P2-D-03`.
 - **Invariant / Error Cases**: Modal closes cleanly when `poll:closed` event arrives.
 - **Fixture Path**: Test poll question payload.
 - **Prerequisites & State**: Student lecture view ready.
@@ -642,6 +709,39 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Command**: `npm test tests/unit/lane-d/student-poll-ui.test.ts`
 - **Expected State**: Student submits answer; evaluation card renders outcome and feedback; personal node updates color.
 
+### P4-A-03 — Class Sky Aggregate Confidence & Course Effort Service
+- **Lane**: Lane A
+- **Goal**: Implement course-level effort aggregation, percentile calculations, and Class Sky concept mean confidence queries.
+- **Target Paths**: `src/server/core/game/course-effort-service.ts`
+- **Dependencies**: `P4-A-02`, `P1-A-06`
+- **Consumed / Produced Contracts**: Implements `GameService.getCourseEffort(actor, courseId)`.
+- **Implementation Instructions**: Query total XP per student from `xp_events`; calculate mean course confidence from `student_mastery`; compute cohort percentile rank via exact formula $\text{round}(100 \times |\{j \mid X_j < X_s\}| / \max(1, N - 1))$; assign `high_effort_low_mastery` flag when $\text{percentile}_{\text{XP}} \ge 75 \land \text{percentile}_{\text{confidence}} \le 40$. Query concept mean confidence and correlate with committed transcript concepts.
+- **Invariant / Error Cases**: Single-student courses return percentile 0; ties share rank; unassessed students remain explicit.
+- **Fixture Path**: Database fixture with 4 students.
+- **Prerequisites & State**: XP ledger and heatmap service ready.
+
+#### CP-P4-A-03 — Course Effort Service Verification
+- **Command**: `npm test tests/unit/lane-a/course-effort.test.ts`
+- **Expected State**: Rahul flagged as `high_effort_low_mastery` with high XP and low confidence; Hari unflagged.
+
+---
+
+### P4-D-03 — Instructor Class Sky Visualization & Effort/Mastery Roster
+- **Lane**: Lane D
+- **Goal**: Build Class Sky tab on teacher dashboard displaying class mean concept stars, taught attention rings, and effort vs mastery quadrant roster.
+- **Target Paths**: `src/features/professor/class-sky.tsx`, `src/features/professor/effort-roster.tsx`
+- **Dependencies**: `P4-D-01`, `P4-A-03`, `P2-D-03`
+- **Consumed / Produced Contracts**: Consumes `CourseEffortDTO[]` and concept mean confidence; mounts on `/professor/dashboard`.
+- **Implementation Instructions**: Render knowledge graph with stars colored by class mean confidence; display attention rings for taught concepts with $\bar{c} < 0.40$; build sortable effort roster with XP, confidence, and `high_effort_low_mastery` warning badge.
+- **Invariant / Error Cases**: Ensure no student-facing leaderboards or public ranking indicators exist.
+- **Fixture Path**: Mock teacher dashboard state.
+- **Prerequisites & State**: Teacher dashboard and course effort service ready.
+
+#### CP-P4-D-03 — Class Sky UI Verification
+- **Command**: `npm test tests/unit/lane-d/class-sky.test.ts`
+- **Expected State**: Taught concept below 0.40 renders crimson attention ring; effort table sorts by XP and confidence percentiles.
+
+---
 ---
 
 ## Phase 5: Autonomous Learning & Socratic Tutoring
@@ -703,7 +803,7 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Target Paths**: `src/server/ai/pipelines/generate-quiz.ts`, `src/server/learning/quiz-service.ts`
 - **Dependencies**: `P1-C-01`, `P5-A-01`
 - **Consumed / Produced Contracts**: Implements `AiService.generateQuizQuestions` and `LearningService.submitQuiz`.
-- **Implementation Instructions**: Generate 5 questions with 4 options each; store correct answer in `concept_quiz_questions`. On submission, grade indices on server; record attempt in `quiz_attempts`.
+- **Implementation Instructions**: Generate 5 questions with 4 options each; store correct answer in `concept_quiz_questions`. On submission, grade indices on server; record attempt in `quiz_attempts`. Hint-capable Encounter enhancements are added in `P5-C-06`.
 - **Invariant / Error Cases**: Strip correct answer indices from student quiz fetch endpoints.
 - **Fixture Path**: Stored quiz question set.
 - **Prerequisites & State**: Learning repository ready.
@@ -780,20 +880,87 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Command**: `npm test tests/unit/lane-d/tutor-route.test.ts`
 - **Expected State**: Tutoring page loads Socratic chat; summaries page renders past lecture highlights.
 
+### P5-A-02 — Daily Quests, Streak Calculation, XP Ledger & Eclipse Service
+- **Lane**: Lane A
+- **Goal**: Implement Daily Quest generation, streak tracking, append-only XP awards, and Eclipse review pressure calculation in `GameService`.
+- **Target Paths**: `src/server/core/game/game-service.ts`, `src/server/core/game/daily-quest-generator.ts`, `src/server/core/game/eclipse-service.ts`
+- **Dependencies**: `P1-A-06`, `P5-A-01`, `P2-A-02`
+- **Consumed / Produced Contracts**: Implements `GameService.getDailyQuest`, `getSummary`, `getEclipse`.
+- **Implementation Instructions**: Generate up to 3 ready concepts (unreviewed, overdue >3 days, or $c < 0.70$) sorted overdue first, confidence ascending, importance descending, UUID ascending. Persist in `daily_quests` for `(student_id, quest_date)`. Compute streak increments on nonempty clear. Calculate Eclipse strength $\text{round}(100 \times \sum \max(0, 0.70 - c_i) / (n \times 0.70))$. Award exact-once XP via `xp_events` with unique constraint enforcement.
+- **Invariant / Error Cases**: Reopening quest on same date returns identical queue; repeating quiz on same concept/date awards 0 XP; empty quest clear awards 0 XP and leaves streak unchanged.
+- **Fixture Path**: Unit test with student mastery fixture.
+- **Prerequisites & State**: Spark schema and quiz evidence ready.
+
+#### CP-P5-A-02 — Game Progression Service Verification
+- **Command**: `npm test tests/integration/lane-a/game-progression.test.ts`
+- **Expected State**: Daily quest generates 3 sorted concepts; streak increments upon clear; repeated clear preserves exact-once XP award.
+
+---
+
+### P5-C-06 — Hint-Capable Question Generation & Practice Encounter Orchestration
+- **Lane**: Lane C
+- **Goal**: Implement `EncounterService` wrapping 5-question quizzes with 3-tier sequential hints and XP calculation.
+- **Target Paths**: `src/server/learning/encounter-service.ts`, `src/server/learning/encounter-repository.ts`
+- **Dependencies**: `P1-A-05`, `P5-C-03`, `P5-A-02`
+- **Consumed / Produced Contracts**: Implements `EncounterService.createEncounter`, `getEncounter`, `getHint`, `submitEncounter`.
+- **Implementation Instructions**: Create encounter with 5 questions and permuted options; store in `encounters`. Handle hint requests with strict sequential unlocking ($1 \to 2 \to 3$). Grade submission against stored keys; apply canonical quiz evidence; calculate XP discounted by hints used ($\max(8, 30 - 6 \times \text{hintsUsed})$ for correct, 8 for incorrect); update daily quest completion subset; emit `game:updated`.
+- **Invariant / Error Cases**: Out-of-sequence hint returns `409 HINT_OUT_OF_SEQUENCE`; level outside 1–3 returns `400 INVALID_HINT_LEVEL`; hint after submit returns `409 ENCOUNTER_ALREADY_SUBMITTED`.
+- **Fixture Path**: Question fixture with 3 hints per question.
+- **Prerequisites & State**: Quiz service and game progression service ready.
+
+#### CP-P5-C-06 — Encounter Service Verification
+- **Command**: `npm test tests/integration/lane-c/encounters.test.ts`
+- **Expected State**: Skipping hint tier returns 409; submission awards correct XP discounted by hints; mastery updates normally.
+
+---
+
+### P5-C-07 — Exported EncounterFeature Component & Hint Drawer
+- **Lane**: Lane C
+- **Goal**: Build accessible `EncounterFeature` React component with question carousel, hint drawer, Spark mood reactions, and reward card.
+- **Target Paths**: `src/features/encounters/encounter-feature.tsx`, `src/features/encounters/hint-drawer.tsx`
+- **Dependencies**: `P5-C-05`, `P5-C-06`
+- **Consumed / Produced Contracts**: Exports `EncounterFeature` consuming `EncounterDTO` and `ActorContext`.
+- **Implementation Instructions**: Render 5-question form with KaTeX math; build 3-tier hint drawer requesting `/api/encounters/:id/hints`; mount 84px Spark mascot in `think` mood; display submission result with score, confidence delta, XP earned, and Spark `cheer`/`oops` reaction.
+- **Invariant / Error Cases**: Ensure submit button disables during transit; render clear error message on server failure.
+- **Fixture Path**: Mock encounter props.
+- **Prerequisites & State**: Feature components and encounter service ready.
+
+#### CP-P5-C-07 — Encounter Feature Verification
+- **Command**: `npm test tests/unit/lane-c/encounter-feature.test.ts`
+- **Expected State**: Requesting hint displays text; submitting all 5 answers renders feedback card with XP total.
+
+---
+
+### P5-D-03 — Student Quests, Eclipse, Mascot Shell Mounting & Encounter Integration
+- **Lane**: Lane D
+- **Goal**: Mount Daily Quest panel, Eclipse diagnostic banner, Summary pill, 132px Spark mascot, and Encounter feature on `/student/[studentId]`.
+- **Target Paths**: `src/features/student/quest-panel.tsx`, `src/features/student/eclipse-banner.tsx`, `src/features/student/game-summary-pill.tsx`, `src/app/student/[studentId]/page.tsx`
+- **Dependencies**: `P5-A-02`, `P5-C-07`, `P2-D-02`, `P2-D-03`
+- **Consumed / Produced Contracts**: Integrates game progression panels with star graph and mounts `EncounterFeature` in slide-over drawer.
+- **Implementation Instructions**: Add summary pill (XP, streak, sky brightness, mascot thumbnail) to header; render Daily Quest panel with ready review items; render Eclipse banner with exam countdown; trigger `EncounterFeature` drawer when student clicks "Practice Encounter" on star detail drawer.
+- **Invariant / Error Cases**: Empty daily quest displays "No review needed" state; reduced motion disables mascot floating.
+- **Fixture Path**: Mock student game state.
+- **Prerequisites & State**: Graph visualizer, mascot, and encounter feature ready.
+
+#### CP-P5-D-03 — Student Game Panels Verification
+- **Command**: `npm test tests/unit/lane-d/student-quests.test.ts`
+- **Expected State**: Daily quest displays items; clicking practice opens encounter drawer; summary pill displays live XP.
+
+---
 ---
 
 ## Phase 6: Consensual Peer Collaboration & Zoom Scheduling
 
-### P6-A-01 — Study Group Relational Schema, Availability & Lock RPCs
+### P6-A-01 — Study Group Relational Schema (Migration 0004), Availability & Lock RPCs
 - **Lane**: Lane A
 - **Goal**: Author migration for `student_availability`, `study_group_messages`, and `claim_and_create_match` RPC.
-- **Target Paths**: `supabase/migrations/20261020000003_study_groups.sql`
-- **Dependencies**: `P0-A-02`
+- **Target Paths**: `supabase/migrations/20261022000004_study_groups.sql`
+- **Dependencies**: `P0-A-02`, `P1-A-06`
 - **Consumed / Produced Contracts**: Produces study group relational schema and atomic pairing lock.
-- **Implementation Instructions**: Author SQL migration creating availability intervals, chat table, and `claim_and_create_match` stored procedure enforcing `student1_id < student2_id`.
+- **Implementation Instructions**: Author SQL migration creating availability intervals, chat table, and `claim_and_create_match` stored procedure enforcing `student1_id < student2_id`. Verify incremental application after game migration 0003 (`20261021000003_spark_learning.sql`).
 - **Invariant / Error Cases**: Prevent simultaneous dual-matching of the same pool entry using `FOR UPDATE` row locks.
 - **Fixture Path**: Local PostgreSQL.
-- **Prerequisites & State**: Base migrations applied.
+- **Prerequisites & State**: Base migrations 0001–0003 applied.
 
 #### CP-P6-A-01 — Study Group Schema Verification
 - **Command**: `npm test tests/integration/lane-a/study-group-schema.test.ts`
@@ -867,22 +1034,71 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Command**: `npm test tests/unit/lane-b/zoom-adapter.test.ts`
 - **Expected State**: Bilateral acceptance calls Zoom adapter, generating authentic meeting ID and join URL.
 
+### P6-A-02 — Additive Collaboration Migration 0005 & Party Quest Constraints
+- **Lane**: Lane A
+- **Goal**: Author migration 0005 creating `study_group_invitations`, `party_quests`, and `party_quest_progress`, and linking foreign key from `encounters.party_quest_id` to `party_quests(id)`.
+- **Target Paths**: `supabase/migrations/20261022000005_spark_collaboration.sql`
+- **Dependencies**: `P6-A-01`, `P1-A-06`
+- **Consumed / Produced Contracts**: Produces 3 collaboration extension tables (bringing total application tables to 28) and enables Encounter party source foreign key.
+- **Implementation Instructions**: Author SQL migration creating tables, constraints, foreign keys, and indexes. Add foreign key from `encounters.party_quest_id` to `party_quests(id)`.
+- **Invariant / Error Cases**: Ensure cascading deletes and strict relational integrity; check that `(party_quest_id, student_id, concept_id)` is unique.
+- **Fixture Path**: Local Docker PostgreSQL.
+- **Prerequisites & State**: Migration 0004 applied.
+
+#### CP-P6-A-02 — Collaboration Extension Schema Verification
+- **Command**: `npm test tests/integration/lane-a/party-schema.test.ts`
+- **Expected State**: Tables created cleanly; encounters foreign key verified.
+
+---
+
+### P6-B-05 — Collaborative Party Quests, Candidate Invitations & Reward Distribution
+- **Lane**: Lane B
+- **Goal**: Implement candidate invitation queries, party quest lifecycle, independent peer completion tracking, and bilateral 60 XP award.
+- **Target Paths**: `src/server/study-groups/party-quest-service.ts`, `src/server/study-groups/invitations-service.ts`
+- **Dependencies**: `P6-A-02`, `P6-B-01`, `P6-B-02`, `P6-B-03`, `P5-C-06`
+- **Consumed / Produced Contracts**: Implements `StudyGroupService.getCandidates`, `sendInvitation`, `respondToInvitation`, `createPartyQuest`, `getPartyQuests`.
+- **Implementation Instructions**: Query opted-in pool candidates with gap $\ge 0.30$; label reciprocal vs mentor fit ($fit = \min(99, \text{round}(100 \times gap))$); create and accept invitations with 5-minute pool expiration; track individual peer quiz progress for 1–3 shared concepts; award 60 XP to each peer in `xp_events` upon bilateral completion; emit `party:quest-updated`.
+- **Invariant / Error Cases**: Invitations to expired pool entries return `409 INVITATION_EXPIRED`; party quest requires bilateral completion before awarding XP; party attendance or chat never grants mastery confidence directly.
+- **Fixture Path**: Mock study group match and party quest progress.
+- **Prerequisites & State**: Study group services and encounter service ready.
+
+#### CP-P6-B-05 — Party Quests Verification
+- **Command**: `npm test tests/integration/lane-b/party-quests.test.ts`
+- **Expected State**: Candidates return with fit labels; bilateral quiz completion marks party quest completed and awards 60 XP each.
+
+---
+
+### P6-C-01 — Extended StudyGroupFeature with Invitations, Fit Badges & Party Goals
+- **Lane**: Lane C
+- **Goal**: Extend `StudyGroupFeature` with candidate invitations list, fit badges, and collaborative Party Quest progress tracking.
+- **Target Paths**: `src/features/study-groups/party-quest-panel.tsx`, `src/features/study-groups/candidate-invites.tsx`, `src/features/study-groups/study-group-feature.tsx`
+- **Dependencies**: `P5-C-05`, `P6-B-05`
+- **Consumed / Produced Contracts**: Consumes `party_quests` and `invitations` state; exports extended `StudyGroupFeature`.
+- **Implementation Instructions**: Render candidate cards with fit badges (e.g., "92% Fit — Reciprocal Strengths"); provide "Send Invite" button; render Party Quest card with progress checkboxes for both peers; retain existing peer chat and Zoom meeting buttons.
+- **Invariant / Error Cases**: Ensure unconsenting classmates cannot be invited; disable invite buttons when pool entry expires.
+- **Fixture Path**: Mock extended study group props.
+- **Prerequisites & State**: Base study group feature and party quest service ready.
+
+#### CP-P6-C-01 — Extended Study Group UI Verification
+- **Command**: `npm test tests/unit/lane-c/party-feature.test.ts`
+- **Expected State**: Candidate cards render with fit score; party quest progress displays dual-student checkmarks.
+
 ---
 
 ### P6-D-01 — Peer Study Group Route Shell & Chat Interface
 - **Lane**: Lane D
-- **Goal**: Mount `StudyGroupFeature` on `/student/[studentId]/study-group` with real-time chat, availability picker, and Zoom join button.
+- **Goal**: Mount extended `StudyGroupFeature` on `/student/[studentId]/study-group` with real-time chat, availability picker, Zoom join button, candidate invitations, and party quests.
 - **Target Paths**: `src/app/student/[studentId]/study-group/page.tsx`
-- **Dependencies**: `P1-D-01`, `P5-C-05`, `P6-B-02`
-- **Consumed / Produced Contracts**: Mounts Lane C `StudyGroupFeature`.
-- **Implementation Instructions**: Render pool opt-in card, concept checkboxes, availability calendar selector, in-app messaging feed, and Zoom meeting card.
+- **Dependencies**: `P1-D-01`, `P5-C-05`, `P6-B-02`, `P6-C-01`
+- **Consumed / Produced Contracts**: Mounts Lane C extended `StudyGroupFeature`.
+- **Implementation Instructions**: Render pool opt-in card, candidate invitations, availability calendar selector, in-app messaging feed, collaborative Party Quest panel, and Zoom meeting card.
 - **Invariant / Error Cases**: Display clear waiting state while peer match is pending.
 - **Fixture Path**: Mock peer match data.
 - **Prerequisites & State**: Route shells ready.
 
 #### CP-P6-D-01 — Peer Study Group UI Verification
 - **Command**: `npm test tests/unit/lane-d/study-group-route.test.ts`
-- **Expected State**: Student views chat feed, sends message, and sees Zoom button upon meeting creation.
+- **Expected State**: Student views chat feed, sends message, sees party quest progress, and sees Zoom button upon meeting creation.
 
 ---
 
@@ -892,7 +1108,7 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Lane**: Lane A
 - **Goal**: Assemble composition root in `server/index.ts`, author `Dockerfile`, and configure Render deploy pipeline.
 - **Target Paths**: `server/index.ts`, `Dockerfile`, `render.yaml`
-- **Dependencies**: `P1-A-01`, `P3-B-01`, `P6-B-04`, `P5-C-01`
+- **Dependencies**: `P1-A-01`, `P3-B-01`, `P6-B-04`, `P5-C-01`, `P5-A-02`, `P5-C-06`, `P6-B-05`
 - **Consumed / Produced Contracts**: Wires all services via constructor dependency injection; mounts Express and Next.js.
 - **Implementation Instructions**: Build production server startup sequence; attach health check probe `GET /api/health`; configure graceful shutdown handlers (`SIGTERM`, `SIGINT`).
 - **Invariant / Error Cases**: Ensure custom server handles both `/api/*` and Next page requests without port conflicts.
@@ -909,12 +1125,12 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Lane**: Lane A
 - **Goal**: Author deterministic database seed script, fast reset utility, and DemoToolbar helper for live demonstrations and video recording.
 - **Target Paths**: `scripts/seed.ts`, `scripts/demo.ts`, `scripts/reset-demo.ts`, `src/components/demo/demo-toolbar.tsx`
-- **Dependencies**: `P2-A-02`, `P1-A-03`, `P7-A-01`
+- **Dependencies**: `P2-A-02`, `P1-A-03`, `P7-A-01`, `P6-A-02`
 - **Consumed / Produced Contracts**: Populates canonical demo dataset defined in `docs/13-demo-and-acceptance.md` and provides `npm run demo:reset`.
-- **Implementation Instructions**: Insert CS229 course; insert 33 concepts and 34 edges; insert Prof. Chen, Hari, Rahul, Praj, Vamshi; insert 132 `student_mastery` rows with baseline confidence values. Implement `npm run demo:reset` to truncate transient demo rows and restore baseline in under 2 seconds. Implement floating `DemoToolbar` in `src/components/demo/demo-toolbar.tsx` providing one-click persona switching (Prof. Chen / Hari / Rahul), simulated speech stepping, scripted poll answer injection, and instant peer matching.
+- **Implementation Instructions**: Insert CS229 course; insert 33 concepts and 34 edges; insert Prof. Chen, Hari, Rahul, Praj, Vamshi; insert 132 `student_mastery` rows with baseline confidence values. Add deterministic labeled game fixtures (Daily Quest records, XP ledger rows, party quest seeds). Implement `npm run demo:reset` to truncate transient demo rows and restore baseline in under 2 seconds. Implement floating `DemoToolbar` in `src/components/demo/demo-toolbar.tsx` providing one-click persona switching (Prof. Chen / Hari / Rahul), simulated speech stepping, scripted poll answer injection, and instant peer matching. Document all five migration targets (0001–0005).
 - **Invariant / Error Cases**: Script execution is idempotent; running twice leaves counts unchanged. Demo endpoints and toolbar are disabled in `NODE_ENV=production`.
 - **Fixture Path**: Local Supabase database.
-- **Prerequisites & State**: Migrations 0001–0003 applied.
+- **Prerequisites & State**: Migrations 0001–0005 applied.
 
 #### CP-P7-A-02 — Database Seed Verification
 - **Command**: `npm run db:seed`
@@ -945,7 +1161,7 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Target Paths**: `tests/integration/lane-c/ai-live.test.ts`
 - **Dependencies**: `P4-C-01`, `P4-C-02`, `P5-C-04`
 - **Consumed / Produced Contracts**: Validates live AI pipelines.
-- **Implementation Instructions**: Execute live verification tests gated by `ANTHROPIC_API_KEY` and `PERPLEXITY_API_KEY`; assert schema validation on live model output.
+- **Implementation Instructions**: Execute live verification tests gated by `ANTHROPIC_API_KEY` and `PERPLEXITY_API_KEY`; assert schema validation on live model output and verify 3-tier hints generation in quiz pipeline.
 - **Invariant / Error Cases**: Provider rate limits or missing keys fail loudly with typed status codes.
 - **Fixture Path**: Explicit live gate test.
 - **Prerequisites & State**: API keys configured in environment.
@@ -971,15 +1187,30 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Command**: `npm run test:e2e`
 - **Expected State**: All 8 user journeys J01–J08 pass completely with green assertions.
 
+### P7-D-04 — Journeys J09–J11 Playwright End-to-End Test Suite
+- **Lane**: Lane D
+- **Goal**: Execute automated multi-browser Playwright test suite validating user journeys J09, J10, and J11.
+- **Target Paths**: `tests/e2e/j09-to-j11.spec.ts`
+- **Dependencies**: `P7-A-02`, `P5-D-03`, `P4-D-03`, `P6-D-01`
+- **Consumed / Produced Contracts**: End-to-end game progression, mascot, encounter, party quest, and Class Sky test harness.
+- **Implementation Instructions**: Run Playwright suite testing Daily Quest review clear, sequential 3-tier hints and XP discounting, streak increment, Eclipse pressure computation and exam countdown, Spark mascot form evolution, bilateral Party quest completion and 60 XP award, and instructor Class Sky mean confidence and effort roster quadrant (`high_effort_low_mastery` flag).
+- **Invariant / Error Cases**: Assert hints cannot be unlocked out of sequence; assert duplicate practice on same date awards 0 XP; assert party quest awards XP only upon bilateral completion; assert no public student leaderboards exist.
+- **Fixture Path**: Executed against local custom server in fixture mode.
+- **Prerequisites & State**: Server and database running with seed data.
+
+#### CP-P7-D-04 — J09–J11 E2E Journey Suite Verification
+- **Command**: `npx playwright test tests/e2e/j09-to-j11.spec.ts`
+- **Expected State**: All 3 journeys J09, J10, J11 pass completely with verified assertions.
+
 ---
 
 ### P7-D-02 — Responsive Layout & Accessibility Audit Verification
 - **Lane**: Lane D
 - **Goal**: Execute automated axe-core accessibility audits and responsive viewport tests across all page routes.
 - **Target Paths**: `tests/e2e/a11y-audit.spec.ts`
-- **Dependencies**: `P7-D-01`
+- **Dependencies**: `P7-D-01`, `P7-D-04`
 - **Consumed / Produced Contracts**: Accessibility and visual regression test suite.
-- **Implementation Instructions**: Run axe-core checks on `/`, `/professor/dashboard`, `/student/[studentId]`, and `/student/[studentId]/concepts/[conceptId]`. Assert zero WCAG 2.1 AA violations.
+- **Implementation Instructions**: Run axe-core checks on `/`, `/professor/dashboard`, `/student/[studentId]`, and `/student/[studentId]/concepts/[conceptId]`. Audit all pages including Class Sky, Daily Quest, and Encounter drawer at 400px and 1360px viewports with reduced motion checks. Assert zero WCAG 2.1 AA violations.
 - **Invariant / Error Cases**: Check that mastery colors provide text alternatives and reduced-motion stops physics.
 - **Fixture Path**: Headless Playwright run.
 - **Prerequisites & State**: Frontend pages running.
@@ -992,11 +1223,11 @@ This build plan provides step-by-step engineering instructions, target paths, de
 
 ### P7-D-03 — Final Classroom Milestone & Complete Product Acceptance
 - **Lane**: Lane D
-- **Goal**: Execute final comprehensive demonstration runbook and verify all acceptance criteria.
+- **Goal**: Execute final comprehensive demonstration runbook and verify all acceptance criteria across journeys J01 through J11.
 - **Target Paths**: `docs/13-demo-and-acceptance.md`
-- **Dependencies**: `P7-A-01` through `P7-D-02`
-- **Consumed / Produced Contracts**: Final verification signoff.
-- **Implementation Instructions**: Run `npm run check` and `npm run demo -- --mode=fixture --seed=42`. Verify that all full-product capabilities (classroom streaming, formative polls, Socratic tutoring, peer collaboration, and Zoom meetings) function cleanly.
+- **Dependencies**: `P7-A-01` through `P7-D-02`, `P7-D-04`
+- **Consumed / Produced Contracts**: Final verification signoff covering all eleven journeys (J01–J11).
+- **Implementation Instructions**: Run `npm run check` and `npm run demo -- --mode=fixture --seed=42`. Verify that all full-product capabilities (classroom streaming, formative polls, Socratic tutoring, peer collaboration, Zoom meetings, Spark mascot, Daily Quests, encounters with tiered hints, Eclipse, and Class Sky) function cleanly.
 - **Invariant / Error Cases**: Ensure no fake live claims or unverified fallbacks exist.
 - **Fixture Path**: Full application stack.
 - **Prerequisites & State**: Complete system deployed locally.
@@ -1004,3 +1235,6 @@ This build plan provides step-by-step engineering instructions, target paths, de
 #### CP-P7-D-03 — Final Acceptance Signoff
 - **Command**: `npm run check && npm run demo -- --mode=fixture --seed=42`
 - **Expected State**: All typechecks, linters, unit tests, contract checks, and demo runbooks pass with zero errors.
+---
+
+
