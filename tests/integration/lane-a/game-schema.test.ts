@@ -10,13 +10,24 @@ import { EnrollmentRepository } from "../../../src/server/core/enrollment/enroll
 
 const isFixtureMode = process.env.INTEGRATION_MODE === "fixture";
 
+const DB_CONTAINER = process.env.SUPABASE_DB_CONTAINER ?? (
+  (() => {
+    try {
+      execFileSync("docker", ["inspect", "supabase_db_spark"], { stdio: "ignore" });
+      return "supabase_db_spark";
+    } catch {
+      return "supabase_db_HackOHIO-2026";
+    }
+  })()
+);
+
 function runPsql(sql: string): string {
   return execFileSync(
     "docker",
     [
       "exec",
       "-i",
-      "supabase_db_HackOHIO-2026",
+      DB_CONTAINER,
       "psql",
       "-U",
       "postgres",
@@ -40,7 +51,7 @@ function runPsqlExpectError(sql: string): string {
       [
         "exec",
         "-i",
-        "supabase_db_HackOHIO-2026",
+        DB_CONTAINER,
         "psql",
         "-U",
         "postgres",

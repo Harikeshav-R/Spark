@@ -304,13 +304,23 @@ describe.skipIf(isFixtureMode)(
         EXECUTE FUNCTION ${fnName}();
       `;
 
+      const dbContainer = process.env.SUPABASE_DB_CONTAINER ?? (
+        (() => {
+          try {
+            execFileSync("docker", ["inspect", "supabase_db_spark"], { stdio: "ignore" });
+            return "supabase_db_spark";
+          } catch {
+            return "supabase_db_HackOHIO-2026";
+          }
+        })()
+      );
+
       try {
         execFileSync(
           "docker",
-          ["exec", "-i", "supabase_db_HackOHIO-2026", "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"],
+          ["exec", "-i", dbContainer, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"],
           { input: installSql },
         );
-
         // Attempt enrollment - must fail
         await expect(service.enrollStudent(actor, course.joinCode)).rejects.toThrow();
 
@@ -340,7 +350,7 @@ describe.skipIf(isFixtureMode)(
         `;
         execFileSync(
           "docker",
-          ["exec", "-i", "supabase_db_HackOHIO-2026", "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"],
+          ["exec", "-i", dbContainer, "psql", "-U", "postgres", "-d", "postgres", "-v", "ON_ERROR_STOP=1"],
           { input: cleanupSql },
         );
       }
