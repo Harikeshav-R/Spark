@@ -17,6 +17,8 @@ This repository contains shared agent skills and Model Context Protocol (MCP) se
 │   └── skills -> ../.agents/skills # Symlink to shared skills
 ├── mcp.json                      # Universal MCP config (Cursor, VS Code, Codex)
 ├── mcp.json.example              # Template with environment variable documentation
+├── scripts/
+│   └── setup-agent-tooling.sh    # Automated agent & MCP setup script (`npm run setup:agents`)
 └── docs/tooling/
     └── AGENTS_SETUP.md           # This onboarding and operational guide
 ```
@@ -91,7 +93,124 @@ All skills live in `.agents/skills/` and are accessible to any compatible AI ass
 
 ---
 
-## 4. Teammate Setup Guide
+## 4. One-Command Automated Setup
+
+For any developer machine or autonomous agent:
+
+```bash
+npm run setup:agents
+```
+
+This runs `scripts/setup-agent-tooling.sh`, which:
+1. Ensures `~/.local/bin` is in `$PATH`.
+2. Checks for `codebase-memory-mcp`; if absent, installs via the official installer script.
+3. Checks for `agentation-mcp`; if absent, installs via global npm or generates a local execution wrapper in `~/.local/bin/`.
+4. Verifies project JSON configs (`mcp.json`, `.claude/mcp.json`, `.omp/mcp.json`) and 35 skills.
+
+---
+
+## 5. Detailed Installation & Verification for Local MCP Binaries
+
+### A. Codebase Memory MCP (`codebase-memory-mcp`)
+A high-performance code intelligence server that builds and queries a persistent knowledge graph of symbols, call hierarchies, and AST relationships.
+
+#### Installation Instructions (macOS & Linux)
+Run the automated installer in your terminal:
+```bash
+curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash
+```
+
+To include the optional 3D graph visualizer UI (`CBM Lens`):
+```bash
+curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --ui
+```
+
+Ensure `~/.local/bin` is exported in your shell profile (`~/.zshrc` or `~/.bashrc`):
+```bash
+export PATH="${HOME}/.local/bin:${PATH}"
+```
+
+#### Automatic Agent Configuration
+Once installed, auto-configure all detected AI coding agents on your machine:
+```bash
+codebase-memory-mcp install -y
+```
+
+#### Initial Repository Indexing
+Index this project so agents can query the knowledge graph:
+```bash
+codebase-memory-mcp cli index_repository
+```
+
+#### Verification Commands
+```bash
+which codebase-memory-mcp
+codebase-memory-mcp --version
+codebase-memory-mcp index-status
+```
+
+---
+
+### B. Agentation MCP (`agentation-mcp`)
+A real-time visual feedback MCP server connecting in-browser element annotations directly to AI coding agents.
+
+#### Installation Instructions
+Install the MCP server package globally:
+```bash
+npm install -g agentation-mcp
+```
+
+Or, if global npm permissions are restricted, create the executable wrapper:
+```bash
+cat << 'EOF' > "${HOME}/.local/bin/agentation-mcp"
+#!/usr/bin/env bash
+exec npx -y agentation-mcp "$@"
+EOF
+chmod +x "${HOME}/.local/bin/agentation-mcp"
+```
+
+#### Diagnostic & Health Verification
+Test server connectivity and agent readiness:
+```bash
+npx -y agentation-mcp doctor
+```
+
+#### Connecting in Web Application (Frontend Development)
+When working on UI components in `src/app/`, teammates can mount the visual toolbar in development:
+```bash
+npm install -D agentation
+```
+```tsx
+// src/app/layout.tsx (dev-only)
+import { Agentation } from 'agentation';
+
+{process.env.NODE_ENV === 'development' && (
+  <Agentation endpoint="http://localhost:4747" />
+)}
+```
+
+---
+
+## 6. Autonomous Agent Instructions
+
+Coding agents encountering missing MCP tools MUST follow this procedure:
+
+```markdown
+### Agent Self-Healing Protocol
+If `codebase-memory-mcp` or `agentation-mcp` fails with `command not found` or `ENOENT`:
+1. Execute the repository setup script:
+   `bash scripts/setup-agent-tooling.sh`
+2. Ensure PATH includes `~/.local/bin`:
+   `export PATH="${HOME}/.local/bin:${PATH}"`
+3. Verify binary readiness:
+   `codebase-memory-mcp --version`
+   `agentation-mcp doctor`
+4. If running in Claude Code or Oh My Pi, restart or reload the session to mount newly registered tools.
+```
+
+---
+
+## 7. Teammate Setup Guide by Client
 
 ### Environment Variables
 Export the following in your shell (`~/.zshrc`, `~/.bashrc`, or `.env.local`):
@@ -107,23 +226,24 @@ export DATABASE_URI="postgresql://postgres:postgres@127.0.0.1:54322/postgres"
 
 #### 1. Claude Code
 Claude Code automatically discovers skills in `.claude/skills` (symlinked to `.agents/skills`) and MCP servers in `.claude/mcp.json`.
-To start:
 ```bash
+npm run setup:agents
 claude
 ```
 
 #### 2. Oh My Pi / Pi (`omp`)
 `omp` automatically loads `.omp/mcp.json` and project skills from `.omp/skills`.
-To start:
 ```bash
+npm run setup:agents
 omp
 ```
 
 #### 3. Cursor
 Cursor reads MCP servers from project-root `mcp.json` (or `.cursor/mcp.json`).
-- Open Cursor Settings -> Features -> MCP Servers.
-- Ensure the project `mcp.json` is recognized.
-- Cursor agent will automatically index skills in `.agents/skills/`.
+1. Run `npm run setup:agents`.
+2. Open Cursor Settings -> Features -> MCP Servers.
+3. Verify servers are listed and green.
+4. Cursor agent automatically indexes skills from `.agents/skills/`.
 
 #### 4. Generic / Other Agents (Codex, Windsurf, OpenCode)
-All skills reside in the standard `.agents/skills/` directory. Direct your agent's skill or prompt directory to `.agents/skills/`.
+All skills reside in the standard `.agents/skills/` directory. Direct your agent's skill directory to `.agents/skills/` and MCP configuration to `mcp.json`.

@@ -117,6 +117,9 @@ The five canonical triage labels are: `needs-triage`, `needs-info`, `ready-for-a
 ### Domain Documentation Guidelines
 This is a single-context repository utilizing **[GLOSSARY.md](GLOSSARY.md)** at the root and **[docs/adr/](docs/adr/)** for architectural decisions. Before exploring domain concepts, consult **[docs/agents/domain.md](docs/agents/domain.md)**. Always use vocabulary defined in `GLOSSARY.md` and avoid terms explicitly flagged under `_Avoid_`.
 
+### Agent Tooling & MCP Environment
+Shared agent skills reside in `.agents/skills/` (with `.claude/skills` and `.omp/skills` symlinks). Universal and client-specific MCP servers are configured in `mcp.json`, `.claude/mcp.json`, and `.omp/mcp.json`. If `codebase-memory-mcp` or `agentation-mcp` are missing from your environment, run `npm run setup:agents` to install and verify them. See **[docs/tooling/AGENTS_SETUP.md](docs/tooling/AGENTS_SETUP.md)**.
+
 ---
 
 ## 12. Definition of Done (DoD) Checklist
