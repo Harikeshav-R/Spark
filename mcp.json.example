@@ -1,0 +1,85 @@
+{
+  "_comment": "Example configuration for Spark MCP servers. Copy values into your local client or environment.",
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ],
+      "_description": "Real-time framework and library documentation lookup"
+    },
+    "shadcn": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "shadcn@latest",
+        "mcp"
+      ],
+      "_description": "Shadcn UI component registry search and code examples"
+    },
+    "motion": {
+      "url": "https://mcp.motion.dev",
+      "_description": "Motion animation examples, patterns, and documentation"
+    },
+    "chrome-devtools": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--no-usage-statistics",
+        "--no-performance-crux"
+      ],
+      "_description": "Chrome browser inspection, console, network, and screenshots"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--isolated"
+      ],
+      "_description": "Isolated browser automation and E2E testing"
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ],
+      "_description": "Web fetch and markdown extraction"
+    },
+    "github": {
+      "url": "https://api.githubcopilot.com/mcp/",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_TOKEN}"
+      },
+      "_description": "GitHub Copilot API / PR / Issues MCP (Set GITHUB_TOKEN in your environment)"
+    },
+    "postgres": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--add-host=host.docker.internal:host-gateway",
+        "-e",
+        "DATABASE_URI",
+        "crystaldba/postgres-mcp",
+        "--access-mode=unrestricted"
+      ],
+      "_description": "PostgreSQL schema inspection (requires Docker and DATABASE_URI)"
+    },
+    "codebase-memory-mcp": {
+      "command": "codebase-memory-mcp",
+      "args": [],
+      "_description": "Codebase structural knowledge graph (requires codebase-memory-mcp in PATH)"
+    },
+    "agentation": {
+      "command": "agentation-mcp",
+      "args": [
+        "server"
+      ],
+      "_description": "Agentation visual annotations server (requires agentation-mcp in PATH)"
+    }
+  }
+}

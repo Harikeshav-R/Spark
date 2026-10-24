@@ -12,7 +12,9 @@ out/
 *.pem
 
 # Local tooling & editor state
-.omp/
+.omp/*
+!.omp/mcp.json
+!.omp/skills
 .DS_Store
 *.log
 coverage/
@@ -22,3 +24,5 @@ playwright-report/
 blob-report/
 *.tsbuildinfo
 .superpowers/
+__pycache__/
+*.pyc
