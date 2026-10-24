@@ -95,3 +95,158 @@
 .animate-active-concept {
   animation: active-concept-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* ============================================================================ */
+/* Spark Mascot Companion Styles & Animation (P2-D-03)                         */
+/* ============================================================================ */
+
+.spark-mascot {
+  overflow: visible;
+  pointer-events: none;
+}
+
+.spark-mascot-figure {
+  transform-origin: 66px 80px;
+}
+
+.spark-mascot-shadow {
+  transform-origin: 66px 117px;
+  opacity: 0.12;
+}
+
+.spark-mascot-halo-glow {
+  opacity: 0.16;
+}
+
+.spark-mascot-halo-nova {
+  opacity: 0.24;
+}
+
+/* Static mood presentation */
+.spark-mascot-mood-think {
+  transform: rotate(5deg);
+}
+
+/* Ambient and reactive animations gated to prefers-reduced-motion: no-preference */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes spark-mascot-float {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes spark-mascot-brow-pulse {
+    0%, 100% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  @keyframes spark-mascot-cheer-hop {
+    0% {
+      transform: translateY(0);
+    }
+    35% {
+      transform: translateY(-8px);
+    }
+    65% {
+      transform: translateY(-2px);
+    }
+    100% {
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes spark-mascot-sparkle-burst {
+    0% {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1.15);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  @keyframes spark-mascot-shrug {
+    0% {
+      transform: rotate(0deg) translateY(0);
+    }
+    30% {
+      transform: rotate(-3deg) translateY(1.5px);
+    }
+    65% {
+      transform: rotate(3deg) translateY(1px);
+    }
+    100% {
+      transform: rotate(0deg) translateY(0);
+    }
+  }
+
+  @keyframes spark-mascot-breathe {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.02);
+      opacity: 0.92;
+    }
+  }
+
+  @keyframes spark-mascot-form-fade {
+    0% {
+      opacity: 0.7;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  .spark-mascot-mood-calm {
+    animation: spark-mascot-float 3s ease-in-out infinite;
+  }
+
+  .spark-mascot-mood-think .spark-mascot-brow {
+    animation: spark-mascot-brow-pulse 1.5s ease-in-out infinite;
+  }
+
+  .spark-mascot-mood-cheer {
+    animation: spark-mascot-cheer-hop 640ms cubic-bezier(0.2, 0.8, 0.2, 1) 1 forwards;
+  }
+
+  .spark-mascot-cheer-sparkles {
+    transform-origin: 66px 36px;
+    animation: spark-mascot-sparkle-burst 640ms ease-out 1 forwards;
+  }
+
+  .spark-mascot-mood-oops {
+    animation: spark-mascot-shrug 480ms ease-out 1 forwards;
+  }
+
+  .spark-mascot-mood-sleepy {
+    animation: spark-mascot-breathe 4s ease-in-out infinite;
+  }
+
+  .spark-mascot-form-layer {
+    animation: spark-mascot-form-fade 180ms ease-out 1;
+  }
+}
+
+/* Strict zero-motion override for prefers-reduced-motion: reduce */
+@media (prefers-reduced-motion: reduce) {
+  .spark-mascot,
+  .spark-mascot * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
