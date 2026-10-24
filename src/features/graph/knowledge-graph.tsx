@@ -25,6 +25,47 @@ export interface KnowledgeGraphProps {
   className?: string;
 }
 
+function captureGraphPointer(element: SVGSVGElement, pointerId: number): void {
+  if (typeof element.setPointerCapture !== "function") {
+    return;
+  }
+  try {
+    if (
+      typeof element.hasPointerCapture === "function" &&
+      element.hasPointerCapture(pointerId)
+    ) {
+      return;
+    }
+    element.setPointerCapture(pointerId);
+  } catch (error: unknown) {
+    console.warn("[KnowledgeGraph] Pointer capture failed", {
+      operation: "set",
+      pointerId,
+      error,
+    });
+  }
+}
+
+function releaseGraphPointer(element: SVGSVGElement, pointerId: number): void {
+  if (
+    typeof element.hasPointerCapture !== "function" ||
+    typeof element.releasePointerCapture !== "function"
+  ) {
+    return;
+  }
+  try {
+    if (element.hasPointerCapture(pointerId)) {
+      element.releasePointerCapture(pointerId);
+    }
+  } catch (error: unknown) {
+    console.warn("[KnowledgeGraph] Pointer capture failed", {
+      operation: "release",
+      pointerId,
+      error,
+    });
+  }
+}
+
 export function KnowledgeGraph({
   graph,
   className,
@@ -274,11 +315,7 @@ export function KnowledgeGraph({
       // Only capture pointer immediately if clicking SVG background, not a button
       const isInteractive = (e.target as Element)?.closest?.('[role="button"]');
       if (!isInteractive) {
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-        } catch {
-          // Pointer capture may fail on unsupported devices
-        }
+        captureGraphPointer(e.currentTarget, e.pointerId);
       }
     } else if (activePointers.current.size === 2) {
       const pts = Array.from(activePointers.current.values());
@@ -294,11 +331,7 @@ export function KnowledgeGraph({
         pinchDist: dist,
         pinchZoom: zoom,
       };
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch {
-        // Pointer capture may fail on unsupported devices
-      }
+      captureGraphPointer(e.currentTarget, e.pointerId);
     }
   };
 
@@ -321,13 +354,7 @@ export function KnowledgeGraph({
 
       if (Math.hypot(dx, dy) > 5) {
         hasMovedRef.current = true;
-        if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
-          try {
-            e.currentTarget.setPointerCapture(e.pointerId);
-          } catch {
-            // Pointer capture may fail on unsupported devices
-          }
-        }
+        captureGraphPointer(e.currentTarget, e.pointerId);
       }
 
       setPan({
@@ -356,9 +383,7 @@ export function KnowledgeGraph({
 
   const handlePointerUpOrCancel = (e: React.PointerEvent<SVGSVGElement>) => {
     activePointers.current.delete(e.pointerId);
-    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    }
+    releaseGraphPointer(e.currentTarget, e.pointerId);
     setTimeout(() => {
       hasMovedRef.current = false;
     }, 50);
