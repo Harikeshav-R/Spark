@@ -4,3 +4,5 @@ export * from "./mastery.js";
 export * from "./errors.js";
 export * from "./classroom.js";
 export * from "./realtime.js";
+export * from "./ai.js";
+export * from "./learning.js";
