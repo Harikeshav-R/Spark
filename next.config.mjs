@@ -6,6 +6,9 @@ const nextConfig = {
       "./mastery.js": "./src/contracts/mastery.ts",
       "./course.js": "./src/contracts/course.ts",
       "./classroom.js": "./src/contracts/classroom.ts",
+      "./game.js": "./src/contracts/game.ts",
+      "./realtime.js": "./src/contracts/realtime.ts",
+      "./learning.js": "./src/contracts/learning.ts",
     },
   },
   webpack: (config) => {

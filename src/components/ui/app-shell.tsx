@@ -8,6 +8,7 @@ export interface AppShellProps {
   workspace?: "teacher" | "student";
   breadcrumbs: readonly { label: string; href?: string }[];
   children: React.ReactNode;
+  sessionStatus?: "anonymous" | "authenticated";
 }
 
 export function AppShell({
@@ -16,6 +17,7 @@ export function AppShell({
   workspace,
   breadcrumbs,
   children,
+  sessionStatus = "anonymous",
 }: AppShellProps): React.JSX.Element {
   const studentHref =
     breadcrumbs.find((b) => b.label === "Student workspace")?.href ||
@@ -118,7 +120,9 @@ export function AppShell({
             <Badge variant="secondary">
               {workspace === "teacher" ? "Instructor workspace" : "Student workspace"}
             </Badge>
-            <Badge variant="outline">Not signed in</Badge>
+            <Badge variant="outline">
+              {sessionStatus === "authenticated" ? "Signed in" : "Not signed in"}
+            </Badge>
           </div>
         )}
 
