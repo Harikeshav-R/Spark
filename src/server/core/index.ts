@@ -26,3 +26,13 @@ export {
 export {
   MasteryService,
 } from "./mastery/mastery-service";
+
+export {
+  type GraphNodeInput,
+  topologicalSort,
+  validateGraph,
+} from "./graph/graph-validator";
+
+export {
+  calculateNodeImportance,
+} from "./graph/importance-calculator";
