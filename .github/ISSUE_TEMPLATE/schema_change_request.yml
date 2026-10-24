@@ -1,0 +1,47 @@
+name: Schema Change Request (SCR)
+description: Propose a database schema alteration or new migration for Lane A review
+title: "[SCR]: <Short description of table/RPC change>"
+labels: ["needs-triage", "ready-for-human"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Schema Change Request (SCR) Protocol
+        Per `OWNERSHIP.md`, all database migrations in `supabase/migrations/` are steward-managed by **Lane A**.
+        Lane B, C, or D developers must open an SCR issue with the proposed DDL and get review before changes are merged.
+
+  - type: dropdown
+    id: requesting_lane
+    attributes:
+      label: Requesting Lane
+      options:
+        - "Lane B: Classroom & Collaboration"
+        - "Lane C: AI & Autonomous Learning"
+        - "Lane D: Core Experience & UI"
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation & Feature Context
+      description: Why is this database modification necessary?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed_ddl
+    attributes:
+      label: Proposed SQL Migration
+      description: Tables, columns, foreign keys, RLS policies, indexes, or RPCs.
+      render: sql
+    validations:
+      required: true
+
+  - type: textarea
+    id: rollback_plan
+    attributes:
+      label: Invariants & Rollback Considerations
+      description: How does this respect the acyclic graph and single mastery writer invariants?
+    validations:
+      required: true

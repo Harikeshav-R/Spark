@@ -1,0 +1,50 @@
+# Default repository owner
+* @Harikeshav-R
+
+# Lane A: Platform & Core (Lead: Hari)
+/src/server/platform/ @Harikeshav-R
+/src/server/core/ @Harikeshav-R
+/supabase/migrations/ @Harikeshav-R
+/scripts/ @Harikeshav-R
+/server/index.ts @Harikeshav-R
+/src/contracts/ @Harikeshav-R
+/package.json @Harikeshav-R
+/package-lock.json @Harikeshav-R
+/tsconfig.json @Harikeshav-R
+/CHECKLIST.md @Harikeshav-R
+/OWNERSHIP.md @Harikeshav-R
+/docs/01-decisions.md @Harikeshav-R
+/tests/unit/lane-a/ @Harikeshav-R
+/tests/contracts/lane-a/ @Harikeshav-R
+/tests/integration/lane-a/ @Harikeshav-R
+
+# Lane B: Classroom & Collaboration (Lead: Rahul)
+/src/server/classroom/ @Harikeshav-R
+/src/server/realtime/ @Harikeshav-R
+/src/server/zoom/ @Harikeshav-R
+/src/server/study-groups/ @Harikeshav-R
+/tests/unit/lane-b/ @Harikeshav-R
+/tests/contracts/lane-b/ @Harikeshav-R
+/tests/integration/lane-b/ @Harikeshav-R
+
+# Lane C: AI & Autonomous Learning (Lead: Praj)
+/src/server/ai/ @Harikeshav-R
+/src/server/learning/ @Harikeshav-R
+/src/features/tutor/ @Harikeshav-R
+/src/features/learning/ @Harikeshav-R
+/src/features/study-groups/ @Harikeshav-R
+/tests/unit/lane-c/ @Harikeshav-R
+/tests/contracts/lane-c/ @Harikeshav-R
+/tests/integration/lane-c/ @Harikeshav-R
+
+# Lane D: Core Experience & UI (Lead: Vamshi)
+/src/features/auth/ @Harikeshav-R
+/src/features/courses/ @Harikeshav-R
+/src/features/professor/ @Harikeshav-R
+/src/features/student/ @Harikeshav-R
+/src/features/graph/ @Harikeshav-R
+/src/components/ui/ @Harikeshav-R
+/src/lib/client/ @Harikeshav-R
+/src/app/ @Harikeshav-R
+/tests/unit/lane-d/ @Harikeshav-R
+/tests/contracts/lane-d/ @Harikeshav-R

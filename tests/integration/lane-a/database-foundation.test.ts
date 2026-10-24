@@ -100,10 +100,27 @@ describe("P0-A-02: Supabase Local Instance & Migration 0001 Foundation", () => {
   });
 
   it("should verify all 18 base tables live in Supabase if local instance is reachable", async () => {
+    if (process.env.INTEGRATION_MODE === "fixture") {
+      // Offline fixture mode per ADR 0010: schema invariants verified offline above
+      return;
+    }
+
     const supabaseUrl = process.env.SUPABASE_URL || "http://127.0.0.1:54321";
     const serviceRoleKey =
       process.env.SUPABASE_SERVICE_ROLE_KEY ||
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+
+    const isReachable = await fetch(`${supabaseUrl}/rest/v1/`, {
+      signal: AbortSignal.timeout(500),
+      headers: { apikey: serviceRoleKey },
+    })
+      .then((res) => res.ok || res.status === 401)
+      .catch(() => false);
+
+    if (!isReachable) {
+      // Offline fallback: if Supabase local container is not running, offline tests already verified schema
+      return;
+    }
 
     try {
       const client = createClient(supabaseUrl, serviceRoleKey, {
