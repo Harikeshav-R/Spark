@@ -66,20 +66,19 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const isActuallyDisabled = disabled || isLoading;
 
-    let computedVariantClass = "";
-    let customStyle: React.CSSProperties | undefined = style;
+    const computedVariantClass =
+      variant === "mastery"
+        ? "hover:opacity-90 active:opacity-100"
+        : variantStyles[variant];
 
-    if (variant === "mastery") {
-      const palette = MASTERY_PALETTE[band];
-      customStyle = {
-        backgroundColor: palette.solidBg,
-        color: palette.solidText,
-        ...style,
-      };
-      computedVariantClass = "hover:opacity-90 active:opacity-100";
-    } else {
-      computedVariantClass = variantStyles[variant];
-    }
+    const customStyle: React.CSSProperties | undefined =
+      variant === "mastery"
+        ? {
+            backgroundColor: MASTERY_PALETTE[band].solidBg,
+            color: MASTERY_PALETTE[band].solidText,
+            ...style,
+          }
+        : style;
 
     const baseClass =
       "inline-flex items-center justify-center font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 select-none cursor-pointer";

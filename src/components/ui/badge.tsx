@@ -62,40 +62,38 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
         ? "mastery"
         : variant;
 
-    let effectiveBand: MasteryBand = "gray";
-    if (confidence !== undefined) {
-      effectiveBand = confidenceToBand(confidence);
-    } else if (band !== undefined) {
-      effectiveBand = band;
-    }
+    const effectiveBand: MasteryBand =
+      confidence !== undefined
+        ? confidenceToBand(confidence)
+        : band !== undefined
+          ? band
+          : "gray";
 
     const palette = MASTERY_PALETTE[effectiveBand];
 
     // Compute accessible text alternative
-    let accessibleLabel = textAlternative;
-    if (!accessibleLabel) {
-      if (confidence !== undefined) {
-        const percent = Math.round(confidence * 100);
-        accessibleLabel = `${palette.name} (${percent}%)`;
-      } else if (effectiveVariant === "mastery") {
-        accessibleLabel = palette.textAlternative;
-      }
-    }
+    const accessibleLabel =
+      textAlternative ||
+      (confidence !== undefined
+        ? `${palette.name} (${Math.round(confidence * 100)}%)`
+        : effectiveVariant === "mastery"
+          ? palette.textAlternative
+          : undefined);
 
-    let customStyle: React.CSSProperties | undefined = style;
-    let variantClasses = "";
+    const customStyle: React.CSSProperties | undefined =
+      effectiveVariant === "mastery"
+        ? {
+            backgroundColor: palette.softBg,
+            color: palette.softText,
+            borderColor: palette.border,
+            ...style,
+          }
+        : style;
 
-    if (effectiveVariant === "mastery") {
-      customStyle = {
-        backgroundColor: palette.softBg,
-        color: palette.softText,
-        borderColor: palette.border,
-        ...style,
-      };
-      variantClasses = "border";
-    } else {
-      variantClasses = `border ${standardVariantStyles[effectiveVariant]}`;
-    }
+    const variantClasses =
+      effectiveVariant === "mastery"
+        ? "border"
+        : `border ${standardVariantStyles[effectiveVariant]}`;
 
     // Pulse ring style for active lecture concept (docs/09-frontend.md section 3.2)
     const pulseClasses = pulse

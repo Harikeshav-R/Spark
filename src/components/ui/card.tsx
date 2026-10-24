@@ -20,21 +20,22 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
     },
     ref
   ) => {
-    let customStyle: React.CSSProperties | undefined = style;
-    let variantClasses = "bg-white text-slate-900 border border-slate-200 shadow-xs";
+    const customStyle: React.CSSProperties | undefined =
+      variant === "mastery"
+        ? {
+            backgroundColor: MASTERY_PALETTE[band].softBg,
+            borderColor: MASTERY_PALETTE[band].border,
+            color: MASTERY_PALETTE[band].softText,
+            ...style,
+          }
+        : style;
 
-    if (variant === "outline") {
-      variantClasses = "bg-transparent text-slate-900 border-2 border-slate-300";
-    } else if (variant === "mastery") {
-      const palette = MASTERY_PALETTE[band];
-      customStyle = {
-        backgroundColor: palette.softBg,
-        borderColor: palette.border,
-        color: palette.softText,
-        ...style,
-      };
-      variantClasses = "border shadow-xs";
-    }
+    const variantClasses =
+      variant === "outline"
+        ? "bg-transparent text-slate-900 border-2 border-slate-300"
+        : variant === "mastery"
+          ? "border shadow-xs"
+          : "bg-white text-slate-900 border border-slate-200 shadow-xs";
 
     return (
       <div
