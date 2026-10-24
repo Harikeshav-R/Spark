@@ -18,3 +18,11 @@ export {
 export {
   EnrollmentService,
 } from "./enrollment/enrollment-service";
+
+export {
+  MasteryRepository,
+} from "./mastery/mastery-repository";
+
+export {
+  MasteryService,
+} from "./mastery/mastery-service";

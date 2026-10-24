@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useId } from "react";
-import { cn } from "../../lib/client/utils.js";
+import { cn } from "../../lib/client/utils";
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -21,7 +23,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="block text-sm font-medium text-gray-900 dark:text-gray-100"
+            className="block text-sm font-medium text-[#2b2a2e]"
           >
             {label}
           </label>
@@ -34,22 +36,21 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
           aria-invalid={error ? "true" : undefined}
           aria-describedby={describedBy}
           className={cn(
-            "flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+            "flex h-10 w-full rounded-md border border-[#3a3a3d] bg-[#fffdf8] px-3 py-2 text-base md:text-sm text-[#2b2a2e] placeholder:text-[#5f5b54]",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2b2a2e] focus-visible:ring-offset-2",
             "disabled:cursor-not-allowed disabled:opacity-50",
-            "dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:placeholder:text-gray-500",
-            error && "border-red-500 focus-visible:ring-red-500 dark:border-red-500",
+            error && "border-[#b0384a] focus-visible:ring-[#b0384a]",
             className
           )}
           {...props}
         />
         {description && !error && (
-          <p id={descId} className="text-xs text-gray-500 dark:text-gray-400">
+          <p id={descId} className="text-xs text-[#5f5b54]">
             {description}
           </p>
         )}
         {error && (
-          <p id={errId} role="alert" className="text-xs font-medium text-red-600 dark:text-red-400">
+          <p id={errId} role="alert" className="text-xs font-medium text-[#b0384a]">
             {error}
           </p>
         )}

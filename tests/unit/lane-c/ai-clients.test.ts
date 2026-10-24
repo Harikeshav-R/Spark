@@ -6,7 +6,6 @@ import {
   AI_CAPABILITIES,
   CAPABILITY_POLICIES,
   DEFAULT_MODELS,
-  type AiCapability,
 } from "../../../src/server/ai/index.js";
 
 const testSchema = z.object({

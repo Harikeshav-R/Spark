@@ -1,5 +1,7 @@
+"use client";
+
 import React from "react";
-import { cn } from "../../lib/client/utils.js";
+import { cn } from "../../lib/client/utils";
 
 export type ButtonVariant = "default" | "secondary" | "outline" | "ghost" | "destructive";
 export type ButtonSize = "sm" | "md" | "lg" | "icon";
@@ -11,11 +13,16 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 }
 
 const variantStyles: Record<ButtonVariant, string> = {
-  default: "bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 shadow-sm",
-  secondary: "bg-gray-100 text-gray-900 hover:bg-gray-200 active:bg-gray-300 dark:bg-gray-800 dark:text-gray-100 dark:hover:bg-gray-700",
-  outline: "border border-gray-300 bg-transparent text-gray-900 hover:bg-gray-50 active:bg-gray-100 dark:border-gray-700 dark:text-gray-100 dark:hover:bg-gray-800",
-  ghost: "bg-transparent text-gray-700 hover:bg-gray-100 active:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-800",
-  destructive: "bg-red-600 text-white hover:bg-red-700 active:bg-red-800 shadow-sm",
+  default:
+    "bg-[#ed793c] text-[#2b2a2e] border border-[#3a3a3d] hover:bg-[#ecdcc0] hover:text-[#2b2a2e] active:bg-[#f4e9d7] shadow-sm",
+  secondary:
+    "bg-[#f4e9d7] text-[#2b2a2e] border border-[#3a3a3d] hover:bg-[#ecdcc0] active:bg-[#ecdcc0]",
+  outline:
+    "bg-[#fffdf8] text-[#2b2a2e] border border-[#3a3a3d] hover:bg-[#f4e9d7] active:bg-[#ecdcc0]",
+  ghost:
+    "bg-transparent text-[#2b2a2e] border border-transparent hover:bg-[#f4e9d7] active:bg-[#ecdcc0]",
+  destructive:
+    "bg-[#b0384a] text-[#fffdf8] border border-[#3a3a3d] hover:bg-[#3a3a3d] hover:text-[#fffdf8] active:bg-[#2b2a2e] shadow-sm",
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
@@ -49,7 +56,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={isLoading ? "true" : undefined}
         className={cn(
           "inline-flex items-center justify-center font-medium transition-colors cursor-pointer select-none",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2b2a2e] focus-visible:ring-offset-2",
           "disabled:opacity-50 disabled:pointer-events-none disabled:cursor-not-allowed",
           variantStyles[variant],
           sizeStyles[size],
