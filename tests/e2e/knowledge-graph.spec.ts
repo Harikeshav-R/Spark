@@ -156,6 +156,45 @@ test.describe("Lane D: Interactive Knowledge Graph E2E (P2-D-02)", () => {
     expect(resetViewBox).toBe(initialViewBox);
   });
 
+  test("camera drag pans viewBox past 5px threshold, releases, and allows subsequent concept selection", async ({
+    page,
+  }) => {
+    await uploadFixtureSyllabus(page);
+
+    const svg = page.locator("svg.cursor-grab");
+    await expect(svg).toBeVisible();
+    const initialViewBox = await svg.getAttribute("viewBox");
+    expect(initialViewBox).toBeTruthy();
+
+    const svgBox = await svg.boundingBox();
+    expect(svgBox).toBeTruthy();
+    if (!svgBox) return;
+
+    // Pick a background point in the SVG away from nodes
+    const startX = svgBox.x + 30;
+    const startY = svgBox.y + 30;
+
+    // Drag past 5px threshold (e.g. 50px delta)
+    await page.mouse.move(startX, startY);
+    await page.mouse.down();
+    await page.mouse.move(startX + 50, startY + 50, { steps: 5 });
+
+    const draggedViewBox = await svg.getAttribute("viewBox");
+    expect(draggedViewBox).not.toBe(initialViewBox);
+
+    // Release mouse/pointer
+    await page.mouse.up();
+
+    // Verify subsequent star click selects node and highlights ancestors
+    const vectorsStar = page.locator('g[role="button"][data-node-id="preview:Vectors"]');
+    await vectorsStar.click();
+    await expect(vectorsStar).toHaveAttribute("aria-pressed", "true");
+
+    const drawer = page.locator('div[role="region"][aria-label="Selected concept details"]');
+    await expect(drawer).toBeVisible();
+    await expect(drawer).toContainText("Vectors");
+  });
+
   test("responsive viewport check on mobile (390x844)", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await uploadFixtureSyllabus(page);
