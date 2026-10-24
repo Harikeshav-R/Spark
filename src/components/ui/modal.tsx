@@ -1,5 +1,7 @@
+"use client";
+
 import React, { useEffect, useId } from "react";
-import { cn } from "../../lib/client/utils.js";
+import { cn } from "../../lib/client/utils";
 
 export interface ModalProps {
   isOpen: boolean;
@@ -61,8 +63,7 @@ export function Modal({
         aria-labelledby={resolvedTitleId}
         aria-describedby={resolvedDescId}
         className={cn(
-          "relative z-10 w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl transition-all",
-          "dark:border-gray-800 dark:bg-gray-900 dark:text-gray-100",
+          "relative z-10 w-full max-w-lg rounded-xl border border-[#e6d8bd] bg-[#fffdf8] text-[#2b2a2e] p-6 shadow-xl transition-opacity",
           className
         )}
       >
@@ -94,7 +95,7 @@ export function ModalTitle({
   return (
     <Component
       id={id}
-      className={cn("text-lg font-semibold leading-none tracking-tight text-gray-900 dark:text-gray-100", className)}
+      className={cn("text-lg font-semibold leading-none tracking-tight text-[#2b2a2e]", className)}
       {...props}
     >
       {children}
@@ -111,7 +112,7 @@ export function ModalDescription({
   return (
     <p
       id={id}
-      className={cn("text-sm text-gray-600 dark:text-gray-400", className)}
+      className={cn("text-sm text-[#5f5b54]", className)}
       {...props}
     >
       {children}
@@ -149,7 +150,7 @@ export function ModalFooter({
 export function ModalCloseButton({
   onClose,
   className,
-}: {
+  }: {
   onClose: () => void;
   className?: string;
 }) {
@@ -159,8 +160,7 @@ export function ModalCloseButton({
       onClick={onClose}
       aria-label="Close"
       className={cn(
-        "absolute right-4 top-4 rounded-sm p-1 text-gray-400 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500",
-        "dark:text-gray-500 dark:hover:text-gray-300",
+        "absolute right-4 top-4 rounded-sm p-1 text-[#5f5b54] hover:text-[#2b2a2e] focus:outline-none focus:ring-2 focus:ring-[#2b2a2e]",
         className
       )}
     >
