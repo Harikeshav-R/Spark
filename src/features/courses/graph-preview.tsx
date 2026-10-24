@@ -1,6 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useMemo } from "react";
+import { KnowledgeGraph } from "../graph/knowledge-graph";
+import type { GraphData } from "../graph/d3-force-layout";
 import {
   Card,
   CardHeader,
@@ -39,6 +41,24 @@ export function GraphPreview({
     category: cat,
     items: concepts.filter((c) => c.category === cat),
   }));
+  const graphData: GraphData = useMemo(() => {
+    return {
+      nodes: concepts.map((c) => ({
+        id: `preview:${c.label}`,
+        label: c.label,
+        description: c.description,
+        category: c.category,
+        difficulty: c.difficulty,
+      })),
+      edges: edges.map(([source, target], index) => ({
+        id: `preview-edge:${index}`,
+        source: `preview:${source}`,
+        target: `preview:${target}`,
+        relationship: "prerequisite" as const,
+      })),
+    };
+  }, [concepts, edges]);
+
 
   return (
     <div className="space-y-6">
@@ -73,6 +93,14 @@ export function GraphPreview({
           <Badge variant="outline">{`${edges.length} prerequisite edges`}</Badge>
         </CardContent>
       </Card>
+      {/* Interactive Knowledge Graph */}
+      <section className="space-y-2">
+        <h3 className="text-base font-semibold text-[#2b2a2e]">
+          Interactive Prerequisite Graph
+        </h3>
+        <KnowledgeGraph graph={graphData} />
+      </section>
+
 
       {/* Category-grouped concept cards */}
       <div className="space-y-8">
