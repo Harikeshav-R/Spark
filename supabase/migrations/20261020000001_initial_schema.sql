@@ -1,4 +1,4 @@
--- HackOHIO-2026: Migration 0001 - Foundation 18 Base Tables
+-- Spark: Migration 0001 - Foundation 18 Base Tables
 -- Reference: docs/05-data-model.md & docs/03-invariants.md
 -- Lane: Lane A (Platform & Core)
 

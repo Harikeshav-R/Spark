@@ -78,7 +78,7 @@ To ensure that this repository is completely self-contained and secure, the foll
 ## 4. Spark Proposal Provenance & Architectural Boundary Record
 
 ### 4.1 Provenance Baseline
-On October 21, 2026, commit `7cce61cfa6c699148dfc30512f84c215642d8c7b` introduced `SPARK_DESIGN.md` and `SPARK_TECHNICAL.md` to explore gamified engagement mechanics for the HackOHIO platform.
+On October 21, 2026, commit `7cce61cfa6c699148dfc30512f84c215642d8c7b` introduced `SPARK_DESIGN.md` and `SPARK_TECHNICAL.md` to explore gamified engagement mechanics for the Spark platform.
 
 ### 4.2 Audit of Accepted vs Rejected Proposals
 The following table records the authoritative architectural decisions governing each proposed element:

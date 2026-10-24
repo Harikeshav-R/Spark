@@ -1,4 +1,4 @@
-# HackOHIO Classroom Companion (Spark)
+# Spark
 
 A TypeScript-only, real-time classroom intelligence, gamified learning, and peer-collaboration platform. The platform ingests course syllabi into prerequisite knowledge graphs, streams live lecture transcripts, detects discussed concepts in real time, generates Socratic polls with server-side evaluation, updates individual student mastery models, and coordinates consensual peer study groups with genuine Zoom meeting scheduling. Learners journey through their curriculum with **Spark**—a reactive SVG companion mascot guiding daily review quests, practice encounters with tiered hints, review-pressure diagnostics, an effort-based XP ledger, and collaborative party goals.
 
@@ -9,7 +9,7 @@ A TypeScript-only, real-time classroom intelligence, gamified learning, and peer
 
 ## 1. Product Summary
 
-HackOHIO Classroom Companion is an independent, production-grade TypeScript recreation and enhancement of the sibling `prereq` prototype. It replaces a split Flask/Next.js prototype with a single unified Node.js runtime, honest third-party integrations, and rigorous invariant enforcement.
+Spark is an independent, production-grade TypeScript recreation and enhancement of the sibling `prereq` prototype. It replaces a split Flask/Next.js prototype with a single unified Node.js runtime, honest third-party integrations, and rigorous invariant enforcement.
 
 ### Core Capabilities
 

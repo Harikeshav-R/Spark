@@ -1,6 +1,6 @@
 # Operations, Deployment & Runbooks
 
-This document specifies the operational lifecycle, developer environment setup, database migrations, configuration matrix, and persistent production deployment for HackOHIO Classroom Companion.
+This document specifies the operational lifecycle, developer environment setup, database migrations, configuration matrix, and persistent production deployment for Spark.
 
 ---
 

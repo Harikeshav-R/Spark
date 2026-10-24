@@ -1,6 +1,6 @@
 # Security, Identity & Privacy Specification
 
-This document details the security controls, access control matrices, authentication protocols, secrets management, and privacy boundaries governing HackOHIO Classroom Companion.
+This document details the security controls, access control matrices, authentication protocols, secrets management, and privacy boundaries governing Spark.
 
 ---
 

@@ -1,6 +1,6 @@
 # Formal System Invariants & Mathematical Rules
 
-This document specifies the authoritative mathematical formulas, state machine invariants, domain constraints, and failure counterexamples governing HackOHIO Classroom Companion. All services, database triggers, RPCs, and UI components MUST adhere strictly to these rules.
+This document specifies the authoritative mathematical formulas, state machine invariants, domain constraints, and failure counterexamples governing Spark. All services, database triggers, RPCs, and UI components MUST adhere strictly to these rules.
 
 ---
 

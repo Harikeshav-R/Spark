@@ -1,6 +1,6 @@
 # Technical Documentation Suite
 
-Welcome to the technical documentation suite for the HackOHIO Classroom Companion. This suite provides the complete architectural, mathematical, behavioral, and operational specifications for the TypeScript recreation.
+Welcome to the technical documentation suite for Spark. This suite provides the complete architectural, mathematical, behavioral, and operational specifications for the TypeScript recreation.
 
 ---
 

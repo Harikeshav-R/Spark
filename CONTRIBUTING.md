@@ -1,6 +1,6 @@
-# Contributing to HackOHIO-2026
+# Contributing to Spark
 
-Thank you for contributing to the HackOHIO Classroom Companion repository.
+Thank you for contributing to the Spark repository.
 
 Please follow these operational rules, standards, and engineering gates.
 

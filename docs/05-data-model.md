@@ -1,6 +1,6 @@
 # Data Model & Relational Schema: 28 Application Tables
 
-This document defines the complete relational database schema for HackOHIO Classroom Companion. The database is hosted on Supabase PostgreSQL (PostgreSQL 15+) and managed through ordered migrations in `supabase/migrations/`.
+This document defines the complete relational database schema for Spark. The database is hosted on Supabase PostgreSQL (PostgreSQL 15+) and managed through ordered migrations in `supabase/migrations/`.
 
 ---
 

@@ -1,8 +1,8 @@
-# Project Brief: HackOHIO Classroom Companion
+# Project Brief: Spark
 
 ## 1. Executive Summary
 
-HackOHIO Classroom Companion is an AI-augmented educational platform that connects classroom instruction with student mastery and peer collaboration. It bridges the gap between passive lecture listening and active concept retention through automated syllabus structuring, live lecture comprehension monitoring, targeted formative assessments, and intelligent peer matchmaking.
+Spark is an AI-augmented educational platform that connects classroom instruction with student mastery and peer collaboration. It bridges the gap between passive lecture listening and active concept retention through automated syllabus structuring, live lecture comprehension monitoring, targeted formative assessments, and intelligent peer matchmaking.
 
 The project is an honest, production-ready TypeScript rewrite of the experimental prototype developed in the sibling `prereq` repository. It eliminates architectural drift, fragile microservice boundaries, unverified authentication fallbacks, and simulated external integrations in favor of a single unified Node.js runtime, strict domain invariants, and verified third-party integrations.
 

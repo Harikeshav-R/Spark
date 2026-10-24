@@ -1,6 +1,6 @@
 # Domain Glossary
 
-This glossary establishes the canonical vocabulary for the HackOHIO Classroom Companion. All code identifiers, database columns, API fields, documentation, and agent discussions MUST adhere strictly to these terms. Synonyms listed under **Avoid** MUST NOT be used in new designs or codebase extensions.
+This glossary establishes the canonical vocabulary for Spark. All code identifiers, database columns, API fields, documentation, and agent discussions MUST adhere strictly to these terms. Synonyms listed under **Avoid** MUST NOT be used in new designs or codebase extensions.
 
 ---
 

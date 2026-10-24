@@ -1,6 +1,6 @@
 # Codebase Ownership & Four-Lane Responsibilities
 
-This document defines the exclusive ownership boundaries, shared file stewardship, handoff protocols, and change-control procedures for HackOHIO Classroom Companion across four parallel engineering streams.
+This document defines the exclusive ownership boundaries, shared file stewardship, handoff protocols, and change-control procedures for Spark across four parallel engineering streams.
 
 ---
 

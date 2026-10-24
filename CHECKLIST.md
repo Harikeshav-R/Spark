@@ -1,4 +1,4 @@
-# Master Implementation Checklist: HackOHIO-2026
+# Master Implementation Checklist: Spark
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
