@@ -19,9 +19,9 @@ The system architecture is governed by twelve fundamental decisions documented i
 5. **Evidence-Owned Mastery Engine ([ADR 0005](docs/adr/0005-evidence-owned-mastery.md))**: Concept confidence is mutated exclusively through four verifiable evidence events: poll evaluations, Socratic tutoring dialogue, practice quiz submissions, and lecture attendance. Direct confidence overwrites are prohibited.
 6. **Strict Prerequisite DAGs ([ADR 0006](docs/adr/0006-prerequisite-dag-and-bounded-import.md))**: Knowledge graphs are modeled as strict Directed Acyclic Graphs (edges point from prerequisite to dependent). PDF extraction is bounded to a maximum of 10 pages and 40 nodes, requiring teacher preview and confirmation before commit.
 7. **Persist-Before-Publish Real-Time Delivery ([ADR 0007](docs/adr/0007-realtime-commit-and-recovery.md))**: All state changes are committed to PostgreSQL before emitting WebSocket events. Reconnecting clients recover missed events via authenticated HTTP snapshot endpoints.
-8. **Validated AI with Honest Failure ([ADR 0008](docs/adr/0008-validated-ai-with-honest-failure.md))**: AI outputs from Anthropic Claude and Perplexity are parsed against strict Zod schemas with bounded timeouts. Malformed outputs or provider outages produce explicit user-facing errors rather than simulated fake grades or silent fallbacks.
+8. **Validated AI with Honest Failure ([ADR 0008](docs/adr/0008-validated-ai-with-honest-failure.md))**: AI outputs from OpenRouter (routing to Anthropic Claude and Perplexity models) are parsed against strict Zod schemas with bounded timeouts. Malformed outputs or provider outages produce explicit user-facing errors rather than simulated fake grades or silent fallbacks.
 9. **Consensual Peer Matchmaking ([ADR 0009](docs/adr/0009-consensual-peer-collaboration.md))**: Students match only when both have explicitly opted into the pool for overlapping concepts. Matching pairs students with complementary knowledge gaps (`score >= 0.30`), provides real in-app chat, and coordinates real Zoom meetings via OAuth.
-10. **Dual-Mode Integration Architecture ([ADR 0010](docs/adr/0010-explicit-demo-and-live-modes.md))**: Supports both `INTEGRATION_MODE=fixture` (zero-cost offline testing and repeatable demos) and `INTEGRATION_MODE=live` (real Anthropic, Perplexity, and Zoom APIs). Missing live credentials fail loudly rather than silently degrading into fake data.
+10. **Dual-Mode Integration Architecture ([ADR 0010](docs/adr/0010-explicit-demo-and-live-modes.md))**: Supports both `INTEGRATION_MODE=fixture` (zero-cost offline testing and repeatable demos) and `INTEGRATION_MODE=live` (real OpenRouter and Zoom APIs). Missing live credentials fail loudly rather than silently degrading into fake data.
 11. **Single-Writer Migrations & Integration ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md))**: Lane A serves as integration steward for database migrations, shared contracts, and configuration files, preventing merge conflicts across the four parallel streams.
 12. **Spark Experience Layer Over Canonical Engine ([ADR 0012](docs/adr/0012-spark-experience-over-canonical-engine.md))**: Adopts Spark mascot, Daily Quests, streak tracking, practice encounters with 3-tier hints, Eclipse review pressure, XP effort ledger, collaborative party quests, and Class Sky instructor view over the single-process TypeScript runtime, 4-band mastery engine, and D3-force graph visualizer.
 
@@ -52,9 +52,9 @@ The application is structured as a modular monolith:
 │              ▼                              ▼               │
 │   ┌─────────────────────┐       ┌───────────────────────┐   │
 │   │ PostgreSQL Database │       │  External Integrations│   │
-│   │  (28 App Tables)    │       │  - Anthropic Claude   │   │
-│   │  (Supabase Auth)    │       │  - Perplexity Search  │   │
-│   │  (Transactional RPC)│       │  - Zoom RTMS / OAuth  │   │
+│   │  (28 App Tables)    │       │  - OpenRouter (AI)    │   │
+│   │  (Supabase Auth)    │       │  - Zoom RTMS / OAuth  │   │
+│   │  (Transactional RPC)│       │                       │   │
 │   └─────────────────────┘       └───────────────────────┘   │
 │                                                             │
 │   ┌─────────────────────────────────────────────────────┐   │

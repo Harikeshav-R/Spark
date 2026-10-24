@@ -1,4 +1,4 @@
-# AI Pipelines & Prompt Contracts: Anthropic & Perplexity
+# AI Pipelines & Prompt Contracts: OpenRouter
 
 This document specifies the prompt engineering standards, output Zod schemas, token ceilings, SLAs, and failure handling across all 13 AI capabilities.
 
@@ -6,11 +6,12 @@ This document specifies the prompt engineering standards, output Zod schemas, to
 
 ## 1. Governance & Execution Architecture
 
-1. **Dual-Model Strategy**:
-   - `ANTHROPIC_FAST_MODEL`: Used for real-time, low-latency tasks (concept detection, understanding checks, prompt grading). Defaults to `claude-3-5-haiku-latest`.
-   - `ANTHROPIC_DEEP_MODEL`: Used for complex curriculum extraction, pedagogical synthesis, and learning content generation. Defaults to `claude-3-7-sonnet-latest`.
-2. **Search Model**:
-   - `PERPLEXITY_MODEL`: Used for cited academic resource search. Defaults to `sonar-pro`.
+1. **Unified OpenRouter Gateway**:
+   All 13 AI capabilities route through OpenRouter via an OpenAI-compatible API client authenticated with a single `OPENROUTER_API_KEY`. OpenRouter consolidates fast evaluations, deep curriculum synthesis, and real-time academic search under a single endpoint and credential.
+2. **Model Strategy**:
+   - `OPENROUTER_FAST_MODEL`: Used for real-time, low-latency tasks (concept detection, understanding checks, prompt grading). Defaults to `minimax/minimax-m3.1-flash:free`.
+   - `OPENROUTER_DEEP_MODEL`: Used for complex curriculum extraction, pedagogical synthesis, and learning content generation. Defaults to `nvidia/nemotron-3-ultra-550b-a55b:free`.
+   - `OPENROUTER_SEARCH_MODEL`: Used for cited academic resource search. Defaults to `perplexity/sonar-pro`.
 3. **Strict Structured Output Validation**: Every pipeline passes raw model text through a Zod schema parser.
 4. **Honest Failure Principle**: Malformed JSON, provider timeouts, or rate limits NEVER fall back to simulated grades or canned responses. They return explicit typed errors (`502 Bad Gateway` or `504 Gateway Timeout`).
 
@@ -19,7 +20,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
 ## 2. Capability Catalog & Specifications
 
 ### 2.1 `extractPrerequisiteGraph`
-- **Model**: `ANTHROPIC_DEEP_MODEL`
+- **Model**: `OPENROUTER_DEEP_MODEL`
 - **Timeout**: 120 seconds | **Max Tokens**: 4,000
 - **Input**: Extracted text/bytes from first `min(pageCount, 10)` pages of syllabus PDF.
 - **System Prompt**:
@@ -38,7 +39,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.2 `detectConcepts`
-- **Model**: `ANTHROPIC_FAST_MODEL`
+- **Model**: `OPENROUTER_FAST_MODEL`
 - **Timeout**: 5 seconds | **Max Tokens**: 300
 - **Input**: Recent transcript text window (last 60–90 seconds) and candidate concept labels.
 - **System Prompt**:
@@ -51,7 +52,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.3 `generatePollQuestion`
-- **Model**: `ANTHROPIC_FAST_MODEL`
+- **Model**: `OPENROUTER_FAST_MODEL`
 - **Timeout**: 15 seconds | **Max Tokens**: 600
 - **Input**: Target concept description and recent transcript chunks.
 - **System Prompt**:
@@ -65,7 +66,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.4 `evaluatePollResponse`
-- **Model**: `ANTHROPIC_FAST_MODEL`
+- **Model**: `OPENROUTER_FAST_MODEL`
 - **Timeout**: 8 seconds | **Max Tokens**: 500
 - **Input**: Question, expected answer rubric, and student's free-form answer.
 - **System Prompt**:
@@ -79,7 +80,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.5 `socraticTutorTurn`
-- **Model**: `ANTHROPIC_DEEP_MODEL`
+- **Model**: `OPENROUTER_DEEP_MODEL`
 - **Timeout**: 15 seconds | **Max Tokens**: 800
 - **Input**: Target concept context, multi-turn message history, and new student query.
 - **System Prompt**:
@@ -93,7 +94,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.6 `checkUnderstanding`
-- **Model**: `ANTHROPIC_FAST_MODEL`
+- **Model**: `OPENROUTER_FAST_MODEL`
 - **Timeout**: 5 seconds | **Max Tokens**: 200
 - **Input**: Concept definition, tutor question, and student's latest reply.
 - **Output Zod Schema**:
@@ -105,7 +106,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.7 `summarizeMisconceptions`
-- **Model**: `ANTHROPIC_FAST_MODEL`
+- **Model**: `OPENROUTER_FAST_MODEL`
 - **Timeout**: 8 seconds | **Max Tokens**: 800
 - **Input**: Poll question, expected rubric, and array of student answers with `wrong`/`partial` outcomes.
 - **Output Zod Schema**:
@@ -121,7 +122,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.8 `summarizeLecture`
-- **Model**: `ANTHROPIC_DEEP_MODEL`
+- **Model**: `OPENROUTER_DEEP_MODEL`
 - **Timeout**: 15 seconds | **Max Tokens**: 1,500
 - **Input**: Complete lecture transcript chunks with timestamps.
 - **Output Zod Schema**:
@@ -138,7 +139,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.9 `suggestInterventions`
-- **Model**: `ANTHROPIC_DEEP_MODEL`
+- **Model**: `OPENROUTER_DEEP_MODEL`
 - **Timeout**: 30 seconds | **Max Tokens**: 1,200
 - **Input**: Aggregate lecture stats, poll results, and active concept prerequisites.
 - **Output Zod Schema**:
@@ -154,7 +155,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.10 `generateLearningPage`
-- **Model**: `ANTHROPIC_DEEP_MODEL`
+- **Model**: `OPENROUTER_DEEP_MODEL`
 - **Timeout**: 60 seconds | **Max Tokens**: 3,500
 - **Input**: Concept label, description, category, and prerequisite ancestors.
 - **Output Zod Schema**:
@@ -165,7 +166,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.11 `generateQuizQuestions`
-- **Model**: `ANTHROPIC_DEEP_MODEL`
+- **Model**: `OPENROUTER_DEEP_MODEL`
 - **Timeout**: 60 seconds | **Max Tokens**: 2,500
 - **Input**: Concept label, description, and learning content.
 - **System Prompt**:
@@ -196,7 +197,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
 - *Mascot Dialogue Note*: Mascot copy reactions (`calm`, `think`, `cheer`, `oops`, `sleepy`) are strictly deterministic, client-side templates; they do not invoke LLM calls.
 
 ### 2.12 `searchAcademicResources`
-- **Provider**: Perplexity AI (`PERPLEXITY_MODEL`)
+- **Provider**: OpenRouter (`OPENROUTER_SEARCH_MODEL`)
 - **Timeout**: 10 seconds | **Max Tokens**: 1,000
 - **Input**: Concept label and optional search query.
 - **Output Zod Schema**:
@@ -212,7 +213,7 @@ This document specifies the prompt engineering standards, output Zod schemas, to
   ```
 
 ### 2.13 `answerResourceQuestion`
-- **Provider**: Perplexity AI (`PERPLEXITY_MODEL`)
+- **Provider**: OpenRouter (`OPENROUTER_SEARCH_MODEL`)
 - **Timeout**: 10 seconds | **Max Tokens**: 1,200
 - **Input**: Concept context and student inquiry.
 - **Output Zod Schema**:

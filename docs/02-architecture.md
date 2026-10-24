@@ -39,9 +39,9 @@ Spark is designed as a unified, single-process TypeScript application hosted on 
 │  ┌──────────────┐                                   ┌──────────────┐   │
 │  │  Supabase    │                                   │  Third-Party │   │
 │  │  PostgreSQL  │                                   │  Adapters    │   │
-│  │  (22 Tables  │                                   │  (Anthropic, │   │
-│  │  + RPCs)     │                                   │  Perplexity, │   │
-│  └──────────────┘                                   │  Zoom RTMS)  │   │
+│  │  (22 Tables  │                                   │  (OpenRouter,│   │
+│  │  + RPCs)     │                                   │  Zoom RTMS)  │   │
+│  └──────────────┘                                   │              │   │
 │                                                     └──────────────┘   │
 │                                                                        │
 │  ┌──────────────────────────────────────────────────────────────────┐  │
@@ -77,7 +77,7 @@ src/
     realtime/                   # Authenticated WebSocket rooms, presence, and publishing
     zoom/                       # Zoom OAuth 2.0, webhook HMAC, and RTMS client
     study-groups/               # Opt-in pool, matchmaking, availability, peer chat
-    ai/                         # Anthropic Claude and Perplexity pipeline adapters
+    ai/                         # OpenRouter prompt pipeline adapters (Anthropic and Perplexity models)
     learning/                   # Socratic tutoring, learning pages, quizzes, encounters (EncounterService)
   features/
     auth/                       # Sign-in, sign-up, session restoration UI
@@ -119,8 +119,7 @@ tests/
 | **Schema Validation** | Zod 4 | Runtime type inference, request validation, and AI structured output parsing. |
 | **Graph Visualizer** | D3-force | Physics-based force-directed layout with deterministic hierarchical prerequisite constraints. |
 | **Animation Engine** | `motion/react` | Modern, smooth React UI transitions without legacy `framer-motion` baggage. |
-| **AI LLM Provider** | Anthropic Claude 3.5 / 3.7 | Industry-leading reasoning for syllabus graph extraction, rubric grading, and Socratic tutoring. |
-| **Search Provider** | Perplexity AI | Real-time academic web search with citation validation. |
+| **AI & Search Provider** | OpenRouter | Unified gateway serving Anthropic Claude (tutoring, grading, extraction) and Perplexity Sonar (academic search) under single `OPENROUTER_API_KEY`. |
 | **Meeting Platform** | Zoom REST & RTMS APIs | Authentic lecture transcript streaming and peer study session creation via OAuth 2.0. |
 
 ---
@@ -135,7 +134,7 @@ sequenceDiagram
     participant Express as Express (/api/courses)
     participant Auth as Token Verifier
     participant Core as CourseService
-    participant AI as AiService (Anthropic)
+    participant AI as AiService (OpenRouter)
     participant DB as PostgreSQL
 
     Teacher->>Express: POST /api/courses/:id/upload (PDF bytes)

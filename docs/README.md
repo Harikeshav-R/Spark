@@ -52,7 +52,7 @@ Level 4: Execution & Historical Record
 | [05-data-model.md](05-data-model.md) | Data Model & Relational Schema | 28 PostgreSQL application tables, foreign keys, indexes, transactional RPC functions. |
 | [06-http-api.md](06-http-api.md) | HTTP REST API Contracts | Express 5 routes, DTOs, authentication requirements, status codes, standard error envelope. |
 | [07-realtime.md](07-realtime.md) | Real-Time WebSocket Protocols | Socket.IO 4 events, room authorization, reference-counted attendance tracking, reconnect sync. |
-| [08-ai-pipelines.md](08-ai-pipelines.md) | AI Pipelines & Prompt Contracts | 13 AI capabilities across Anthropic and Perplexity, prompts, Zod schemas, SLAs, and fallbacks. |
+| [08-ai-pipelines.md](08-ai-pipelines.md) | AI Pipelines & Prompt Contracts | 13 AI capabilities via OpenRouter (Anthropic and Perplexity models), prompts, Zod schemas, SLAs, and fallbacks. |
 | [09-frontend.md](09-frontend.md) | Frontend & Client Architecture | Next.js App Router shells, feature components, D3-force knowledge graph, accessibility. |
 | [10-security.md](10-security.md) | Security, Identity & Privacy | Supabase Auth token validation, RBAC matrix, Zoom webhook HMAC, credential encryption at rest. |
 | [11-testing.md](11-testing.md) | Testing Strategy & Assurance | Unit, contract, integration, and Playwright E2E suites; offline fixture policies. |

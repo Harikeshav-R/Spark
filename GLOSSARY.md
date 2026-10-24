@@ -117,11 +117,11 @@ A discrete, future half-open time interval $[startsAt, endsAt)$ of at least 30 m
 ### Operational Modes & Testing
 
 #### fixture
-A deterministic, offline mock implementation of an external provider (Anthropic, Perplexity, or Zoom) used for unit tests, contract checks, and offline development. Enabled via `INTEGRATION_MODE=fixture`.
+A deterministic, offline mock implementation of an external provider (OpenRouter or Zoom) used for unit tests, contract checks, and offline development. Enabled via `INTEGRATION_MODE=fixture`.
 - _Avoid_: mock_service, fake_backend, stub.
 
 #### live integration
-An execution mode connecting to authentic external APIs (Anthropic Claude, Perplexity Search, Zoom RTMS and REST APIs). Enabled via `INTEGRATION_MODE=live`. Missing credentials cause immediate, explicit capability errors.
+An execution mode connecting to authentic external APIs (OpenRouter for Anthropic Claude and Perplexity models, Zoom RTMS and REST APIs). Enabled via `INTEGRATION_MODE=live`. Missing credentials cause immediate, explicit capability errors.
 - _Avoid_: production_mode (in development contexts).
 
 #### simulation

@@ -240,8 +240,8 @@ npm run demo:record
 | **J02** | Student Onboarding & Prerequisite Navigation | Hari | Idempotent enrollment; 33 `gray` nodes; ancestor path lighting. |
 | **J03** | Live Lecture & Real-Time Attendance | Hari, Rahul, Prof. Chen | Speech streaming; chunk persistence; attendance evidence boost $\le 0.30$. |
 | **J04** | Formative Socratic Poll Cycle | Hari, Rahul, Prof. Chen | Open-ended question; server grading; atomic mastery update; heatmap refresh. |
-| **J05** | Mid-Lecture Pedagogical Interventions | Prof. Chen | Claude misconception clustering; 2 concrete instructional actions. |
-| **J06** | Socratic Tutoring & Autonomous Review | Rahul | Socratic dialogue; breakthrough $+0.20$; server quiz grading; cited Perplexity search. |
+| **J05** | Mid-Lecture Pedagogical Interventions | Prof. Chen | OpenRouter misconception clustering; 2 concrete instructional actions. |
+| **J06** | Socratic Tutoring & Autonomous Review | Rahul | Socratic dialogue; breakthrough $+0.20$; server quiz grading; cited OpenRouter academic search. |
 | **J07** | Consensual Peer Matching & Zoom Scheduling | Hari, Rahul | Opt-in pool; gap $\ge 0.30$; in-app chat; mutual slot; authentic Zoom meeting. |
 | **J08** | Seeded Demonstration & Deployment | System Administrator | 33 concepts/34 edges/132 mastery rows; zero-cost fixture run; Render persistence. |
 | **J09** | Daily Review Quest, Hints & Effort Streak | Rahul | 3-item daily quest; sequential 3-tier hints; XP discount; streak increments upon clear. |

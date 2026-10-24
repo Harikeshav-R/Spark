@@ -28,7 +28,7 @@ src/app/
 ### 1.1 Feature Component Contracts
 Lane C and Lane B export self-contained feature views from `src/features/`:
 1. `TutorFeature` (Lane C): Interactive multi-turn Socratic chat interface with KaTeX math rendering.
-2. `LearningFeature` (Lane C): Comprehensive Markdown concept learning guide, 5-question practice quiz, and cited Perplexity academic search.
+2. `LearningFeature` (Lane C): Comprehensive Markdown concept learning guide, 5-question practice quiz, and cited academic search via OpenRouter.
 3. `EncounterFeature` (Lane C): Inline practice encounter modal/drawer wrapping 5-question quizzes with Spark mascot reactions, three-tier sequential hints (Nudge, Bigger hint, Walkthrough), and XP reward card.
 4. `StudyGroupFeature` (Lane C / Lane B): Consensual peer pool opt-in, mutual availability picker, private peer chat, bilateral Zoom meeting display, and collaborative Party quest progress (1–3 shared concepts).
 

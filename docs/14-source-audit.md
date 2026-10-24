@@ -19,7 +19,7 @@ During the architectural audit of early drafts, several contradictions and secur
 | **D07** | **Socket Identity Trust** | Early socket handlers accepted client-supplied `role` and `studentId` query parameters during WebSocket handshakes. | Specifications assumed authenticated sockets. | **Eliminated completely**. Handshakes require a valid Supabase JWT. Server derives user identity and course enrollments strictly from the token. |
 | **D08** | **Peer Matchmaking Integrity** | Early draft matching picked random, non-opted-in classmates from the course roster and returned a static personal meeting link. | Specifications described intelligent peer study groups. | **Replaced with honest consensual matching**: ephemeral 5-minute pool, explicit concept selection, complementary score $\ge 0.30$, and real mutual availability overlap. |
 | **D09** | **Peer Chat Impersonation** | Early draft chat feature simulated offline peers using an LLM when the peer was unavailable. | Specifications did not disclose bot impersonation. | **Eliminated completely**. In-app chat is strictly human-to-human between matched students. No bot simulation or fake responses. |
-| **D10** | **Pedagogical Interventions** | Early UI displayed hardcoded static intervention cards regardless of actual poll results. | Specifications described AI-driven lecture interventions. | **Replaced with live AI pipeline**: Anthropic Claude analyzes real aggregate poll evaluations and student response clusters. |
+| **D10** | **Pedagogical Interventions** | Early UI displayed hardcoded static intervention cards regardless of actual poll results. | Specifications described AI-driven lecture interventions. | **Replaced with live AI pipeline**: OpenRouter analyzes real aggregate poll evaluations and student response clusters. |
 | **D11** | **PDF Extraction Truncation** | Early syllabus service silently extracted only the first 10 pages of any uploaded PDF. | Specifications described full syllabus processing. | **Documented and surfaced**: Ingestion bounds extraction to `min(pageCount, 10)`, but explicitly returns `totalPages`, `processedPages`, and `truncated: true` for teacher UI disclosure. |
 | **D12** | **Graph Importance Formula** | Early implementation counted `in_degree` (incoming edges) but comments claimed "how many nodes depend on this". | Comments conflicted with the mathematical formula. | **Formalized as incoming-prerequisite weighting**: Formula is $\text{sigmoid}(\text{round}(\text{in\_degree} / \text{max\_in}, 3) + 1)$. Acknowledged as weighting nodes by the number of their prerequisites. |
 
@@ -32,24 +32,24 @@ Every core feature and requirement maps directly to target documentation, an own
 | Feature Area | Target Document | Lane | Build Task ID | Acceptance ID | Target Implementation Notes |
 |---|---|---|---|---|---|
 | **Course Creation & Join Codes** | `docs/05-data-model.md`, `docs/06-http-api.md` | Lane A | `P1-A-02` | `J01` | Unique 8-character uppercase join code; idempotent enrollment. |
-| **PDF Syllabus Ingestion** | `docs/08-ai-pipelines.md`, `docs/06-http-api.md` | Lane C | `P2-C-01` | `J01` | TypeScript `pdf-lib` extracts up to 10 pages; Anthropic document API. |
+| **PDF Syllabus Ingestion** | `docs/08-ai-pipelines.md`, `docs/06-http-api.md` | Lane C | `P2-C-01` | `J01` | TypeScript `pdf-lib` extracts up to 10 pages; OpenRouter extraction. |
 | **Knowledge Graph Validation** | `docs/03-invariants.md`, `docs/contracts/service-ports.md` | Lane A | `P2-A-01` | `J01` | Cycle detection via DFS; incoming-prerequisite importance formula. |
 | **D3 Graph Visualizer** | `docs/09-frontend.md` | Lane D | `P2-D-02` | `J01`, `J02` | Prerequisite hierarchical ranks; D3-force simulation; a11y support. |
 | **Student Enrollment & Mastery Init** | `docs/05-data-model.md`, `docs/03-invariants.md` | Lane A | `P1-A-03` | `J02` | Transactional initialization of 33 mastery rows at `confidence = 0.0`. |
 | **Live Lecture Lifecycle** | `docs/06-http-api.md`, `docs/07-realtime.md` | Lane B | `P3-B-01` | `J03` | Transitions `draft` -> `live` -> `completed`; room isolation. |
 | **Live Transcript Streaming** | `docs/07-realtime.md`, `docs/06-http-api.md` | Lane B | `P3-B-02` | `J03` | Express ingestion endpoint; Socket.IO broadcast to lecture room. |
-| **Live Concept Detection** | `docs/08-ai-pipelines.md` | Lane C | `P3-C-01` | `J03` | Sliding transcript window; Claude fast model; 5-second timeout. |
+| **Live Concept Detection** | `docs/08-ai-pipelines.md` | Lane C | `P3-C-01` | `J03` | Sliding transcript window; OpenRouter fast model; 5-second timeout. |
 | **Lecture Attendance Tracking** | `docs/07-realtime.md`, `docs/03-invariants.md` | Lane B | `P3-B-03` | `J03` | Ref-counted socket tracking; $+0.05$ boost for confidence $< 0.30$. |
-| **Socratic Poll Generation** | `docs/08-ai-pipelines.md`, `docs/06-http-api.md` | Lane C | `P4-C-01` | `J04` | Anthropic prompt with recent transcript context; 15-second SLA. |
+| **Socratic Poll Generation** | `docs/08-ai-pipelines.md`, `docs/06-http-api.md` | Lane C | `P4-C-01` | `J04` | OpenRouter prompt with recent transcript context; 15-second SLA. |
 | **Poll Lifecycle & Response Ingestion** | `docs/03-invariants.md`, `docs/06-http-api.md` | Lane B | `P4-B-01` | `J04` | States: `draft` -> `active` -> `closed`; single submission per student. |
-| **Server-Side Poll Evaluation** | `docs/08-ai-pipelines.md`, `docs/03-invariants.md` | Lane C | `P4-C-02` | `J04` | Claude evaluation into `correct`, `partial`, `wrong`; atomic mastery update. |
+| **Server-Side Poll Evaluation** | `docs/08-ai-pipelines.md`, `docs/03-invariants.md` | Lane C | `P4-C-02` | `J04` | OpenRouter evaluation into `correct`, `partial`, `wrong`; atomic mastery update. |
 | **Teacher Heatmap & Roster** | `docs/06-http-api.md`, `docs/09-frontend.md` | Lane A / Lane D | `P4-A-02`, `P4-D-01` | `J04` | Course-wide aggregate distribution across 4 semantic mastery bands. |
 | **Pedagogical Interventions** | `docs/08-ai-pipelines.md`, `docs/09-frontend.md` | Lane C / Lane D | `P4-C-03`, `P4-D-02` | `J05` | Real-time AI analysis of poll misconception clusters and teaching actions. |
 | **Lecture Summarization** | `docs/08-ai-pipelines.md`, `docs/06-http-api.md` | Lane C | `P3-C-02` | `J05` | Structured summary, key concepts, and timestamped transcript links. |
 | **Socratic Tutoring Chat** | `docs/08-ai-pipelines.md`, `docs/09-frontend.md` | Lane C | `P5-C-01` | `J06` | Multi-turn pedagogical chat; Socratic guidance; understanding evidence. |
 | **Concept Learning Pages** | `docs/08-ai-pipelines.md`, `docs/06-http-api.md` | Lane C | `P5-C-02` | `J06` | Generated markdown guides with definitions, examples, and pitfalls. |
 | **Server-Graded Practice Quizzes** | `docs/03-invariants.md`, `docs/06-http-api.md` | Lane C | `P5-C-03` | `J06` | 5-question multiple choice; server validates indices against stored key. |
-| **Perplexity Resource Search & Ask** | `docs/08-ai-pipelines.md` | Lane C | `P5-C-04` | `J06` | Grounded academic web search with citations; 10-second SLA. |
+| **OpenRouter Resource Search & Ask** | `docs/08-ai-pipelines.md` | Lane C | `P5-C-04` | `J06` | Grounded academic web search with citations; 10-second SLA. |
 | **Consensual Peer Matchmaking** | `docs/03-invariants.md`, `docs/06-http-api.md` | Lane B | `P6-B-01` | `J07` | Ephemeral pool; complementary gap score $\ge 0.30$; transactional pair creation. |
 | **Real Peer Chat** | `docs/06-http-api.md`, `docs/07-realtime.md` | Lane B | `P6-B-02` | `J07` | Authenticated peer messaging; persist-before-publish via Socket.IO. |
 | **Mutual Availability Scheduling** | `docs/03-invariants.md`, `docs/06-http-api.md` | Lane B | `P6-B-03` | `J07` | Stored UTC half-open intervals; earliest 30-min overlap; bilateral acceptance. |

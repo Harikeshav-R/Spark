@@ -76,7 +76,7 @@ Zoom webhook deliveries (`POST /webhook/zoom/:teacherId`) are protected against 
 ## 5. Learner Privacy & Data Handling
 
 1. **No Learner Data in Public Caches**: Endpoints returning personal confidence, student answers, or chat messages include `Cache-Control: private, no-store`.
-2. **Minimization of AI Context**: Transcripts and student answers sent to Anthropic Claude are stripped of student emails and real full names; only synthetic or anonymized student tokens (e.g., `student_1`, `student_2`) are included in misconception analysis prompts.
+2. **Minimization of AI Context**: Transcripts and student answers sent to OpenRouter are stripped of student emails and real full names; only synthetic or anonymized student tokens (e.g., `student_1`, `student_2`) are included in misconception analysis prompts.
 3. **Synthetic Demo Data**: Demonstration scripts and seed fixtures use synthetic personas (Hari, Rahul, Praj, Vamshi) with `@example.test` email domains and locally generated test passwords.
 4. **Teacher-Only Effort Quadrant & Class Sky**: Student XP, effort percentiles, and `high_effort_low_mastery` flags are visible exclusively to the course teacher. Student-facing leaderboards or public XP comparisons are strictly prohibited.
 5. **Selected-Concept-Only Study Pool Disclosure**: Study pool candidate listings (`GET /api/courses/:courseId/study-groups/candidates`) disclose only requested concept IDs, confidence bands on those specific concepts, and fit classification. Non-requested concept mastery is never exposed to prospective peers.

@@ -212,13 +212,13 @@ This build plan provides step-by-step engineering instructions, target paths, de
 
 ---
 
-### P1-C-01 — Anthropic & Perplexity Typed Client Adapters
+### P1-C-01 — OpenRouter Typed Client Adapter (Anthropic & Perplexity Models)
 - **Lane**: Lane C
-- **Goal**: Implement typed API client wrappers for Anthropic Claude and Perplexity Search.
-- **Target Paths**: `src/server/ai/providers/anthropic-client.ts`, `src/server/ai/providers/perplexity-client.ts`
+- **Goal**: Implement typed API client wrapper for OpenRouter (routing to fast, deep, and search models).
+- **Target Paths**: `src/server/ai/providers/openrouter-client.ts`
 - **Dependencies**: `P0-C-01`
 - **Consumed / Produced Contracts**: Implements network adapters with per-capability timeouts.
-- **Implementation Instructions**: Wrap official SDKs; attach Zod schema validation to raw responses; configure model IDs via environment variables.
+- **Implementation Instructions**: Wrap OpenRouter API via OpenAI-compatible SDK; attach Zod schema validation to raw responses; configure model IDs via environment variables (`OPENROUTER_FAST_MODEL` defaulting to `minimax/minimax-m3.1-flash:free`, `OPENROUTER_DEEP_MODEL` defaulting to `nvidia/nemotron-3-ultra-550b-a55b:free`, and `OPENROUTER_SEARCH_MODEL` defaulting to `perplexity/sonar-pro`).
 - **Invariant / Error Cases**: Missing credentials in `INTEGRATION_MODE=live` raise typed configuration errors; timeouts abort requests cleanly.
 - **Fixture Path**: Fixture mode returns deterministic responses without network calls.
 - **Prerequisites & State**: Node toolchain initialized.
@@ -235,7 +235,7 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Target Paths**: `src/server/learning/tutoring-service.ts`, `src/server/learning/tutoring-repository.ts`
 - **Dependencies**: `P1-C-01`, `P1-A-04`
 - **Consumed / Produced Contracts**: Implements `LearningService.createTutoringSession` and `submitTutoringMessage`.
-- **Implementation Instructions**: Store messages in `tutoring_messages`. Send conversation history to Claude Socratic prompt. If understanding is detected, call `MasteryService.applyEvidence(..., { type: 'tutor' })`.
+- **Implementation Instructions**: Store messages in `tutoring_messages`. Send conversation history to Socratic prompt via OpenRouter Deep Model. If understanding is detected, call `MasteryService.applyEvidence(..., { type: 'tutor' })`.
 - **Invariant / Error Cases**: Replaying same message ID does not apply duplicate mastery evidence.
 - **Fixture Path**: Fake AI service.
 - **Prerequisites & State**: Mastery service available.
@@ -352,14 +352,14 @@ This build plan provides step-by-step engineering instructions, target paths, de
 
 ### P2-C-01 — Syllabus PDF Bounded Ingestion & Graph Extraction Pipeline
 - **Lane**: Lane C
-- **Goal**: Ingest syllabus PDF, slice first $\min(\text{pageCount}, 10)$ pages via `pdf-lib`, and call Anthropic graph extraction.
+- **Goal**: Ingest syllabus PDF, slice first $\min(\text{pageCount}, 10)$ pages via `pdf-lib`, and call OpenRouter graph extraction.
 - **Target Paths**: `src/server/ai/pipelines/extract-graph.ts`, `src/server/core/ingestion/pdf-processor.ts`
 - **Dependencies**: `P1-C-01`, `P0-A-03`
 - **Consumed / Produced Contracts**: Implements `AiService.extractPrerequisiteGraph`.
-- **Implementation Instructions**: Count pages; slice first 10 pages; compute SHA-256 hash for `pdf_cache`; call Claude Deep Model; parse output with Zod schema.
+- **Implementation Instructions**: Count pages; slice first 10 pages; compute SHA-256 hash for `pdf_cache`; call OpenRouter Deep Model; parse output with Zod schema.
 - **Invariant / Error Cases**: Return `truncated: true` when page count $> 10$. Enforce 50 MiB upload cap.
 - **Fixture Path**: Deterministic fixture returns pre-parsed CS229 graph.
-- **Prerequisites & State**: Anthropic client adapter available.
+- **Prerequisites & State**: OpenRouter client adapter available.
 
 #### CP-P2-C-01 — Syllabus Extraction Verification
 - **Command**: `npm test tests/unit/lane-c/extract-graph.test.ts`
@@ -507,11 +507,11 @@ This build plan provides step-by-step engineering instructions, target paths, de
 
 ### P3-C-01 — Real-Time Sliding-Window Concept Detection Pipeline
 - **Lane**: Lane C
-- **Goal**: Ingest recent speech chunks and detect active knowledge graph concepts using Claude Fast Model.
+- **Goal**: Ingest recent speech chunks and detect active knowledge graph concepts using OpenRouter Fast Model.
 - **Target Paths**: `src/server/ai/pipelines/detect-concepts.ts`
 - **Dependencies**: `P1-C-01`, `P0-C-01`
 - **Consumed / Produced Contracts**: Implements `AiService.detectConcepts`.
-- **Implementation Instructions**: Assemble 60–90 second transcript window; call Claude fast model; parse returned UUIDs; associate in `transcript_concepts`.
+- **Implementation Instructions**: Assemble 60–90 second transcript window; call OpenRouter Fast Model; parse returned UUIDs; associate in `transcript_concepts`.
 - **Invariant / Error Cases**: Enforce 5-second timeout; failed detection returns empty array without throwing.
 - **Fixture Path**: Deterministic text-matching fixture.
 - **Prerequisites & State**: AI client available.
@@ -528,7 +528,7 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Target Paths**: `src/server/ai/pipelines/summarize-lecture.ts`
 - **Dependencies**: `P1-C-01`, `P1-B-01`
 - **Consumed / Produced Contracts**: Implements `AiService.summarizeLecture`.
-- **Implementation Instructions**: Fetch all chunks for lecture; call Claude Deep Model; format Markdown summary; broadcast `lecture:summary-ready`.
+- **Implementation Instructions**: Fetch all chunks for lecture; call OpenRouter Deep Model; format Markdown summary; broadcast `lecture:summary-ready`.
 - **Invariant / Error Cases**: Lecture with zero chunks returns concise notice without LLM error.
 - **Fixture Path**: Fixture transcript dataset.
 - **Prerequisites & State**: Lecture lifecycle service ready.
@@ -628,11 +628,11 @@ This build plan provides step-by-step engineering instructions, target paths, de
 
 ### P4-C-01 — Socratic Formative Poll Question Generation Pipeline
 - **Lane**: Lane C
-- **Goal**: Generate open-ended conceptual comprehension questions from active lecture concepts via Anthropic Claude.
+- **Goal**: Generate open-ended conceptual comprehension questions from active lecture concepts via OpenRouter.
 - **Target Paths**: `src/server/ai/pipelines/generate-poll.ts`
 - **Dependencies**: `P1-C-01`, `P3-C-01`
 - **Consumed / Produced Contracts**: Implements `AiService.generatePollQuestion`.
-- **Implementation Instructions**: Format prompt with concept description and recent transcript chunks; call Claude Fast Model; parse question and expected rubric.
+- **Implementation Instructions**: Format prompt with concept description and recent transcript chunks; call OpenRouter Fast Model; parse question and expected rubric.
 - **Invariant / Error Cases**: Enforce 15-second timeout; malformed JSON throws typed parsing error.
 - **Fixture Path**: Deterministic poll question fixture.
 - **Prerequisites & State**: AI client ready.
@@ -649,7 +649,7 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Target Paths**: `src/server/ai/pipelines/evaluate-poll.ts`
 - **Dependencies**: `P1-C-01`, `P4-A-01`
 - **Consumed / Produced Contracts**: Implements `AiService.evaluatePollResponse`.
-- **Implementation Instructions**: Prompt Claude with rubric and student response; validate output schema with Zod; return pedagogical feedback and discrete outcome.
+- **Implementation Instructions**: Prompt OpenRouter Fast Model with rubric and student response; validate output schema with Zod; return pedagogical feedback and discrete outcome.
 - **Invariant / Error Cases**: 8-second timeout; upstream error leaves response in `failed` status without mutating mastery.
 - **Fixture Path**: Pre-graded test response pairs.
 - **Prerequisites & State**: AI client ready.
@@ -786,7 +786,7 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Target Paths**: `src/server/ai/pipelines/generate-learning-page.ts`, `src/server/learning/learning-page-repository.ts`
 - **Dependencies**: `P1-C-01`
 - **Consumed / Produced Contracts**: Implements `AiService.generateLearningPage`.
-- **Implementation Instructions**: Call Claude Deep Model; format markdown with formal definition, intuition, worked examples, and pitfalls; cache in `concept_learning_pages`.
+- **Implementation Instructions**: Call OpenRouter Deep Model; format markdown with formal definition, intuition, worked examples, and pitfalls; cache in `concept_learning_pages`.
 - **Invariant / Error Cases**: 60-second timeout; sanitize markdown output.
 - **Fixture Path**: Precomputed markdown learning guide.
 - **Prerequisites & State**: AI client available.
@@ -814,16 +814,16 @@ This build plan provides step-by-step engineering instructions, target paths, de
 
 ---
 
-### P5-C-04 — Perplexity Academic Resource Search & Cited Q&A
+### P5-C-04 — OpenRouter Academic Resource Search & Cited Q&A (Perplexity Models)
 - **Lane**: Lane C
-- **Goal**: Search authoritative academic resources and provide grounded Q&A with validated citations via Perplexity AI.
+- **Goal**: Search authoritative academic resources and provide grounded Q&A with validated citations via OpenRouter (Perplexity search model).
 - **Target Paths**: `src/server/ai/pipelines/search-resources.ts`, `src/server/ai/pipelines/resource-qa.ts`
 - **Dependencies**: `P1-C-01`
 - **Consumed / Produced Contracts**: Implements `AiService.searchAcademicResources` and `answerResourceQuestion`.
-- **Implementation Instructions**: Call Perplexity Sonar Pro; validate external URLs; parse citation numbers; return structured resources.
+- **Implementation Instructions**: Call OpenRouter Search Model (Perplexity Sonar Pro); validate external URLs; parse citation numbers; return structured resources.
 - **Invariant / Error Cases**: 10-second timeout; malformed citation URLs are filtered out.
 - **Fixture Path**: Deterministic search fixture with verified URLs.
-- **Prerequisites & State**: Perplexity client available.
+- **Prerequisites & State**: OpenRouter client available.
 
 #### CP-P5-C-04 — Academic Search Verification
 - **Command**: `npm test tests/unit/lane-c/resource-search.test.ts`
@@ -1155,20 +1155,20 @@ This build plan provides step-by-step engineering instructions, target paths, de
 
 ---
 
-### P7-C-01 — Live Anthropic & Perplexity Production Verification
+### P7-C-01 — Live OpenRouter Production Verification (Anthropic & Perplexity Models)
 - **Lane**: Lane C
-- **Goal**: Verify live Anthropic Claude and Perplexity Sonar Pro pipelines against real provider APIs.
+- **Goal**: Verify live OpenRouter pipelines for deep reasoning, fast evaluation, and Perplexity search against real OpenRouter API.
 - **Target Paths**: `tests/integration/lane-c/ai-live.test.ts`
 - **Dependencies**: `P4-C-01`, `P4-C-02`, `P5-C-04`
 - **Consumed / Produced Contracts**: Validates live AI pipelines.
-- **Implementation Instructions**: Execute live verification tests gated by `ANTHROPIC_API_KEY` and `PERPLEXITY_API_KEY`; assert schema validation on live model output and verify 3-tier hints generation in quiz pipeline.
+- **Implementation Instructions**: Execute live verification tests gated by `OPENROUTER_API_KEY`; assert schema validation on live model output and verify 3-tier hints generation in quiz pipeline.
 - **Invariant / Error Cases**: Provider rate limits or missing keys fail loudly with typed status codes.
 - **Fixture Path**: Explicit live gate test.
 - **Prerequisites & State**: API keys configured in environment.
 
 #### CP-P7-C-01 — Live AI Verification
 - **Command**: `npm run test:integration -- -t "AiLive"`
-- **Expected State**: Live Anthropic and Perplexity calls return valid structured outputs passing Zod schemas.
+- **Expected State**: Live OpenRouter calls return valid structured outputs passing Zod schemas.
 
 ---
 

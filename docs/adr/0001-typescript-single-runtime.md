@@ -18,6 +18,6 @@ We adopt a single, unified TypeScript runtime on Node.js 24 LTS for the entire p
 - Allows direct in-memory service injection and sharing of domain logic (e.g., mastery formulas and DAG validations) across server and client boundaries.
 
 ## Consequences
-- Requires porting Python AI orchestration (Anthropic/Perplexity calls) and PDF handling into TypeScript (using `pdf-lib`).
+- Requires porting Python AI orchestration (OpenRouter AI calls) and PDF handling into TypeScript (using `pdf-lib`).
 - Prevents independent language-level optimization (e.g., Python numeric libraries), though the domain requires only basic algebraic formulas.
 - Backend and frontend must scale together within the single Node.js runtime process.

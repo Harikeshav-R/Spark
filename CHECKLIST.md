@@ -25,7 +25,7 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [ ] P1-A-04 — Atomic Mastery Engine & PostgreSQL RPC
 - [ ] P1-B-01 — Lecture Session Lifecycle & State Machine
 - [ ] P1-B-02 — Ephemeral Study Group Pool Repository
-- [ ] P1-C-01 — Anthropic & Perplexity Typed Client Adapters
+- [ ] P1-C-01 — OpenRouter Typed Client Adapter (Anthropic & Perplexity Models)
 - [ ] P1-C-02 — Socratic Tutoring Session Engine
 - [ ] P1-D-01 — App Router Shells & Navigation Layout
 - [ ] P1-A-05 — Shared Game, Encounter & Party Extension Contracts and Fixtures
@@ -80,7 +80,7 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [ ] P5-C-01 — Socratic Tutoring Dialogue Pipeline & Understanding Verification
 - [ ] P5-C-02 — Concept Learning Page Generation Pipeline
 - [ ] P5-C-03 — Practice Quiz Generation & Server-Side Scoring Engine
-- [ ] P5-C-04 — Perplexity Academic Resource Search & Cited Q&A
+- [ ] P5-C-04 — OpenRouter Academic Resource Search & Cited Q&A (Perplexity Models)
 - [ ] P5-C-05 — TutorFeature, LearningFeature & StudyGroupFeature UI Modules
 - [ ] P5-D-01 — Student Concept Learning & Quiz Route Shell Mounting
 - [ ] P5-D-02 — Student Tutoring & Lecture Summaries Shell Mounting
@@ -110,7 +110,7 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [ ] P7-A-01 — Persistent Server Composition Root & Production Containerization
 - [ ] P7-A-02 — Deterministic 33-Node CS229 Database Seed & Demo Script
 - [ ] P7-B-01 — Live Zoom RTMS & Webhook Production Verification
-- [ ] P7-C-01 — Live Anthropic & Perplexity Production Verification
+- [ ] P7-C-01 — Live OpenRouter Production Verification (Anthropic & Perplexity Models)
 - [ ] P7-D-01 — Multi-Browser End-to-End Playwright Journey Suite
 - [ ] P7-D-04 — Journeys J09–J11 Playwright End-to-End Test Suite
 - [ ] P7-D-02 — Responsive Layout & Accessibility Audit Verification

@@ -34,7 +34,7 @@ Spark is an educational intelligence system designed to eliminate the passive di
 - **F-A01: Course Lifecycle**: Create courses, generate unique 8-character join codes, and manage teacher ownership.
 - **F-A02: Student Enrollment**: Idempotent enrollment via join code; automatic initialization of personal concept mastery rows at `confidence = 0.0`.
 - **F-A03: Bounded Syllabus Ingestion**: Ingest PDF syllabi up to 50 MiB, automatically bounding extraction to `min(pageCount, 10)` pages with clear UI truncation disclosure.
-- **F-A04: Prerequisite DAG Generation**: Extract 30–40 foundational concepts and directed prerequisite edges (`source -> target` where source must precede target) using Anthropic Claude.
+- **F-A04: Prerequisite DAG Generation**: Extract 30–40 foundational concepts and directed prerequisite edges (`source -> target` where source must precede target) via OpenRouter.
 - **F-A05: Graph Preview & Commit**: Teacher visual preview of extracted concepts and edges with interactive graph inspection before irreversible database persistence.
 - **F-A06: Prerequisite Validation**: Strict server-side verification ensuring graph acyclicity, no self-edges, valid node references, and incoming-degree prerequisite weighting.
 - **F-A07: Interactive Graph Visualization**: D3-force rendering with prerequisite hierarchical levels, color-coded mastery bands, ancestor path highlighting, and responsive keyboard navigation.
@@ -57,7 +57,7 @@ Spark is an educational intelligence system designed to eliminate the passive di
 - **F-C02: Understanding Evidence Recording**: Detection of student comprehension breakthroughs during tutoring, triggering a bounded mastery increase.
 - **F-C03: Generated Learning Pages**: Comprehensive, Markdown-formatted concept guides featuring formal definitions, core mechanisms, worked examples, and common pitfalls.
 - **F-C04: Practice Quizzes**: Five-question multiple-choice quizzes with randomized option order and server-side validation against precomputed answer keys.
-- **F-C05: Cited Resource Discovery**: Live web search via Perplexity to fetch authoritative academic tutorials, papers, and videos with verified URLs.
+- **F-C05: Cited Resource Discovery**: Live web search via OpenRouter (Perplexity search model) to fetch authoritative academic tutorials, papers, and videos with verified URLs.
 - **F-C06: Resource Q&A**: Grounded Q&A against retrieved search context with strict citation requirements.
 
 ### Feature Family D: Consensual Peer Collaboration
@@ -130,7 +130,7 @@ The system behavior is formally validated against eleven end-to-end user journey
 - **Persona**: Teacher (Prof. Chen) and Students (Hari, Rahul).
 - **Flow**:
   1. Teacher clicks "Generate Poll" on dashboard.
-  2. System calls Anthropic Claude with recent transcript chunks and concept context to generate an open-ended question: `"Why must we save the intermediate activations during the forward pass of backpropagation?"`
+  2. System calls OpenRouter with recent transcript chunks and concept context to generate an open-ended question: `"Why must we save the intermediate activations during the forward pass of backpropagation?"`
   3. Teacher reviews draft, edits rubric, and clicks "Activate Poll".
   4. Server transitions poll to `active` and broadcasts `poll:new-question` to `lecture:<lectureId>`.
   5. Hari submits answer: `"Because the chain rule requires local gradients evaluated at the forward values to compute weight updates."`
@@ -149,7 +149,7 @@ The system behavior is formally validated against eleven end-to-end user journey
 - **Flow**:
   1. Observing high error rates on the backpropagation poll, teacher clicks "Suggest Interventions".
   2. System analyzes poll evaluations, student response clusters, and concept prerequisites.
-  3. Anthropic pipeline identifies root misconception: *"Students are confusing computational graph storage requirements with inference optimization."*
+  3. AI pipeline identifies root misconception via OpenRouter: *"Students are confusing computational graph storage requirements with inference optimization."*
   4. System returns two concrete teaching actions:
      - *"Pause and draw a 2-node scalar computational graph on the board, explicitly writing where $\frac{\partial z}{\partial x}$ is evaluated."*
      - *"Ask a follow-up question contrasting memory usage during training versus inference."*
@@ -168,7 +168,7 @@ The system behavior is formally validated against eleven end-to-end user journey
   5. Confidence updates: $0.20 + 0.20 = 0.40$ (band changes from `red` to `yellow`).
   6. Rahul opens `/student/[studentId]/concepts/[conceptId]`, reads the comprehensive generated learning page, and takes a 5-question practice quiz.
   7. Server validates quiz submission ($4/5 = 80\%$) and awards $+0.15$ confidence boost $\to 0.55$.
-  8. Rahul requests supplementary resources; Perplexity returns three verified external academic guides with valid URLs.
+  8. Rahul requests supplementary resources; OpenRouter returns three verified external academic guides with valid URLs via Perplexity search model.
 - **Acceptance Criteria**:
   - Tutoring messages and session state persist in database.
   - Practice quiz grading happens strictly on the server; client cannot submit arbitrary score deltas.
@@ -268,4 +268,4 @@ The system behavior is formally validated against eleven end-to-end user journey
 
 ### Explicit Simulation Disclosure
 - **Lecture Simulator**: In development, testing, and fixture demonstration modes, lecture transcripts may be generated via the internal lecture simulator (`LECTURE_SOURCE=simulator`). The user interface MUST display a prominent `[SIMULATED TRANSCRIPT]` indicator whenever simulated speech is active.
-- **Provider Fallback Policy**: When `INTEGRATION_MODE=live` is configured, the system MUST NOT silently degrade to simulated or fixture responses if third-party credentials (Anthropic, Perplexity, Zoom) are missing or invalid. Missing credentials MUST raise an explicit `503 SERVICE_UNAVAILABLE` or error badge in the UI.
+- **Provider Fallback Policy**: When `INTEGRATION_MODE=live` is configured, the system MUST NOT silently degrade to simulated or fixture responses if third-party credentials (OpenRouter, Zoom) are missing or invalid. Missing credentials MUST raise an explicit `503 SERVICE_UNAVAILABLE` or error badge in the UI.

@@ -10,7 +10,7 @@ Developing a full educational platform across database models, real-time streami
 We organize the engineering implementation into four decoupled, vertical lanes:
 - **Lane A (Platform & Core)**: Database schema, migrations, authentication, course enrollment, core knowledge graph, and mastery engine.
 - **Lane B (Classroom & Collaboration)**: Live lecture lifecycle, transcript ingestion, real-time presence, polls, Zoom integration, and study group matchmaking.
-- **Lane C (AI & Autonomous Learning)**: Anthropic and Perplexity prompt pipelines, Socratic tutoring, learning pages, quizzes, and learning UI modules.
+- **Lane C (AI & Autonomous Learning)**: OpenRouter prompt pipelines (Anthropic and Perplexity models), Socratic tutoring, learning pages, quizzes, and learning UI modules.
 - **Lane D (Core Experience & UI)**: Shared design tokens, Next.js page shells, teacher and student lecture dashboards, and D3-force knowledge graph.
 
 All inter-lane communication is governed by frozen TypeScript service interfaces and Zod DTO contracts defined upfront in Phase 0 (`src/contracts/` and `docs/contracts/service-ports.md`). Each lane develops and tests its features in isolation using deterministic fakes of other lanes' services. Lane A acts as the integration steward for shared configuration, migration, and composition files.
