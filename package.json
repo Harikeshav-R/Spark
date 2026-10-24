@@ -20,7 +20,7 @@
     "demo": "tsx scripts/demo.ts",
     "demo:reset": "tsx scripts/demo-reset.ts",
     "demo:record": "playwright test tests/e2e/demo.spec.ts",
-    "setup:agents": "bash scripts/setup-agent-tooling.sh"
+    "setup:agents": "node scripts/setup-agent-tooling.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.0",
@@ -50,5 +50,8 @@
     "typescript": "~5.8.2",
     "typescript-eslint": "^8.25.0",
     "vitest": "^5.0.5"
+  },
+  "allowScripts": {
+    "esbuild": true
   }
 }

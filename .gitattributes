@@ -1,0 +1,10 @@
+# Default: auto-detect
+* text=auto
+
+# Force LF for shell scripts (CRLF breaks shebangs)
+*.sh text eol=lf
+
+# Force LF for other script/config types commonly broken by CRLF
+*.bash text eol=lf
+*.zsh text eol=lf
+Makefile text eol=lf
