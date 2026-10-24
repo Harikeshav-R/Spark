@@ -11,7 +11,7 @@ Educational platforms leveraging Large Language Models (LLMs) often exhibit brit
 
 ## Decision
 We enforce strict schema validation, bounded execution timeouts, and honest failure reporting across all 13 AI capabilities:
-1. **Zod Runtime Validation**: All structured outputs returned by Anthropic Claude or Perplexity AI MUST be validated against strict Zod schemas before being accepted by domain services. Untrusted model text that fails schema parsing is immediately rejected.
+1. **Zod Runtime Validation**: All structured outputs returned by OpenRouter (Anthropic Claude and Perplexity models) MUST be validated against strict Zod schemas before being accepted by domain services. Untrusted model text that fails schema parsing is immediately rejected.
 2. **Explicit Per-Capability Timeouts**:
    - Concept Detection & Understanding Checks: 5 seconds
    - Poll Evaluation & Misconception Summaries: 8 seconds

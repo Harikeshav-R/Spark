@@ -28,7 +28,7 @@ Autonomous agents MUST NEVER violate these inviolable engineering gates:
 - **GATE 3 (Single Mastery Writer)**: Direct SQL updates to `student_mastery` from UI, sockets, or AI modules are STRICTLY PROHIBITED. All confidence updates MUST route through `MasteryService.applyEvidence()`.
 - **GATE 4 (Strict DAG Invariant)**: Knowledge graphs MUST remain acyclic, strictly directed from prerequisite to dependent, with between 1 and 40 nodes.
 - **GATE 5 (Persist Before Broadcast)**: NEVER emit a WebSocket event before the underlying data mutation is successfully committed to PostgreSQL.
-- **GATE 6 (No Fake Live Integrations)**: When `INTEGRATION_MODE=live` is configured, NEVER fabricate responses or fallback to fixtures if external credentials (Anthropic, Perplexity, Zoom) are missing. Missing credentials MUST return explicit `503 SERVICE_UNAVAILABLE`.
+- **GATE 6 (No Fake Live Integrations)**: When `INTEGRATION_MODE=live` is configured, NEVER fabricate responses or fallback to fixtures if external credentials (OpenRouter, Zoom) are missing. Missing credentials MUST return explicit `503 SERVICE_UNAVAILABLE`.
 - **GATE 7 (Zero Secret Exposure)**: NEVER check secrets, API keys, or plaintext Zoom OAuth credentials into git or expose them over browser HTTP responses.
 - **GATE 8 (Branch Isolation & Zero Direct Main Commits)**: NEVER commit directly to `main`. ALWAYS create a dedicated feature branch using conventional branch naming before making code changes. ALWAYS open a Pull Request upon task completion. NEVER auto-merge PRs to `main`; all merges require human review.
 ---
@@ -102,7 +102,7 @@ Refer to [OWNERSHIP.md](OWNERSHIP.md) for full lane mappings:
 Halt and escalate immediately to the human lead when encountering:
 1. **Contract Contradiction**: A conflict between an ADR in `docs/adr/` and a service port in `docs/contracts/service-ports.md`.
 2. **Schema Change Requirement**: A feature requires altering database columns or adding an RPC. (Submit SCR to Lane A).
-3. **Third-Party Provider Outage**: Persistent failure of live Anthropic or Zoom endpoints during Phase 7 live verification.
+3. **Third-Party Provider Outage**: Persistent failure of live OpenRouter or Zoom endpoints during Phase 7 live verification.
 
 ---
 

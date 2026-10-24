@@ -35,7 +35,7 @@ interface ApiError {
 | `409 Conflict` | State Machine Conflict | Active poll exists, duplicate response, graph exists, out-of-sequence hint, or duplicate encounter submit. |
 | `413 Payload Too Large` | Upload Limit Exceeded | Uploaded PDF syllabus exceeds 50 MiB limit. |
 | `422 Unprocessable` | Domain / Provider Error | Malformed AI output or cyclical graph structure detected. |
-| `502 Bad Gateway` | Upstream API Failure | Anthropic, Perplexity, or Zoom returned an upstream network error. |
+| `502 Bad Gateway` | Upstream API Failure | OpenRouter or Zoom returned an upstream network error. |
 | `503 Service Unavailable` | Provider Not Configured | Capability disabled or API keys missing in live integration mode. |
 | `504 Gateway Timeout` | Timeout Exceeded | AI or Zoom pipeline exceeded per-capability SLA timeout. |
 

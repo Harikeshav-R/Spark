@@ -13,12 +13,12 @@ Spark is an independent, production-grade TypeScript platform. It eliminates spl
 
 ### Core Capabilities
 
-- **Prerequisite Knowledge Graph**: Extracts a directed acyclic graph (DAG) of 30–40 core course concepts from uploaded PDF syllabi (up to 10 processed pages) using Anthropic Claude, validated for acyclicity and foundational prerequisites.
+- **Prerequisite Knowledge Graph**: Extracts a directed acyclic graph (DAG) of 30–40 core course concepts from uploaded PDF syllabi (up to 10 processed pages) via OpenRouter, validated for acyclicity and foundational prerequisites.
 - **Real-Time Lecture Streaming**: Streams live lecture speech via Zoom Real-Time Media Streams (RTMS) or an automated lecture simulator, ingesting transcript chunks and detecting covered concepts on the fly.
 - **Socratic Formative Assessment**: Generates open-ended poll questions aligned with active lecture concepts. The server grades student free-form responses against rubric criteria and updates student mastery atomically.
 - **Evidence-Based Mastery Engine**: Maintains personal concept confidence across four semantic bands (`gray`, `red`, `yellow`, `green`) driven exclusively by verifiable evidence: poll evaluations, Socratic tutoring dialogue, practice quiz submissions, and lecture attendance.
 - **Targeted Teacher Interventions**: Analyzes live aggregate student comprehension and misconceptions to suggest actionable, course-specific teaching adjustments during class.
-- **Autonomous Student Learning & Spark Quests**: Generates comprehensive concept learning pages, server-graded practice quizzes, Socratic tutoring conversations, and cited web resources via Perplexity. Guides learners with a reactive companion mascot (**Spark**), persistent Daily Quests, streak tracking, practice Encounters with three-tier progressive hints, and an Eclipse exam-readiness diagnostic.
+- **Autonomous Student Learning & Spark Quests**: Generates comprehensive concept learning pages, server-graded practice quizzes, Socratic tutoring conversations, and cited web resources via OpenRouter (Perplexity search models). Guides learners with a reactive companion mascot (**Spark**), persistent Daily Quests, streak tracking, practice Encounters with three-tier progressive hints, and an Eclipse exam-readiness diagnostic.
 - **Effort-Based Progression**: Records student learning effort in an append-only server-authoritative XP ledger (`xp_events`) strictly decoupled from academic mastery confidence.
 - **Consensual Peer Collaboration & Party Quests**: Matches enrolled students who explicitly opt into a study pool based on complementary knowledge gaps. Facilitates real in-app messaging, collaborative two-student Party quests on shared concepts, mutual availability overlap scheduling, and authentic Zoom meeting creation.
 - **Instructor Class Sky**: Offers teachers an aggregate knowledge graph showing class mean confidence, transcript-evidenced taught status, and an effort-vs-mastery roster quadrant without student-facing leaderboards.
@@ -46,7 +46,7 @@ Depending on your role and immediate objective, consult the following documentat
 - **Data & Storage**: [docs/05-data-model.md](docs/05-data-model.md) (28 application tables, constraints, RPCs).
 - **HTTP API**: [docs/06-http-api.md](docs/06-http-api.md) (REST endpoints, auth policies, error envelopes).
 - **Real-Time WebSockets**: [docs/07-realtime.md](docs/07-realtime.md) (Socket.IO events, room isolation, attendance tracking).
-- **AI Pipelines**: [docs/08-ai-pipelines.md](docs/08-ai-pipelines.md) (Claude and Perplexity prompts, schemas, budgets, and timeouts).
+- **AI Pipelines**: [docs/08-ai-pipelines.md](docs/08-ai-pipelines.md) (OpenRouter prompts, schemas, budgets, and timeouts).
 - **Frontend Architecture**: [docs/09-frontend.md](docs/09-frontend.md) (Next.js App Router, feature modules, D3-force graph, a11y).
 - **Security & Secrets**: [docs/10-security.md](docs/10-security.md) (Auth verification, RBAC, Zoom webhook HMAC, encryption at rest).
 - **Quality Assurance**: [docs/11-testing.md](docs/11-testing.md) (Unit, contract, integration, and Playwright E2E suites).
@@ -64,8 +64,7 @@ For Phase 1 and subsequent implementation phases, the project requires the follo
 - **Docker**: Engine `26+` (for running local Supabase CLI containers)
 - **Supabase CLI**: `v1.170+` (local PostgreSQL database, migrations, and Auth engine)
 - **External Accounts (for Live Integration Mode)**:
-  - Anthropic API key (`ANTHROPIC_API_KEY`)
-  - Perplexity API key (`PERPLEXITY_API_KEY`)
+  - OpenRouter API key (`OPENROUTER_API_KEY`)
   - Zoom Marketplace App credentials (OAuth 2.0 Client ID, Secret, Secret Token)
 
 *Note: In `INTEGRATION_MODE=fixture`, the application runs completely offline using deterministic test fixtures without external API keys or cloud dependencies.*
@@ -93,7 +92,7 @@ For Phase 1 and subsequent implementation phases, the project requires the follo
 │   ├── 05-data-model.md       # Database schemas, relational constraints, RPC functions
 │   ├── 06-http-api.md         # Canonical Express HTTP REST contracts
 │   ├── 07-realtime.md         # Socket.IO event specifications and room protocols
-│   ├── 08-ai-pipelines.md     # Anthropic and Perplexity prompt pipelines and schemas
+│   ├── 08-ai-pipelines.md     # OpenRouter prompt pipelines (Anthropic and Perplexity models) and schemas
 │   ├── 09-frontend.md         # Next.js App Router, React 19 UI, and graph visualizer
 │   ├── 10-security.md         # RBAC, token verification, credential encryption, privacy
 │   ├── 11-testing.md          # Testing strategy, fixture policies, regression suites

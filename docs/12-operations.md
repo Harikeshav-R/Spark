@@ -76,11 +76,10 @@ The application configuration is loaded via environment variables and validated 
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | (Local key) | Privileged service key for server backend queries. |
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | `http://localhost:3000` | Client-exposed Supabase URL. |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | (Local key) | Client-exposed anonymous key. |
-| `ANTHROPIC_API_KEY` | Live only | `""` | Anthropic Claude API key. |
-| `ANTHROPIC_FAST_MODEL` | No | `claude-3-5-haiku-latest` | Fast model for detection and grading. |
-| `ANTHROPIC_DEEP_MODEL` | No | `claude-3-7-sonnet-latest` | Deep model for extraction and tutoring. |
-| `PERPLEXITY_API_KEY` | Live only | `""` | Perplexity API key for academic resource search. |
-| `PERPLEXITY_MODEL` | No | `sonar-pro` | Perplexity model identifier. |
+| `OPENROUTER_API_KEY` | Live only | `""` | OpenRouter unified API key for AI models. |
+| `OPENROUTER_FAST_MODEL` | No | `minimax/minimax-m3.1-flash:free` | Fast model for detection, understanding checks, and grading. |
+| `OPENROUTER_DEEP_MODEL` | No | `nvidia/nemotron-3-ultra-550b-a55b:free` | Deep model for syllabus extraction, tutoring, and summaries. |
+| `OPENROUTER_SEARCH_MODEL` | No | `perplexity/sonar-pro` | Perplexity search model identifier on OpenRouter. |
 | `ZOOM_CLIENT_ID` | Live only | `""` | Zoom Marketplace App OAuth Client ID. |
 | `ZOOM_CLIENT_SECRET` | Live only | `""` | Zoom Marketplace App OAuth Client Secret. |
 | `ZOOM_SECRET_TOKEN` | Live only | `""` | Zoom Webhook secret token for HMAC verification. |

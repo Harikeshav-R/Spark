@@ -77,7 +77,7 @@ All implementations must formally pass the following regression scenarios:
 
 ### 4.5 External Provider & Failure Scenarios
 - **SC-15: AI Evaluation Timeout**: When the AI evaluation pipeline exceeds 8 seconds, the response status is saved as `pending_evaluation`, confidence is not mutated, and the teacher receives an evaluation failure notice.
-- **SC-16: Live Mode Credential Gate**: In `INTEGRATION_MODE=live`, missing `ANTHROPIC_API_KEY` causes `/api/lectures/:id/poll/generate` to return `503 SERVICE_UNAVAILABLE` rather than falling back to fixture data.
+- **SC-16: Live Mode Credential Gate**: In `INTEGRATION_MODE=live`, missing `OPENROUTER_API_KEY` causes `/api/lectures/:id/poll/generate` to return `503 SERVICE_UNAVAILABLE` rather than falling back to fixture data.
 - **SC-17: Server-Side Quiz Grading**: Student submits practice quiz answers `[0, 2, 1, 3, 0]`. Server calculates score ($4/5 = 80\%$) and awards $+0.15$ delta. Client-submitted score deltas are ignored.
 
 ### 4.6 Spark Progression, Encounter & Habit Scenarios
