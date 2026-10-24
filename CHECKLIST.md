@@ -8,7 +8,7 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 
 ## Phase 0: Foundations & Shared Contracts
 
-- [ ] P0-A-01 — Repository Preflight, Toolchain Setup & Project Skeleton
+- [x] P0-A-01 — Repository Preflight, Toolchain Setup & Project Skeleton
 - [ ] P0-A-02 — Supabase Local Instance & Migration 0001 Foundation
 - [ ] P0-A-03 — Shared Contracts & Zod Domain Schemas
 - [ ] P0-B-01 — Classroom & Collaboration Contract Stubs & Realtime Fixtures

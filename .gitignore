@@ -17,3 +17,5 @@ out/
 *.log
 coverage/
 recordings/
+*.tsbuildinfo
+.superpowers/
