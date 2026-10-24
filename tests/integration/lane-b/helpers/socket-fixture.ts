@@ -41,6 +41,7 @@ export const FIXTURE_IDS = {
 export interface TestFixtureOptions {
   authUnavailable?: boolean;
   databaseError?: boolean;
+  tableRows?: Record<string, Record<string, unknown>[]>;
 }
 
 export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): SupabaseClient {
@@ -124,11 +125,15 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
       id: FIXTURE_IDS.teacher1.lectureId,
       course_id: FIXTURE_IDS.teacher1.courseId,
       title: "Lecture 1",
+      status: "live",
+      started_at: "2026-10-20T14:00:00.000Z",
     },
     {
       id: FIXTURE_IDS.teacher2.lectureId,
       course_id: FIXTURE_IDS.teacher2.courseId,
       title: "Lecture 2",
+      status: "live",
+      started_at: "2026-10-20T14:00:00.000Z",
     },
   ];
 
@@ -137,7 +142,16 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
     students,
     courses,
     lecture_sessions,
+    concept_nodes: [],
+    transcript_chunks: [],
+    transcript_concepts: [],
   };
+
+  if (options.tableRows) {
+    for (const [name, rows] of Object.entries(options.tableRows)) {
+      tables[name] = rows;
+    }
+  }
 
   const fixtureFetch = async (
     urlInput: RequestInfo | URL,
@@ -182,10 +196,55 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
       });
     }
 
+    const method = init?.method?.toUpperCase() ?? "GET";
     const tableMatch = path.match(/^\/rest\/v1\/([^/?]+)/);
     if (tableMatch) {
-      const tableName = tableMatch[1];
-      const records = tables[tableName] ?? [];
+      const tableName = tableMatch[1]!;
+      if (!tables[tableName]) {
+        tables[tableName] = [];
+      }
+      const records = tables[tableName]!;
+
+      const headers = (init?.headers ?? {}) as Record<string, string>;
+      const acceptHeader =
+        headers.Accept ||
+        headers.accept ||
+        (init?.headers instanceof Headers ? init.headers.get("Accept") : null) ||
+        "";
+
+      if (method === "POST") {
+        const bodyText = typeof init?.body === "string" ? init.body : "{}";
+        let bodyParsed: unknown;
+        try {
+          bodyParsed = JSON.parse(bodyText);
+        } catch {
+          return new Response(JSON.stringify({ message: "Invalid JSON in POST", status: 400 }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const itemsToInsert = Array.isArray(bodyParsed) ? bodyParsed : [bodyParsed];
+        for (const item of itemsToInsert) {
+          if (item && typeof item === "object") {
+            records.push(item as Record<string, unknown>);
+          }
+        }
+
+        if (acceptHeader.includes("application/vnd.pgrst.object+json")) {
+          const singleItem = Array.isArray(bodyParsed) ? bodyParsed[0] : bodyParsed;
+          return new Response(JSON.stringify(singleItem ?? {}), {
+            status: 201,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify(itemsToInsert), {
+          status: 201,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
       let filtered = [...records];
 
       for (const [key, val] of url.searchParams.entries()) {
@@ -197,6 +256,26 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
           const targets = val.slice(4, -1).split(",").map(decodeURIComponent);
           filtered = filtered.filter((r) => targets.includes(String(r[key])));
         }
+      }
+
+      if (acceptHeader.includes("application/vnd.pgrst.object+json")) {
+        if (filtered.length === 0) {
+          return new Response(
+            JSON.stringify({
+              code: "PGRST116",
+              details: "The result contains 0 rows",
+              message: "JSON object requested, multiple (or no) rows returned",
+            }),
+            {
+              status: 406,
+              headers: { "Content-Type": "application/json" },
+            },
+          );
+        }
+        return new Response(JSON.stringify(filtered[0]), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
       }
 
       return new Response(JSON.stringify(filtered), {
