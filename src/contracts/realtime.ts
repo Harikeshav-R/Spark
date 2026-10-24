@@ -10,6 +10,12 @@ import {
   masteryUpdatedEventSchema,
   type MasteryUpdatedEvent,
 } from "./mastery.js";
+import {
+  type GameSummaryDTO,
+  type DailyQuestDTO,
+  gameSummarySchema,
+  dailyQuestSchema,
+} from "./game.js";
 
 export { masteryUpdatedEventSchema, type MasteryUpdatedEvent };
 
@@ -113,6 +119,26 @@ export interface StudyGroupUpdatedEvent {
   meetingStatus: "pending" | "created" | "unavailable";
 }
 
+export interface GameUpdatedEvent {
+  eventId: UUID;
+  occurredAt: ISOTimestamp;
+  studentId: UUID;
+  updatedAt: ISOTimestamp;
+  summary: GameSummaryDTO;
+  dailyQuest: DailyQuestDTO | null;
+}
+
+export interface PartyQuestUpdatedEvent {
+  eventId: UUID;
+  occurredAt: ISOTimestamp;
+  matchId: UUID;
+  partyQuestId: UUID;
+  version: number;
+  status: "active" | "completed" | "cancelled";
+  completedPairs: number;
+  totalPairs: number;
+}
+
 export interface LectureJoinPayload {
   lectureId: UUID;
 }
@@ -153,6 +179,8 @@ export interface ServerToClientEvents {
   "study-group:matched": (payload: StudyGroupMatchedEvent) => void;
   "study-group:message": (payload: StudyGroupMessageEvent) => void;
   "study-group:updated": (payload: StudyGroupUpdatedEvent) => void;
+  "game:updated": (payload: GameUpdatedEvent) => void;
+  "party:quest-updated": (payload: PartyQuestUpdatedEvent) => void;
 }
 
 export interface ClientToServerEvents {
@@ -306,3 +334,28 @@ export const socketAckResponseSchema = z.object({
   success: z.boolean(),
   error: z.string().optional(),
 });
+
+export const gameUpdatedEventSchema = z.object({
+  eventId: uuidSchema,
+  occurredAt: isoTimestampSchema,
+  studentId: uuidSchema,
+  updatedAt: isoTimestampSchema,
+  summary: gameSummarySchema,
+  dailyQuest: dailyQuestSchema.nullable(),
+});
+
+export const partyQuestUpdatedEventSchema = z
+  .object({
+    eventId: uuidSchema,
+    occurredAt: isoTimestampSchema,
+    matchId: uuidSchema,
+    partyQuestId: uuidSchema,
+    version: z.number().int().positive(),
+    status: z.enum(["active", "completed", "cancelled"]),
+    completedPairs: z.number().int().min(0),
+    totalPairs: z.union([z.literal(2), z.literal(4), z.literal(6)]),
+  })
+  .refine((data) => data.completedPairs <= data.totalPairs, {
+    message: "completedPairs must not exceed totalPairs",
+    path: ["completedPairs"],
+  });
