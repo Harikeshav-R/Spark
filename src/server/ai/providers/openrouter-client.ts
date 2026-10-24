@@ -57,7 +57,7 @@ export interface OpenRouterClientOptions {
 
 export interface OpenRouterCompletionRequest<T> {
   capability: AiCapability;
-  messages: { role: "system" | "user" | "assistant"; content: string }[];
+  messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[];
   schema: z.ZodType<T>;
   fixture: () => unknown | Promise<unknown>;
 }
@@ -186,6 +186,16 @@ export class OpenRouterClient {
           model,
           messages: request.messages,
           max_tokens: policy.maxTokens,
+          ...(request.capability === "extractPrerequisiteGraph"
+            ? {
+                plugins: [
+                  {
+                    id: "file-parser",
+                    pdf: { engine: "cloudflare-ai" },
+                  },
+                ],
+              }
+            : {}),
         },
         {
           signal: abortController.signal,

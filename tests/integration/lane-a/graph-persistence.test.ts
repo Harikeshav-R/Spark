@@ -13,7 +13,7 @@ import {
 import {
   FIXTURE_33_CONCEPTS,
   FIXTURE_34_EDGES,
-} from "../../fixtures/ai.fixture";
+} from "../../../src/server/ai/index";
 import {
   SupabaseTestHarness,
   type TestContext,
