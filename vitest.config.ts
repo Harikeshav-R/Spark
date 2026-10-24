@@ -6,10 +6,11 @@ export default defineConfig({
     globals: true,
     environment: "node",
     passWithNoTests: true,
+    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**"],
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
 });

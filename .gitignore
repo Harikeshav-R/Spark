@@ -17,5 +17,8 @@ out/
 *.log
 coverage/
 recordings/
+test-results/
+playwright-report/
+blob-report/
 *.tsbuildinfo
 .superpowers/
