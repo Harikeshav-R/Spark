@@ -3,7 +3,7 @@ import { AppError } from "../../../src/contracts/errors";
 import {
   FIXTURE_33_CONCEPTS,
   FIXTURE_34_EDGES,
-} from "../../fixtures/ai.fixture";
+} from "../../../src/server/ai/index";
 import {
   calculateNodeImportance,
   type GraphNodeInput,

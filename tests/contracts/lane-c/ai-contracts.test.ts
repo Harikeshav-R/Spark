@@ -45,6 +45,10 @@ import {
 } from "../../../src/contracts/index.js";
 import {
   FIXTURE_COURSE_ID,
+  FIXTURE_33_CONCEPTS,
+  FIXTURE_34_EDGES,
+} from "../../../src/server/ai/index.js";
+import {
   FIXTURE_TEACHER_ID,
   FIXTURE_STUDENT_ID,
   FIXTURE_STUDENT_2_ID,
@@ -52,8 +56,6 @@ import {
   FIXTURE_CONCEPT_ID_2,
   FIXTURE_TUTORING_SESSION_ID,
   FIXTURE_QUIZ_ATTEMPT_ID,
-  FIXTURE_33_CONCEPTS,
-  FIXTURE_34_EDGES,
   FIXTURE_CONCEPT_QUIZ_QUESTIONS,
   FIXTURE_STUDENT_QUIZ_QUESTIONS,
   FakeAiService,

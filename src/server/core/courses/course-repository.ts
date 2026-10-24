@@ -73,7 +73,7 @@ export class CourseRepository {
   private readonly client: CourseDatabaseClientPort;
 
   constructor(
-    client: Pick<SupabaseClient, "from"> | CourseDatabaseClientPort,
+    client: SupabaseClient | Pick<SupabaseClient, "from"> | CourseDatabaseClientPort,
   ) {
     this.client = client as unknown as CourseDatabaseClientPort;
   }

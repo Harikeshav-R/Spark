@@ -44,3 +44,17 @@ export {
 export {
   GraphService,
 } from "./graph/graph-service";
+
+export {
+  MAX_SYLLABUS_BYTES,
+  MAX_SYLLABUS_PAGES,
+  type ProcessedSyllabusPdf,
+  assertSyllabusSize,
+  hashSyllabusPdf,
+  processSyllabusPdf,
+} from "./ingestion/pdf-processor";
+
+export {
+  type SyllabusGraphExtractor,
+  SyllabusIngestionService,
+} from "./ingestion/syllabus-ingestion-service";
