@@ -19,7 +19,8 @@
     "db:seed": "tsx scripts/seed.ts",
     "demo": "tsx scripts/demo.ts",
     "demo:reset": "tsx scripts/demo-reset.ts",
-    "demo:record": "playwright test tests/e2e/demo.spec.ts"
+    "demo:record": "playwright test tests/e2e/demo.spec.ts",
+    "setup:agents": "bash scripts/setup-agent-tooling.sh"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.0",
