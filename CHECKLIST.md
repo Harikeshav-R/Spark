@@ -2,7 +2,7 @@
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
-> **Status Notice**: Phase 0, Phase 1, and Phase 2 are complete. All Phase 2 tasks (P2-A-01, P2-A-02, P2-C-01, P2-D-01, P2-D-02, P2-D-03) have been implemented, verified, and merged into `main`. The dependency frontier has advanced to Phase 3: Live Classroom & Transcript Streaming (P3-A-01, P3-B-01, P3-B-02, P3-B-03, P3-B-04, P3-C-01, P3-C-02, P3-D-01, P3-D-02). In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
+> **Status Notice**: Phase 0, Phase 1, and Phase 2 are complete. Phase 3 (Live Classroom & Transcript Streaming) is actively underway: P3-A-01, P3-B-01, and P3-B-02 have been implemented, verified, and merged into `main`. The dependency frontier has advanced to P3-B-03, P3-B-04, P3-C-01, P3-C-02, P3-D-01, and P3-D-02. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
 
 ---
 
@@ -47,9 +47,9 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 
 ## Phase 3: Live Classroom & Transcript Streaming
 
-- [ ] P3-A-01 — Attendance Evidence Recording & Verification
-- [ ] P3-B-01 — Authenticated Socket.IO Server & Room Authorization
-- [ ] P3-B-02 — Live Transcript Chunk Ingestion & Broadcasting
+- [x] P3-A-01 — Attendance Evidence Recording & Verification
+- [x] P3-B-01 — Authenticated Socket.IO Server & Room Authorization
+- [x] P3-B-02 — Live Transcript Chunk Ingestion & Broadcasting
 - [ ] P3-B-03 — Reference-Counted Connection & Attendance Tracker
 - [ ] P3-B-04 — Lecture Simulator & Zoom RTMS Streaming Adapter
 - [ ] P3-C-01 — Real-Time Sliding-Window Concept Detection Pipeline
