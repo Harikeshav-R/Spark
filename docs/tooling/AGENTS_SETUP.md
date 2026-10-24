@@ -89,7 +89,7 @@ All skills live in `.agents/skills/` and are accessible to any compatible AI ass
 | `github` | HTTP | `https://api.githubcopilot.com/mcp/` | GitHub PRs, issues, code search | `GITHUB_TOKEN` |
 | `postgres` | stdio (Docker) | `crystaldba/postgres-mcp` | Direct PostgreSQL schema & data queries | `DATABASE_URI` + Docker |
 | `codebase-memory-mcp` | stdio | `codebase-memory-mcp` | Structural knowledge graph search | Local binary in PATH |
-| `agentation` | stdio | `agentation-mcp server` | Browser design annotations server | Local binary in PATH |
+| `agentation` | stdio | `npx -y agentation-mcp@latest server` | Browser design annotations server | None (Node.js / npx) |
 
 ---
 

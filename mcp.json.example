@@ -75,11 +75,13 @@
       "_description": "Codebase structural knowledge graph (requires codebase-memory-mcp in PATH)"
     },
     "agentation": {
-      "command": "agentation-mcp",
+      "command": "npx",
       "args": [
+        "-y",
+        "agentation-mcp@latest",
         "server"
       ],
-      "_description": "Agentation visual annotations server (requires agentation-mcp in PATH)"
+      "_description": "Agentation visual annotations server (zero-install via npx)"
     }
   }
 }

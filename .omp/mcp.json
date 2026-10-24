@@ -67,8 +67,10 @@
       "args": []
     },
     "agentation": {
-      "command": "agentation-mcp",
+      "command": "npx",
       "args": [
+        "-y",
+        "agentation-mcp@latest",
         "server"
       ]
     }
