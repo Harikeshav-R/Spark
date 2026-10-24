@@ -52,6 +52,10 @@ All skills live in `.agents/skills/` and are accessible to any compatible AI ass
 - `improve-codebase-architecture`: High-level structural refactoring patterns.
 - `setup-ts-deep-modules`: TypeScript export ergonomics and module boundaries.
 
+### Supabase & Database Architecture (All Lanes)
+- `supabase`: Official core guidance covering Database, Auth, Edge Functions, Realtime, Storage, Vectors, and SSR client integrations.
+- `supabase-postgres-best-practices`: Official PostgreSQL performance, schema design, RLS policy enforcement, and indexing guide.
+
 ### Testing & TDD (All Lanes)
 - `tdd`: Red-green-refactor workflows, writing failing tests first.
 - `migrate-to-shoehorn`: Type assertion safety, eliminating unsafe `as` casts in test suites.
