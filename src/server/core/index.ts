@@ -10,3 +10,11 @@ export {
 export {
   CryptoIdGenerator,
 } from "./id-generator";
+
+export {
+  EnrollmentRepository,
+} from "./enrollment/enrollment-repository";
+
+export {
+  EnrollmentService,
+} from "./enrollment/enrollment-service";
