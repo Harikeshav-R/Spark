@@ -2,17 +2,15 @@ import { defineConfig } from "vitest/config";
 import path from "node:path";
 
 export default defineConfig({
-  esbuild: {
-    jsx: "automatic",
-  },
   test: {
     globals: true,
     environment: "node",
     passWithNoTests: true,
+    exclude: ["**/node_modules/**", "**/dist/**", "tests/e2e/**"],
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
 });
