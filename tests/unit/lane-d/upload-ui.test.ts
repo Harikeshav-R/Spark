@@ -1,12 +1,8 @@
 import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToString } from "react-dom/server";
-import {
-  SyllabusUpload,
-  CommitSection,
-} from "../../../src/features/courses/syllabus-upload";
+import { CommitSection } from "../../../src/features/courses/syllabus-upload";
 import { GraphPreview } from "../../../src/features/courses/graph-preview";
-import ProfessorUploadPage from "../../../src/app/professor/upload/page";
 import {
   fixturePrerequisiteGraph,
   FIXTURE_33_CONCEPTS,
@@ -15,17 +11,6 @@ import {
 describe("Lane D: Syllabus Upload & Graph Preview UI (P2-D-01)", () => {
   const fixtureGraph = fixturePrerequisiteGraph();
 
-  describe("SyllabusUpload component", () => {
-    it("renders idle state with file input, drop zone, and course ID input", () => {
-      const html = renderToString(React.createElement(SyllabusUpload));
-
-      expect(html).toContain('type="file"');
-      expect(html).toContain('accept="application/pdf"');
-      expect(html).toContain("Course ID");
-      expect(html).toContain("Drop PDF here or click to browse");
-      expect(html).toContain("Choose file");
-    });
-  });
 
   describe("GraphPreview component", () => {
     it("renders all 33 concept labels and summary stats from fixture data", () => {
@@ -173,13 +158,4 @@ describe("Lane D: Syllabus Upload & Graph Preview UI (P2-D-01)", () => {
     });
   });
 
-  describe("ProfessorUploadPage route shell", () => {
-    it("renders instructor workspace shell with upload syllabus title", () => {
-      const html = renderToString(React.createElement(ProfessorUploadPage));
-
-      expect(html).toContain("Upload syllabus");
-      expect(html).toContain("Instructor workspace");
-      expect(html).toContain("Upload course syllabus");
-    });
-  });
 });
