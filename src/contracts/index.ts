@@ -6,3 +6,4 @@ export * from "./classroom.js";
 export * from "./realtime.js";
 export * from "./ai.js";
 export * from "./learning.js";
+export * from "./game.js";
