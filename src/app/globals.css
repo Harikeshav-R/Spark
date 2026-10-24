@@ -1,55 +1,73 @@
 @import "tailwindcss";
 
 @theme {
-  /* Canonical mastery band color tokens */
-  --color-mastery-gray: #9CA3AF;
-  --color-mastery-red: #EF4444;
-  --color-mastery-yellow: #F59E0B;
-  --color-mastery-green: #10B981;
+  /* Warm editorial theme palette tokens */
+  --color-paper: #faf6ee;
+  --color-panel: #fffdf8;
+  --color-cream: #f4e9d7;
+  --color-cream-deep: #ecdcc0;
+  --color-line: #e6d8bd;
+  --color-ink: #2b2a2e;
+  --color-charcoal: #3a3a3d;
+  --color-muted: #5f5b54;
+  --color-orange: #ed793c;
+  --color-orange-deep: #c85c22;
+  --color-orange-text: #a9481a;
+  --color-yellow: #f4bc55;
+  --color-yellow-deep: #cf951f;
+  --color-yellow-tint: #fbeac2;
+  --color-good: #2b7f55;
+  --color-good-tint: #dff1e5;
+  --color-bad: #b0384a;
+  --color-bad-tint: #f8e0e3;
 
-  /* Accessible soft badge tokens (WCAG 2.1 AA >= 4.5:1 contrast) */
-  --color-mastery-gray-bg: #F3F4F6;
-  --color-mastery-gray-text: #374151;
-  --color-mastery-gray-border: #D1D5DB;
+  /* Canonical mastery band color tokens (mapped to warm palette) */
+  --color-mastery-gray: #f4e9d7;
+  --color-mastery-red: #b0384a;
+  --color-mastery-yellow: #f4bc55;
+  --color-mastery-green: #2b7f55;
 
-  --color-mastery-red-bg: #FEF2F2;
-  --color-mastery-red-text: #991B1B;
-  --color-mastery-red-border: #FCA5A5;
+  /* Accessible soft badge tokens (WCAG 2.1 AA >= 4.5:1 contrast with ink #2b2a2e) */
+  --color-mastery-gray-bg: #f4e9d7;
+  --color-mastery-gray-text: #2b2a2e;
+  --color-mastery-gray-border: #e6d8bd;
 
-  --color-mastery-yellow-bg: #FEF3C7;
-  --color-mastery-yellow-text: #92400E;
-  --color-mastery-yellow-border: #FCD34D;
+  --color-mastery-red-bg: #f8e0e3;
+  --color-mastery-red-text: #2b2a2e;
+  --color-mastery-red-border: #b0384a;
 
-  --color-mastery-green-bg: #D1FAE5;
-  --color-mastery-green-text: #065F46;
-  --color-mastery-green-border: #6EE7B7;
+  --color-mastery-yellow-bg: #fbeac2;
+  --color-mastery-yellow-text: #2b2a2e;
+  --color-mastery-yellow-border: #cf951f;
+
+  --color-mastery-green-bg: #dff1e5;
+  --color-mastery-green-text: #2b2a2e;
+  --color-mastery-green-border: #2b7f55;
 
   /* Active concept overlay tokens */
-  --color-active-concept: #F59E0B;
-  --color-active-concept-bg: #FFFBEB;
-  --color-active-concept-text: #92400E;
-  --color-active-concept-ring: rgba(245, 158, 11, 0.45);
+  --color-active-concept: #ed793c;
+  --color-active-concept-bg: #fbeac2;
+  --color-active-concept-text: #2b2a2e;
+  --color-active-concept-ring: rgba(200, 92, 34, 0.45);
 }
 
 :root {
+  color-scheme: light;
   --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --color-bg-canvas: #FFFFFF;
-  --color-fg-default: #111827;
-  --color-fg-muted: #4B5563;
-  --color-border-default: #E5E7EB;
+  --color-bg-canvas: #faf6ee;
+  --color-fg-default: #2b2a2e;
+  --color-fg-muted: #5f5b54;
+  --color-border-default: #e6d8bd;
 
   /* Focus ring tokens */
-  --focus-ring-color: #3B82F6;
+  --focus-ring-color: #2b2a2e;
   --focus-ring-offset: 2px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg-canvas: #0F172A;
-    --color-fg-default: #F9FAFB;
-    --color-fg-muted: #9CA3AF;
-    --color-border-default: #334155;
-  }
+/* Global focus-visible outline 2px solid ink, offset 2px */
+:focus-visible {
+  outline: 2px solid #2b2a2e;
+  outline-offset: 2px;
 }
 
 /* Reduced motion support per WCAG 2.1 AA and project invariant */
@@ -67,10 +85,10 @@
 /* Active concept gentle pulse animation */
 @keyframes active-concept-pulse {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6);
+    box-shadow: 0 0 0 0 rgba(237, 121, 60, 0.6);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+    box-shadow: 0 0 0 6px rgba(237, 121, 60, 0);
   }
 }
 

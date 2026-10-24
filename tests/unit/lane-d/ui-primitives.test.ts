@@ -27,14 +27,14 @@ describe("Lane D: UI Component Primitives - Headless Rendering (P0-D-01)", () =>
       expect(html).toContain("<button");
       expect(html).toContain('type="button"');
       expect(html).toContain("Click Me");
-      expect(html).toContain("bg-blue-600");
+      expect(html).toContain("bg-[#ed793c]");
     });
 
     it("renders destructive variant and large size", () => {
       const html = renderToString(
         React.createElement(Button, { variant: "destructive", size: "lg" }, "Delete")
       );
-      expect(html).toContain("bg-red-600");
+      expect(html).toContain("bg-[#b0384a]");
       expect(html).toContain("h-12");
       expect(html).toContain("Delete");
     });
@@ -70,7 +70,7 @@ describe("Lane D: UI Component Primitives - Headless Rendering (P0-D-01)", () =>
       );
       expect(html).toContain('aria-label="Mastered (85%)"');
       expect(html).toContain("Mastered (85%)");
-      expect(html).toContain("background-color:#10B981");
+      expect(html).toContain("background-color:#2b7f55");
     });
 
     it("renders active concept pulse ring when isActiveConcept is true", () => {
@@ -82,7 +82,7 @@ describe("Lane D: UI Component Primitives - Headless Rendering (P0-D-01)", () =>
         })
       );
       expect(html).toContain("animate-active-concept");
-      expect(html).toContain("ring-amber-500");
+      expect(html).toContain("ring-[#c85c22]");
     });
 
     it("renders solid mastery variant with dark text for high contrast", () => {
@@ -92,8 +92,8 @@ describe("Lane D: UI Component Primitives - Headless Rendering (P0-D-01)", () =>
           variant: "solid",
         })
       );
-      expect(html).toContain("bg-[#F59E0B]");
-      expect(html).toContain("text-gray-950");
+      expect(html).toContain("bg-[#f4bc55]");
+      expect(html).toContain("text-[#2b2a2e]");
     });
   });
 
@@ -197,7 +197,7 @@ describe("Lane D: UI Component Primitives - Headless Rendering (P0-D-01)", () =>
       expect(html).toContain('aria-invalid="true"');
       expect(html).toContain('role="alert"');
       expect(html).toContain("Please enter a valid university email address");
-      expect(html).toContain("border-red-500");
+      expect(html).toContain("border-[#b0384a]");
     });
   });
 });

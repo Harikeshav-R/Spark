@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import type { MasteryBand } from "@/contracts/common";
-import { cn } from "@/lib/client/utils";
+import type { MasteryBand } from "../../contracts/common";
+import { cn } from "../../lib/client/utils";
 
 export type BadgeVariant = "default" | "secondary" | "outline" | "soft" | "solid";
 
@@ -14,34 +14,34 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
 }
 
 export const MASTERY_COLORS = {
-  gray: "#9CA3AF",
-  red: "#EF4444",
-  yellow: "#F59E0B",
-  green: "#10B981",
+  gray: "#f4e9d7",
+  red: "#b0384a",
+  yellow: "#f4bc55",
+  green: "#2b7f55",
 } as const;
 
 export const MASTERY_BG_COLORS = {
-  gray: "#F3F4F6",
-  red: "#FEF2F2",
-  yellow: "#FEF3C7",
-  green: "#D1FAE5",
+  gray: "#f4e9d7",
+  red: "#f8e0e3",
+  yellow: "#fbeac2",
+  green: "#dff1e5",
 } as const;
 
 export const MASTERY_TEXT_COLORS = {
-  gray: "#374151",
-  red: "#991B1B",
-  yellow: "#92400E",
-  green: "#065F46",
+  gray: "#2b2a2e",
+  red: "#2b2a2e",
+  yellow: "#2b2a2e",
+  green: "#2b2a2e",
 } as const;
 
 export const MASTERY_BORDER_COLORS = {
-  gray: "#D1D5DB",
-  red: "#FCA5A5",
-  yellow: "#FCD34D",
-  green: "#6EE7B7",
+  gray: "#e6d8bd",
+  red: "#b0384a",
+  yellow: "#cf951f",
+  green: "#2b7f55",
 } as const;
 
-export const ACTIVE_CONCEPT_COLOR = "#F59E0B";
+export const ACTIVE_CONCEPT_COLOR = "#ed793c";
 
 /**
  * Returns an accessible text description for a mastery band per WCAG 2.1 AA.
@@ -62,29 +62,31 @@ export function getMasteryLabel(band: MasteryBand, confidence?: number): string 
       return `In Progress${percentageStr}`;
     case "green":
       return `Mastered${percentageStr}`;
+    default:
+      return `Unknown${percentageStr}`;
   }
 }
 
 const masterySoftStyles: Record<MasteryBand, string> = {
-  gray: "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-700",
-  red: "bg-red-50 text-red-900 border-red-200 dark:bg-red-950 dark:text-red-200 dark:border-red-800",
-  yellow: "bg-amber-50 text-amber-950 border-amber-300 dark:bg-amber-950 dark:text-amber-200 dark:border-amber-800",
-  green: "bg-emerald-50 text-emerald-950 border-emerald-300 dark:bg-emerald-950 dark:text-emerald-200 dark:border-emerald-800",
+  gray: "bg-[#f4e9d7] text-[#2b2a2e] border-[#e6d8bd]",
+  red: "bg-[#f8e0e3] text-[#2b2a2e] border-[#b0384a]",
+  yellow: "bg-[#fbeac2] text-[#2b2a2e] border-[#cf951f]",
+  green: "bg-[#dff1e5] text-[#2b2a2e] border-[#2b7f55]",
 };
 
 const masterySolidStyles: Record<MasteryBand, string> = {
-  gray: "bg-[#9CA3AF] text-gray-950 border-[#9CA3AF]",
-  red: "bg-[#EF4444] text-gray-950 border-[#EF4444]",
-  yellow: "bg-[#F59E0B] text-gray-950 border-[#F59E0B]",
-  green: "bg-[#10B981] text-gray-950 border-[#10B981]",
+  gray: "bg-[#f4e9d7] text-[#2b2a2e] border-[#e6d8bd]",
+  red: "bg-[#b0384a] text-[#fffdf8] border-[#b0384a]",
+  yellow: "bg-[#f4bc55] text-[#2b2a2e] border-[#cf951f]",
+  green: "bg-[#2b7f55] text-[#fffdf8] border-[#2b7f55]",
 };
 
 const variantStyles: Record<BadgeVariant, string> = {
-  default: "bg-blue-100 text-blue-900 border-blue-200 dark:bg-blue-950 dark:text-blue-200",
-  secondary: "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200",
-  outline: "bg-transparent text-gray-800 border-gray-300 dark:text-gray-200 dark:border-gray-700",
-  soft: "bg-gray-100 text-gray-800 border-transparent dark:bg-gray-800 dark:text-gray-200",
-  solid: "bg-gray-900 text-white border-transparent dark:bg-gray-100 dark:text-gray-900",
+  default: "bg-[#f4e9d7] text-[#a9481a] border-[#e6d8bd]",
+  secondary: "bg-[#f4e9d7] text-[#2b2a2e] border-[#e6d8bd]",
+  outline: "bg-transparent text-[#2b2a2e] border-[#3a3a3d]",
+  soft: "bg-[#f4e9d7] text-[#2b2a2e] border-transparent",
+  solid: "bg-[#2b2a2e] text-[#fffdf8] border-transparent",
 };
 
 export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
@@ -113,10 +115,10 @@ export const Badge = React.forwardRef<HTMLSpanElement, BadgeProps>(
         ref={ref}
         aria-label={props["aria-label"] || accessibleLabel}
         className={cn(
-          "inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold rounded-full border transition-all select-none",
+          "inline-flex items-center gap-1.5 px-2.5 py-0.5 text-xs font-semibold rounded-full border transition-colors select-none",
           resolvedStyle,
           isActiveConcept &&
-            "ring-2 ring-amber-500 ring-offset-1 ring-offset-white dark:ring-offset-gray-900 animate-active-concept",
+            "ring-2 ring-[#c85c22] ring-offset-1 ring-offset-[#faf6ee] animate-active-concept",
           className
         )}
         {...props}
