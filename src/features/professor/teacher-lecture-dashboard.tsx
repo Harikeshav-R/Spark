@@ -35,16 +35,10 @@ export interface TeacherLectureDashboardProps {
 
 type FeedConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "error";
 
-const lectureSnapshotWithProvenanceSchema = lectureSnapshotSchema.passthrough();
-const transcriptChunkEventWithProvenanceSchema = transcriptChunkEventSchema.passthrough();
-
-function extractSimulatedProvenance(data: unknown): boolean | null {
-  if (data && typeof data === "object" && "isSimulated" in data) {
-    const val = data.isSimulated;
-    if (typeof val === "boolean") {
-      return val;
-    }
-  }
+function deriveSnapshotProvenance(chunks: readonly TranscriptChunk[]): boolean | null {
+  if (chunks.length === 0) return null;
+  if (chunks.some((c) => c.isSimulated === true)) return true;
+  if (chunks.every((c) => c.isSimulated === false)) return false;
   return null;
 }
 
@@ -120,7 +114,7 @@ export function TeacherLectureDashboard({
       try {
         const snapshot = await requestJson(
           `/api/lectures/${encodeURIComponent(targetLectureId)}/snapshot`,
-          lectureSnapshotWithProvenanceSchema,
+          lectureSnapshotSchema,
           {
             getAccessToken: async () => currentToken,
           }
@@ -137,7 +131,7 @@ export function TeacherLectureDashboard({
           return snapshot.lecture;
         });
 
-        const snapshotProvenance = extractSimulatedProvenance(snapshot);
+        const snapshotProvenance = deriveSnapshotProvenance(snapshot.recentChunks);
         setIsSimulated(snapshotProvenance);
 
         setChunks((prev) => mergeTranscriptChunks(prev, snapshot.recentChunks));
@@ -203,7 +197,7 @@ export function TeacherLectureDashboard({
           try {
             const snapshot = await requestJson(
               `/api/lectures/${encodeURIComponent(activeLectureId)}/snapshot`,
-              lectureSnapshotWithProvenanceSchema,
+              lectureSnapshotSchema,
               { getAccessToken: async () => token }
             );
 
@@ -218,7 +212,7 @@ export function TeacherLectureDashboard({
 
             setLecture(snapshot.lecture);
             setChunks(snapshot.recentChunks);
-            const snapshotProvenance = extractSimulatedProvenance(snapshot);
+            const snapshotProvenance = deriveSnapshotProvenance(snapshot.recentChunks);
             setIsSimulated(snapshotProvenance);
           } catch (snapshotErr: unknown) {
             if (abort) return;
@@ -302,7 +296,7 @@ export function TeacherLectureDashboard({
     });
 
     socket.on("transcript:chunk", (rawPayload: unknown) => {
-      const parsed = transcriptChunkEventWithProvenanceSchema.safeParse(rawPayload);
+      const parsed = transcriptChunkEventSchema.safeParse(rawPayload);
       if (!parsed.success) return;
       const event: TranscriptChunkEvent = parsed.data;
 
@@ -310,9 +304,8 @@ export function TeacherLectureDashboard({
       if (seenEventIdsRef.current.has(event.eventId)) return;
       seenEventIdsRef.current.add(event.eventId);
 
-      const chunkProvenance = extractSimulatedProvenance(event);
-      if (chunkProvenance !== null) {
-        setIsSimulated(chunkProvenance);
+      if (typeof event.isSimulated === "boolean") {
+        setIsSimulated(event.isSimulated);
       }
 
       const newChunk: TranscriptChunk = {
@@ -322,6 +315,7 @@ export function TeacherLectureDashboard({
         timestampSec: event.timestampSec,
         speakerName: event.speakerName,
         detectedConceptIds: [],
+        isSimulated: event.isSimulated,
         createdAt: event.occurredAt,
       };
 
