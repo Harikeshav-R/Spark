@@ -43,3 +43,16 @@ export {
   type SpeechSourceDependencies,
   type ZoomRtmsStart,
 } from "./speech-source.js";
+
+export {
+  PollRepository,
+  type PollDatabaseClientPort,
+  type PollContext,
+  type StoredPollMastery,
+  type StoredPollResponse,
+} from "./poll-repository.js";
+
+export {
+  PollService,
+  type PollServiceDependencies,
+} from "./poll-service.js";
