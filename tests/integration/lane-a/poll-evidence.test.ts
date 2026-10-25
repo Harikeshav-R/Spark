@@ -260,7 +260,7 @@ describe.skipIf(isFixtureMode)(
           concept_id: conceptId,
           question: "Question 1 on concept",
           expected_answer: "Answer 1",
-          status: "active",
+          status: "closed",
         },
         {
           id: question2Id,
@@ -356,7 +356,7 @@ describe.skipIf(isFixtureMode)(
           concept_id: conceptId,
           question: "Pending poll question",
           expected_answer: "Pending answer",
-          status: "active",
+          status: "closed",
         },
         {
           id: questionFailedId,
