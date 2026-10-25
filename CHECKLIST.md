@@ -2,7 +2,7 @@
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
-> **Status Notice**: Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, and Phase 5 are complete. In Phase 6 (Consensual Peer Collaboration & Zoom Scheduling), Lane A has completed both database migrations: Study Group Relational Schema (Migration 0004) & Lock RPCs (P6-A-01) and Additive Collaboration Migration 0005 & Party Quest Constraints (P6-A-02). Lane B has completed Consensual Complementary Matchmaking Engine (P6-B-01), Secure Peer Messaging & Room Broadcaster (P6-B-02), Mutual Availability Overlap Detector & Scheduling State Machine (P6-B-03), and Authentic Zoom OAuth 2.0 Client & Meeting Adapter (P6-B-04). Active pending Phase 6 tasks are P6-D-01, P6-B-05, and P6-C-01. In Phase 7 (Deployment, Verification & Final Acceptance), Lane A has landed the persistent server composition root in `server/index.ts` with cross-lane runtime integration and verified integration tests (`tests/integration/lane-a/composition-contracts.test.ts`), while production containerization (`Dockerfile`, `render.yaml`) and `doctor.ts` remain pending for full P7-A-01 closure. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
+> **Status Notice**: Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, Phase 5, and Phase 6 are complete. In Phase 6 (Consensual Peer Collaboration & Zoom Scheduling), Lane A completed both database migrations: Study Group Relational Schema (Migration 0004) & Lock RPCs (P6-A-01) and Additive Collaboration Migration 0005 & Party Quest Constraints (P6-A-02); Lane B completed Consensual Complementary Matchmaking Engine (P6-B-01), Secure Peer Messaging & Room Broadcaster (P6-B-02), Mutual Availability Overlap Detector & Scheduling State Machine (P6-B-03), Authentic Zoom OAuth 2.0 Client & Meeting Adapter (P6-B-04), and Collaborative Party Quests, Candidate Invitations & Reward Distribution (P6-B-05); Lane C completed Extended StudyGroupFeature with Invitations, Fit Badges & Party Goals (P6-C-01); and Lane D completed Peer Study Group Route Shell & Chat Interface (P6-D-01). In Phase 7 (Deployment, Verification & Final Acceptance), Lane A has landed the persistent server composition root in `server/index.ts` with cross-lane runtime integration and verified integration tests (`tests/integration/lane-a/composition-contracts.test.ts`), while production containerization (`Dockerfile`, `render.yaml`) and `doctor.ts` remain pending for full P7-A-01 closure. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
 
 ---
 
@@ -98,10 +98,10 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [x] P6-B-02 — Secure Peer Messaging & Room Broadcaster
 - [x] P6-B-03 — Mutual Availability Overlap Detector & Scheduling State Machine
 - [x] P6-B-04 — Authentic Zoom OAuth 2.0 Client & Meeting Adapter
-- [ ] P6-D-01 — Peer Study Group Route Shell & Chat Interface
+- [x] P6-D-01 — Peer Study Group Route Shell & Chat Interface
 - [x] P6-A-02 — Additive Collaboration Migration 0005 & Party Quest Constraints
-- [ ] P6-B-05 — Collaborative Party Quests, Candidate Invitations & Reward Distribution
-- [ ] P6-C-01 — Extended StudyGroupFeature with Invitations, Fit Badges & Party Goals
+- [x] P6-B-05 — Collaborative Party Quests, Candidate Invitations & Reward Distribution
+- [x] P6-C-01 — Extended StudyGroupFeature with Invitations, Fit Badges & Party Goals
 
 ---
 
