@@ -100,6 +100,46 @@ export interface StudyGroupOptInResponse {
   expiresAt: ISOTimestamp;
 }
 
+export type StudyGroupFitKind = "reciprocal" | "mentor";
+
+export interface StudyGroupCandidateConcept {
+  conceptId: UUID;
+  label: string;
+  band: MasteryBand;
+}
+
+export interface StudyGroupCandidate {
+  studentId: UUID;
+  requestedConcepts: StudyGroupCandidateConcept[];
+  complementaryGap: number;
+  fitKind: StudyGroupFitKind;
+}
+
+export interface StudyGroupInvitationResponse {
+  invitationId: UUID;
+  expiresAt: ISOTimestamp;
+}
+
+export interface StudyGroupInvitationDecisionResponse {
+  status: "accepted" | "declined";
+  matchId?: UUID;
+}
+
+export type PartyQuestStatus = "active" | "completed" | "cancelled";
+
+export interface PartyQuestProgressItem {
+  studentId: UUID;
+  conceptId: UUID;
+  completed: boolean;
+}
+
+export interface PartyQuestItem {
+  partyQuestId: UUID;
+  conceptIds: UUID[];
+  status: PartyQuestStatus;
+  progress: PartyQuestProgressItem[];
+}
+
 export interface TimeInterval {
   startsAt: ISOTimestamp;
   endsAt: ISOTimestamp;
@@ -159,6 +199,21 @@ export interface StudyGroupService {
     conceptIds: UUID[]
   ): Promise<StudyGroupOptInResponse>;
   optOutOfPool(actor: ActorContext, courseId: UUID): Promise<void>;
+  getCandidates(
+    actor: ActorContext,
+    courseId: UUID
+  ): Promise<StudyGroupCandidate[]>;
+  sendInvitation(
+    actor: ActorContext,
+    courseId: UUID,
+    inviteeId: UUID,
+    conceptIds: UUID[]
+  ): Promise<StudyGroupInvitationResponse>;
+  respondToInvitation(
+    actor: ActorContext,
+    invitationId: UUID,
+    decision: "accepted" | "declined"
+  ): Promise<StudyGroupInvitationDecisionResponse>;
   registerAvailability(
     actor: ActorContext,
     courseId: UUID,
@@ -189,6 +244,15 @@ export interface StudyGroupService {
     zoomMeetingId?: string;
     zoomLink?: string;
   }>;
+  createPartyQuest(
+    actor: ActorContext,
+    matchId: UUID,
+    conceptIds: UUID[]
+  ): Promise<{ partyQuestId: UUID; status: "active"; conceptIds: UUID[] }>;
+  getPartyQuests(
+    actor: ActorContext,
+    matchId: UUID
+  ): Promise<PartyQuestItem[]>;
 }
 
 export interface ZoomAdapter {
@@ -304,4 +368,44 @@ export const studyGroupMessageSchema = z.object({
   senderId: uuidSchema,
   content: z.string().min(1),
   createdAt: isoTimestampSchema,
+});
+
+export const studyGroupFitKindSchema = z.enum(["reciprocal", "mentor"]);
+
+export const studyGroupCandidateConceptSchema = z.object({
+  conceptId: uuidSchema,
+  label: z.string(),
+  band: masteryBandSchema,
+});
+
+export const studyGroupCandidateSchema = z.object({
+  studentId: uuidSchema,
+  requestedConcepts: z.array(studyGroupCandidateConceptSchema),
+  complementaryGap: z.number(),
+  fitKind: studyGroupFitKindSchema,
+});
+
+export const studyGroupInvitationResponseSchema = z.object({
+  invitationId: uuidSchema,
+  expiresAt: isoTimestampSchema,
+});
+
+export const studyGroupInvitationDecisionResponseSchema = z.object({
+  status: z.enum(["accepted", "declined"]),
+  matchId: uuidSchema.optional(),
+});
+
+export const partyQuestStatusSchema = z.enum(["active", "completed", "cancelled"]);
+
+export const partyQuestProgressItemSchema = z.object({
+  studentId: uuidSchema,
+  conceptId: uuidSchema,
+  completed: z.boolean(),
+});
+
+export const partyQuestItemSchema = z.object({
+  partyQuestId: uuidSchema,
+  conceptIds: z.array(uuidSchema),
+  status: partyQuestStatusSchema,
+  progress: z.array(partyQuestProgressItemSchema),
 });

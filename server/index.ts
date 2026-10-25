@@ -91,9 +91,13 @@ import {
 } from "../src/server/realtime/index.js";
 import {
   AvailabilityService,
+  InvitationsRepository,
+  InvitationsService,
   MatchRepository,
   MessagingRepository,
   MessagingService,
+  PartyQuestRepository,
+  PartyQuestService,
   PoolRepository,
   Scheduler,
   SchedulerRepository,
@@ -296,6 +300,45 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     ids: new CryptoIdGenerator(),
     clock: dependencies.clock,
   });
+  const poolRepository = new PoolRepository(dependencies.databaseClient);
+  const matchRepository = new MatchRepository(dependencies.databaseClient);
+  const studyGroupService = new StudyGroupService({
+    courses,
+    pool: poolRepository,
+    matches: matchRepository,
+    publisher,
+    clock: dependencies.clock,
+    ids: new CryptoIdGenerator(),
+  });
+
+  const messagingRepository = new MessagingRepository(dependencies.databaseClient);
+  const messagingService = new MessagingService({
+    repository: messagingRepository,
+    publisher,
+    clock: dependencies.clock,
+    ids: new CryptoIdGenerator(),
+  });
+
+  const invitationsRepository = new InvitationsRepository(dependencies.databaseClient);
+  const invitationsService = new InvitationsService({
+    courses,
+    pool: poolRepository,
+    matches: matchRepository,
+    invitations: invitationsRepository,
+    publisher,
+    clock: dependencies.clock,
+    ids: new CryptoIdGenerator(),
+  });
+
+  const partyQuestRepository = new PartyQuestRepository(dependencies.databaseClient);
+  const partyQuestService = new PartyQuestService({
+    questsRepo: partyQuestRepository,
+    membership: messagingRepository,
+    publisher,
+    clock: dependencies.clock,
+    ids: new CryptoIdGenerator(),
+  });
+
 
   const createEncounterService = (courseId: UUID) => {
     return new EncounterService({
@@ -310,6 +353,7 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       gameRepository,
       mastery,
       clock: dependencies.clock,
+      partyQuests: partyQuestService,
       ids: new CryptoIdGenerator(),
     });
   };
@@ -499,25 +543,6 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     })
   );
 
-  const poolRepository = new PoolRepository(dependencies.databaseClient);
-  const matchRepository = new MatchRepository(dependencies.databaseClient);
-  const studyGroupService = new StudyGroupService({
-    courses,
-    pool: poolRepository,
-    matches: matchRepository,
-    publisher,
-    clock: dependencies.clock,
-    ids: new CryptoIdGenerator(),
-  });
-
-  const messagingRepository = new MessagingRepository(dependencies.databaseClient);
-  const messagingService = new MessagingService({
-    repository: messagingRepository,
-    publisher,
-    clock: dependencies.clock,
-    ids: new CryptoIdGenerator(),
-  });
-
   const schedulerRepository = new SchedulerRepository(dependencies.databaseClient);
   const scheduler = new Scheduler({
     membership: messagingRepository,
@@ -542,6 +567,8 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       scheduler,
       schedulerRepository,
       availability: availabilityService,
+      invitations: invitationsService,
+      partyQuests: partyQuestService,
     })
   );
 

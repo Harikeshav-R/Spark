@@ -515,6 +515,24 @@ describe("P5-C-06: Practice Encounters Offline Scenarios", () => {
         },
       ],
     };
+    const partyQuestsMock = {
+      authorizePartyEncounter: async (
+        _actor: unknown,
+        _courseId: unknown,
+        _studentId: unknown,
+        partyQuestId: UUID,
+      ) => {
+        if (partyQuestId === "00000000-0000-4000-8000-000000000000") {
+          throw new AppError({
+            code: DomainErrorCode.NOT_FOUND,
+            statusCode: 404,
+            message: "Party quest not found",
+          });
+        }
+      },
+      recordPartyEncounterCompletion: async () => {},
+    };
+
 
     return new EncounterService({
       courseId,
@@ -527,6 +545,7 @@ describe("P5-C-06: Practice Encounters Offline Scenarios", () => {
       game: gameMock as unknown as ConcreteGameService,
       gameRepository: gameRepoMock as unknown as GameRepository,
       mastery: masteryMock as unknown as MasteryService,
+      partyQuests: partyQuestsMock,
       clock,
       ids,
       ...overrides,
@@ -771,7 +790,7 @@ describe("P5-C-06: Practice Encounters Offline Scenarios", () => {
   });
 
   // Assertion 6: Authorization and security checks
-  it("rejects unauthorized actors and party source with 503", async () => {
+  it("rejects unauthorized actors and validates party source admission", async () => {
     const service = createService();
 
     // Teacher cannot create encounter
@@ -797,19 +816,28 @@ describe("P5-C-06: Practice Encounters Offline Scenarios", () => {
       }),
     );
 
-    // Party source rejected with 503
+    // Party source with invalid quest rejected with 404
     await expect(
       service.createEncounter(studentActor, studentId, {
         conceptId: conceptAId,
         source: "party",
-        partyQuestId: "55555555-5555-4555-8555-555555555555" as UUID,
+        partyQuestId: "00000000-0000-4000-8000-000000000000" as UUID,
       }),
     ).rejects.toThrowError(
       expect.objectContaining({
-        code: DomainErrorCode.SERVICE_UNAVAILABLE,
-        statusCode: 503,
+        code: DomainErrorCode.NOT_FOUND,
+        statusCode: 404,
       }),
     );
+
+    // Party source with valid quest succeeds
+    const partyEncounter = await service.createEncounter(studentActor, studentId, {
+      conceptId: conceptAId,
+      source: "party",
+      partyQuestId: "55555555-5555-4555-8555-555555555555" as UUID,
+    });
+    expect(partyEncounter.source).toBe("party");
+    expect(partyEncounter.partyQuestId).toBe("55555555-5555-4555-8555-555555555555");
   });
 });
 
@@ -938,6 +966,10 @@ describe.skipIf(!isLocalSupabase)(
         gameRepository,
         mastery: masteryService,
         clock,
+        partyQuests: {
+          authorizePartyEncounter: async () => {},
+          recordPartyEncounterCompletion: async () => {},
+        },
         ids,
       });
     }, 30000);

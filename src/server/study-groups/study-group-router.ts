@@ -10,6 +10,8 @@ import type { MessagingRepository } from "./messaging-repository.js";
 import type { Scheduler } from "./scheduler.js";
 import type { SchedulerRepository } from "./scheduler-repository.js";
 import type { AvailabilityService } from "./availability-service.js";
+import type { InvitationsService } from "./invitations-service.js";
+import type { PartyQuestService } from "./party-quest-service.js";
 
 const putAvailabilityBodySchema = z
   .object({
@@ -43,6 +45,25 @@ const acceptScheduleBodySchema = z
   })
   .strict();
 
+const postInvitationBodySchema = z
+  .object({
+    inviteeId: uuidSchema,
+    conceptIds: z.array(uuidSchema).min(1).max(3),
+  })
+  .strict();
+
+const respondInvitationBodySchema = z
+  .object({
+    decision: z.enum(["accepted", "declined"]),
+  })
+  .strict();
+
+const createPartyQuestBodySchema = z
+  .object({
+    conceptIds: z.array(uuidSchema).min(1).max(3),
+  })
+  .strict();
+
 export interface StudyGroupRouterDependencies {
   auth: Pick<AuthGateway, "verifyToken">;
   studyGroups: Pick<StudyGroupService, "optIntoPool" | "optOutOfPool">;
@@ -51,6 +72,14 @@ export interface StudyGroupRouterDependencies {
   scheduler: Pick<Scheduler, "proposeSchedule" | "acceptSchedule">;
   schedulerRepository: Pick<SchedulerRepository, "getMatch">;
   availability: Pick<AvailabilityService, "registerAvailability" | "getAvailability">;
+  invitations: Pick<
+    InvitationsService,
+    "getCandidates" | "sendInvitation" | "respondToInvitation"
+  >;
+  partyQuests: Pick<
+    PartyQuestService,
+    "createPartyQuest" | "getPartyQuests"
+  >;
 }
 
 export function createStudyGroupRouter(
@@ -292,6 +321,126 @@ export function createStudyGroupRouter(
         }
 
         res.status(200).json(responsePayload);
+      } catch (err: unknown) {
+        next(err);
+      }
+    }
+  );
+
+  // 10. GET /api/courses/:courseId/study-groups/candidates
+  router.get(
+    "/api/courses/:courseId/study-groups/candidates",
+    authMiddleware,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const actor = req.actor!;
+        const courseId = uuidSchema.parse(req.params.courseId);
+        const candidates = await dependencies.invitations.getCandidates(
+          actor,
+          courseId
+        );
+        res.status(200).json({ candidates });
+      } catch (err: unknown) {
+        next(err);
+      }
+    }
+  );
+
+  // 11. POST /api/courses/:courseId/study-groups/invitations
+  router.post(
+    "/api/courses/:courseId/study-groups/invitations",
+    authMiddleware,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const actor = req.actor!;
+        const courseId = uuidSchema.parse(req.params.courseId);
+        const body = postInvitationBodySchema.parse(req.body);
+        if (new Set(body.conceptIds).size !== body.conceptIds.length) {
+          throw new AppError({
+            code: "VALIDATION_ERROR",
+            statusCode: 400,
+            message: "Duplicate concept IDs are not allowed in invitations",
+          });
+        }
+        const result = await dependencies.invitations.sendInvitation(
+          actor,
+          courseId,
+          body.inviteeId,
+          body.conceptIds
+        );
+        res.status(201).json({
+          invitationId: result.invitationId,
+          status: "pending",
+          expiresAt: result.expiresAt,
+        });
+      } catch (err: unknown) {
+        next(err);
+      }
+    }
+  );
+
+  // 12. POST /api/study-group-invitations/:invitationId/respond
+  router.post(
+    "/api/study-group-invitations/:invitationId/respond",
+    authMiddleware,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const actor = req.actor!;
+        const invitationId = uuidSchema.parse(req.params.invitationId);
+        const body = respondInvitationBodySchema.parse(req.body);
+        const result = await dependencies.invitations.respondToInvitation(
+          actor,
+          invitationId,
+          body.decision
+        );
+        res.status(200).json(result);
+      } catch (err: unknown) {
+        next(err);
+      }
+    }
+  );
+
+  // 13. POST /api/study-groups/:matchId/quests
+  router.post(
+    "/api/study-groups/:matchId/quests",
+    authMiddleware,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const actor = req.actor!;
+        const matchId = uuidSchema.parse(req.params.matchId);
+        const body = createPartyQuestBodySchema.parse(req.body);
+        if (new Set(body.conceptIds).size !== body.conceptIds.length) {
+          throw new AppError({
+            code: "VALIDATION_ERROR",
+            statusCode: 400,
+            message: "Duplicate concept IDs are not allowed in party quests",
+          });
+        }
+        const result = await dependencies.partyQuests.createPartyQuest(
+          actor,
+          matchId,
+          body.conceptIds
+        );
+        res.status(201).json(result);
+      } catch (err: unknown) {
+        next(err);
+      }
+    }
+  );
+
+  // 14. GET /api/study-groups/:matchId/quests
+  router.get(
+    "/api/study-groups/:matchId/quests",
+    authMiddleware,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const actor = req.actor!;
+        const matchId = uuidSchema.parse(req.params.matchId);
+        const partyQuests = await dependencies.partyQuests.getPartyQuests(
+          actor,
+          matchId
+        );
+        res.status(200).json({ partyQuests });
       } catch (err: unknown) {
         next(err);
       }

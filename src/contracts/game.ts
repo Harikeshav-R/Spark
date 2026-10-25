@@ -211,3 +211,18 @@ export interface EncounterService {
     answers: { questionId: UUID; selectedOption: number }[]
   ): Promise<EncounterResultDTO>;
 }
+
+export interface PartyQuestEncounterPort {
+  authorizePartyEncounter(
+    actor: ActorContext,
+    courseId: UUID,
+    studentId: UUID,
+    partyQuestId: UUID,
+    conceptId: UUID
+  ): Promise<void>;
+  recordPartyEncounterCompletion(
+    actor: ActorContext,
+    partyQuestId: UUID,
+    attemptId: UUID
+  ): Promise<void>;
+}

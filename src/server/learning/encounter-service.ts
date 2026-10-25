@@ -19,6 +19,7 @@ import {
   encounterSchema,
   encounterResultSchema,
   hintLevelSchema,
+  type PartyQuestEncounterPort,
 } from "../../contracts/game.js";
 import {
   type ConceptQuizQuestion,
@@ -61,6 +62,7 @@ export interface EncounterServiceDependencies {
     "getDailyQuestRow" | "getLatestCommittedReviews"
   >;
   mastery: Pick<MasteryService, "getMastery">;
+  partyQuests: PartyQuestEncounterPort;
   clock: Clock;
   ids: Pick<IdGenerator, "generateId">;
   randomInt?: (maxExclusive: number) => number;
@@ -286,11 +288,13 @@ export class EncounterService {
     );
 
     if (validatedInput.source === "party") {
-      throw new AppError({
-        code: DomainErrorCode.SERVICE_UNAVAILABLE,
-        statusCode: 503,
-        message: "Party encounters are not available until Phase 6",
-      });
+      await this.deps.partyQuests.authorizePartyEncounter(
+        actor,
+        this.deps.courseId,
+        authStudentId,
+        validatedInput.partyQuestId,
+        validatedInput.conceptId,
+      );
     }
 
     const topology = await this.deps.topology.getTopology(
@@ -409,7 +413,7 @@ export class EncounterService {
       conceptId: validatedInput.conceptId,
       source: validatedInput.source,
       questId: validatedInput.source === "daily" ? validatedInput.questId : null,
-      partyQuestId: null,
+      partyQuestId: validatedInput.source === "party" ? validatedInput.partyQuestId : null,
       questionIds: [
         questionIds[0],
         questionIds[1],
@@ -944,7 +948,31 @@ export class EncounterService {
         );
       if (completedEncounter) {
         currentEncounter = completedEncounter;
+      } else {
+        const reread = await this.deps.repository.getEncounter(
+          studentId,
+          parsedEncounterId.data,
+        );
+        if (reread) {
+          currentEncounter = reread;
+        }
       }
+    }
+
+    if (currentEncounter.status !== "completed") {
+      throw new AppError({
+        code: DomainErrorCode.CONFLICT,
+        statusCode: 409,
+        message: "Encounter could not be marked completed",
+      });
+    }
+
+    if (currentEncounter.source === "party" && currentEncounter.partyQuestId) {
+      await this.deps.partyQuests.recordPartyEncounterCompletion(
+        actor,
+        currentEncounter.partyQuestId,
+        activeAttempt.id,
+      );
     }
 
     return await this.reconstructResult(

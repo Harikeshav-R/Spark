@@ -45,3 +45,26 @@ export {
   createStudyGroupRouter,
   type StudyGroupRouterDependencies,
 } from "./study-group-router.js";
+
+export {
+  InvitationsRepository,
+  type CreateInvitationInput,
+  type RespondRpcResult,
+} from "./invitations-repository.js";
+
+export {
+  InvitationsService,
+  type InvitationsServiceDependencies,
+} from "./invitations-service.js";
+
+export {
+  PartyQuestRepository,
+  type PartyQuestRow,
+  type PartyQuestProgressRow,
+  type RecordProgressRpcResult,
+} from "./party-quest-repository.js";
+
+export {
+  PartyQuestService,
+  type PartyQuestServiceDependencies,
+} from "./party-quest-service.js";
