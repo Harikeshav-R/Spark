@@ -8,3 +8,5 @@ export {
   type RealtimeSocketServer,
   type SocketServerDependencies,
 } from "./socket-server.js";
+
+export { PresenceTracker } from "./presence-tracker.js";

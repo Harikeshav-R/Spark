@@ -7,7 +7,9 @@ import { createRoomAuthorizer } from "../../../../src/server/realtime/room-autho
 import {
   createSocketServer,
   type RealtimeSocketServer,
-} from "../../../../src/server/realtime/socket-server.js";
+  PresenceTracker,
+} from "../../../../src/server/realtime/index.js";
+import { LectureRepository } from "../../../../src/server/classroom/index.js";
 import type { RealtimePublisher } from "../../../../src/contracts/realtime.js";
 
 export const FIXTURE_IDS = {
@@ -112,11 +114,15 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
       id: FIXTURE_IDS.teacher1.courseId,
       teacher_id: FIXTURE_IDS.teacher1.teacherId,
       name: "CS101",
+      join_code: "COURSE01",
+      created_at: "2026-10-20T14:00:00.000Z",
     },
     {
       id: FIXTURE_IDS.teacher2.courseId,
       teacher_id: FIXTURE_IDS.teacher2.teacherId,
       name: "CS201",
+      join_code: "COURSE02",
+      created_at: "2026-10-20T14:00:00.000Z",
     },
   ];
 
@@ -300,6 +306,7 @@ export interface TestRealtimeHarness {
   httpServer: http.Server;
   io: RealtimeSocketServer;
   publisher: RealtimePublisher;
+  presence: PresenceTracker;
   port: number;
   connectClient(authOrOptions?: Record<string, unknown>): Promise<ClientSocket>;
   cleanup(): Promise<void>;
@@ -313,10 +320,12 @@ export async function createTestRealtimeHarness(
   const rooms = createRoomAuthorizer(supabase);
 
   const httpServer = http.createServer();
+  const lectures = new LectureRepository(supabase);
 
-  const { io, publisher } = createSocketServer(httpServer, {
+  const { io, publisher, presence } = createSocketServer(httpServer, {
     auth,
     rooms,
+    lectures,
     origin: "*",
   });
 
@@ -368,6 +377,7 @@ export async function createTestRealtimeHarness(
     httpServer,
     io,
     publisher,
+    presence,
     port,
     connectClient,
     cleanup,
