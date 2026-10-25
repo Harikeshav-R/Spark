@@ -16,7 +16,10 @@ import {
   type SubmitTutoringMessageResponse,
 } from "../../contracts/learning.js";
 import type { AiService } from "../../contracts/ai.js";
-import { socraticTutorTurnResponseSchema } from "../../contracts/ai.js";
+import {
+  socraticTutorTurnResponseSchema,
+  checkUnderstandingResponseSchema,
+} from "../../contracts/ai.js";
 import type { MasteryService } from "../../contracts/mastery.js";
 import { confidenceSchema } from "../../contracts/mastery.js";
 import { AppError, DomainErrorCode } from "../../contracts/errors.js";
@@ -25,6 +28,7 @@ import type { TutoringRepositoryPort } from "./tutoring-repository.js";
 export interface TutoringServiceDependencies {
   repository: TutoringRepositoryPort;
   ai: Pick<AiService, "socraticTutorTurn">;
+  understandingChecker: Required<Pick<AiService, "checkUnderstanding">>;
   mastery: Pick<MasteryService, "applyEvidence">;
   ids: IdGenerator;
   clock: Clock;
@@ -35,6 +39,7 @@ export class TutoringService
 {
   private readonly repository: TutoringRepositoryPort;
   private readonly ai: Pick<AiService, "socraticTutorTurn">;
+  private readonly understandingChecker: Required<Pick<AiService, "checkUnderstanding">>;
   private readonly mastery: Pick<MasteryService, "applyEvidence">;
   private readonly ids: IdGenerator;
   private readonly clock: Clock;
@@ -42,6 +47,7 @@ export class TutoringService
   constructor(deps: TutoringServiceDependencies) {
     this.repository = deps.repository;
     this.ai = deps.ai;
+    this.understandingChecker = deps.understandingChecker;
     this.mastery = deps.mastery;
     this.ids = deps.ids;
     this.clock = deps.clock;
@@ -199,6 +205,40 @@ export class TutoringService
       });
     }
 
+    let understandingConfirmed = false;
+    if (validatedAi.data.understandingDetected) {
+      let priorAssistantQuestion: string | undefined;
+      for (let i = priorMessages.length - 1; i >= 0; i--) {
+        const msg = priorMessages[i];
+        if (
+          msg.role === "assistant" &&
+          msg.conceptId === resolvedConceptId &&
+          msg.content.trim().length > 0
+        ) {
+          priorAssistantQuestion = msg.content;
+          break;
+        }
+      }
+
+      if (priorAssistantQuestion) {
+        const checkerResult = await this.understandingChecker.checkUnderstanding(
+          concept,
+          priorAssistantQuestion,
+          content
+        );
+        const validatedChecker = checkUnderstandingResponseSchema.safeParse(checkerResult);
+        if (!validatedChecker.success) {
+          throw new AppError({
+            code: DomainErrorCode.BAD_GATEWAY,
+            statusCode: 502,
+            message: "AI understanding checker returned invalid response format",
+            cause: validatedChecker.error,
+          });
+        }
+        understandingConfirmed = validatedChecker.data.understandingConfirmed;
+      }
+    }
+
     const asstNowMs = this.clock.now().getTime();
     const asstTimeMs = Math.max(asstNowMs, userTimeMs + 1);
     const assistantMessageId = this.ids.generateId();
@@ -216,18 +256,18 @@ export class TutoringService
       role: "assistant",
       content: validatedAi.data.assistantResponse,
       conceptId: resolvedConceptId,
-      understandingDetected: validatedAi.data.understandingDetected,
+      understandingDetected: understandingConfirmed,
       createdAt: new Date(asstTimeMs).toISOString(),
     });
 
     let masteryUpdated: { confidence: number; band: MasteryBand } | undefined;
-    if (validatedAi.data.understandingDetected) {
+    if (understandingConfirmed) {
       masteryUpdated = await this.applyUnderstandingEvidence(actor, sessionId, assistantMessageId);
     }
 
     const response: SubmitTutoringMessageResponse = {
       assistantContent: validatedAi.data.assistantResponse,
-      understandingDetected: validatedAi.data.understandingDetected,
+      understandingDetected: understandingConfirmed,
       ...(masteryUpdated ? { masteryUpdated } : {}),
     };
 

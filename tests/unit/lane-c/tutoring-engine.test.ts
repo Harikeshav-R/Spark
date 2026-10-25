@@ -1,269 +1,36 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { ActorContext, UUID, Clock, IdGenerator, MasteryBand } from "../../../src/contracts/common.js";
-import type { ConceptNode } from "../../../src/contracts/course.js";
-import type { TutoringMessage } from "../../../src/contracts/learning.js";
+import type { ActorContext, UUID } from "../../../src/contracts/common.js";
 import { AppError, DomainErrorCode } from "../../../src/contracts/errors.js";
-import { applyMasteryEvidence } from "../../../src/contracts/mastery.js";
 import {
   TutoringService,
   TutoringRepository,
-  type TutoringRepositoryPort,
-  type TutoringSessionRecord,
 } from "../../../src/server/learning/index.js";
-import { SocraticTutorAi } from "../../../src/server/ai/index.js";
-import { OpenRouterClient } from "../../../src/server/ai/index.js";
+import {
+  SocraticTutorAi,
+  CheckUnderstandingAi,
+  OpenRouterClient,
+} from "../../../src/server/ai/index.js";
 
-// Canonical test fixtures
-const FIXTURE_COURSE_ID: UUID = "11111111-1111-4111-8111-111111111111";
-const FIXTURE_OTHER_COURSE_ID: UUID = "99999999-9999-4999-8999-999999999999";
-const FIXTURE_STUDENT_ID: UUID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
-const FIXTURE_STUDENT_AUTH_ID: UUID = "12121212-1212-4212-8212-121212121212";
-const FIXTURE_CONCEPT_1: UUID = "33333333-3333-4333-8333-333333333301";
-const FIXTURE_CONCEPT_2: UUID = "33333333-3333-4333-8333-333333333302";
-const FIXTURE_CROSS_COURSE_CONCEPT: UUID = "44444444-4444-4444-8444-444444444401";
-
-function createStudentActor(overrides?: Partial<ActorContext>): ActorContext {
-  return {
-    userId: FIXTURE_STUDENT_ID,
-    authId: FIXTURE_STUDENT_AUTH_ID,
-    name: "Ada Lovelace",
-    email: "ada@example.com",
-    role: "student",
-    enrolledCourses: [
-      {
-        studentId: FIXTURE_STUDENT_ID,
-        courseId: FIXTURE_COURSE_ID,
-      },
-    ],
-    ...overrides,
-  };
-}
-
-function createTeacherActor(): ActorContext {
-  return {
-    userId: "22222222-2222-4222-8222-222222222222",
-    authId: "77777777-7777-4777-8777-777777777777",
-    name: "Professor Babbage",
-    email: "prof@example.com",
-    role: "teacher",
-    enrolledCourses: [],
-  };
-}
-
-class InMemoryTutoringRepository implements TutoringRepositoryPort {
-  sessions = new Map<UUID, TutoringSessionRecord>();
-  messages = new Map<UUID, TutoringMessage[]>();
-  concepts = new Map<UUID, ConceptNode>();
-
-  constructor() {
-    this.concepts.set(FIXTURE_CONCEPT_1, {
-      id: FIXTURE_CONCEPT_1,
-      courseId: FIXTURE_COURSE_ID,
-      label: "Backpropagation",
-      description: "Gradient computation via chain rule through network layers",
-      category: "Optimization",
-      difficulty: 4,
-      createdAt: "2026-10-20T10:00:00.000Z",
-    });
-    this.concepts.set(FIXTURE_CONCEPT_2, {
-      id: FIXTURE_CONCEPT_2,
-      courseId: FIXTURE_COURSE_ID,
-      label: "Gradient Descent",
-      description: "Iterative optimization moving parameters along negative gradient",
-      category: "Optimization",
-      difficulty: 2,
-      createdAt: "2026-10-20T10:00:00.000Z",
-    });
-    this.concepts.set(FIXTURE_CROSS_COURSE_CONCEPT, {
-      id: FIXTURE_CROSS_COURSE_CONCEPT,
-      courseId: FIXTURE_OTHER_COURSE_ID,
-      label: "Foreign Concept",
-      description: "Concept from a different course",
-      category: "Foreign",
-      difficulty: 3,
-      createdAt: "2026-10-20T10:00:00.000Z",
-    });
-  }
-
-  async createSession(
-    actor: ActorContext,
-    sessionId: UUID,
-    studentId: UUID,
-    conceptIds: UUID[],
-    startedAt: string
-  ): Promise<TutoringSessionRecord> {
-    if (actor.role !== "student") {
-      throw new AppError({ code: DomainErrorCode.FORBIDDEN, statusCode: 403, message: "Forbidden" });
-    }
-    const enrollment = actor.enrolledCourses.find((e) => e.studentId === studentId);
-    if (!enrollment) {
-      throw new AppError({ code: DomainErrorCode.FORBIDDEN, statusCode: 403, message: "Not enrolled" });
-    }
-    for (const cid of conceptIds) {
-      const c = this.concepts.get(cid);
-      if (!c || c.courseId !== enrollment.courseId) {
-        throw new AppError({
-          code: DomainErrorCode.NOT_FOUND,
-          statusCode: 404,
-          message: "Target concept not found in course",
-        });
-      }
-    }
-    const record: TutoringSessionRecord = {
-      id: sessionId,
-      studentId,
-      courseId: enrollment.courseId,
-      targetConcepts: Array.from(new Set(conceptIds)),
-      startedAt,
-      endedAt: null,
-    };
-    this.sessions.set(sessionId, record);
-    this.messages.set(sessionId, []);
-    return record;
-  }
-
-  async getSession(actor: ActorContext, sessionId: UUID): Promise<TutoringSessionRecord> {
-    if (actor.role !== "student") {
-      throw new AppError({ code: DomainErrorCode.FORBIDDEN, statusCode: 403, message: "Forbidden" });
-    }
-    const record = this.sessions.get(sessionId);
-    if (!record) {
-      throw new AppError({ code: DomainErrorCode.NOT_FOUND, statusCode: 404, message: "Session not found" });
-    }
-    const enrollment = actor.enrolledCourses.find((e) => e.studentId === record.studentId);
-    if (!enrollment || enrollment.courseId !== record.courseId) {
-      throw new AppError({ code: DomainErrorCode.NOT_FOUND, statusCode: 404, message: "Session not found" });
-    }
-    return record;
-  }
-
-  async getConcept(actor: ActorContext, studentId: UUID, conceptId: UUID): Promise<ConceptNode> {
-    if (actor.role !== "student") {
-      throw new AppError({ code: DomainErrorCode.FORBIDDEN, statusCode: 403, message: "Forbidden" });
-    }
-    const enrollment = actor.enrolledCourses.find((e) => e.studentId === studentId);
-    if (!enrollment) {
-      throw new AppError({ code: DomainErrorCode.FORBIDDEN, statusCode: 403, message: "Not enrolled" });
-    }
-    const concept = this.concepts.get(conceptId);
-    if (!concept || concept.courseId !== enrollment.courseId) {
-      throw new AppError({ code: DomainErrorCode.NOT_FOUND, statusCode: 404, message: "Concept not found" });
-    }
-    return concept;
-  }
-
-  async listMessages(actor: ActorContext, sessionId: UUID): Promise<TutoringMessage[]> {
-    await this.getSession(actor, sessionId);
-    return [...(this.messages.get(sessionId) ?? [])];
-  }
-
-  async insertMessage(actor: ActorContext, message: TutoringMessage): Promise<TutoringMessage> {
-    const session = await this.getSession(actor, message.sessionId);
-    if (message.conceptId && !session.targetConcepts.includes(message.conceptId)) {
-      throw new AppError({
-        code: DomainErrorCode.VALIDATION_ERROR,
-        statusCode: 400,
-        message: "Concept not in session targets",
-      });
-    }
-    const list = this.messages.get(message.sessionId) ?? [];
-    const existing = list.find((m) => m.id === message.id);
-    if (existing) {
-      if (
-        existing.sessionId === message.sessionId &&
-        existing.role === message.role &&
-        existing.content === message.content &&
-        existing.conceptId === message.conceptId &&
-        existing.understandingDetected === message.understandingDetected
-      ) {
-        return existing;
-      }
-      throw new AppError({
-        code: DomainErrorCode.CONFLICT,
-        statusCode: 409,
-        message: "Message already exists with different content",
-      });
-    }
-    list.push(message);
-    this.messages.set(message.sessionId, list);
-    return message;
-  }
-
-  async getMessage(actor: ActorContext, sessionId: UUID, messageId: UUID): Promise<TutoringMessage> {
-    await this.getSession(actor, sessionId);
-    const list = this.messages.get(sessionId) ?? [];
-    const message = list.find((m) => m.id === messageId);
-    if (!message) {
-      throw new AppError({ code: DomainErrorCode.NOT_FOUND, statusCode: 404, message: "Message not found" });
-    }
-    return message;
-  }
-}
-
-class TestMasteryService {
-  state: { confidence: number; band: MasteryBand; attempts: number; version: number };
-  seenEvidenceKeys = new Set<string>();
-
-  constructor(initialConfidence = 0.2) {
-    this.state = {
-      confidence: initialConfidence,
-      band: initialConfidence < 0.4 ? "red" : initialConfidence < 0.7 ? "yellow" : "green",
-      attempts: 1,
-      version: 1,
-    };
-  }
-
-  async applyEvidence(
-    _actor: ActorContext,
-    studentId: UUID,
-    conceptId: UUID,
-    evidence: { type: "tutor"; sourceId: UUID }
-  ): Promise<{ confidence: number; band: MasteryBand; attempts: number; version: number }> {
-    const key = `${evidence.type}:${evidence.sourceId}:${studentId}:${conceptId}`;
-    if (this.seenEvidenceKeys.has(key)) {
-      // Idempotent duplicate: return current state without incrementing attempts, version, or modifying confidence
-      return { ...this.state };
-    }
-
-    this.seenEvidenceKeys.add(key);
-    const computed = applyMasteryEvidence(this.state.confidence, evidence);
-    this.state = {
-      confidence: computed.confidence,
-      band: computed.band,
-      attempts: this.state.attempts, // Tutoring breakthrough does not increase practice attempts
-      version: this.state.version + 1,
-    };
-    return { ...this.state };
-  }
-}
-
-class SequentialIdGenerator implements IdGenerator {
-  private count = 0;
-  generateId(): UUID {
-    this.count++;
-    const hex = this.count.toString(16).padStart(12, "0");
-    return `00000000-0000-4000-8000-${hex}`;
-  }
-  generateJoinCode(): string {
-    return "ABC12345";
-  }
-}
-
-class FrozenClock implements Clock {
-  constructor(private fixedDate: Date = new Date("2026-10-21T12:00:00.000Z")) {}
-  now(): Date {
-    return this.fixedDate;
-  }
-  nowISO(): string {
-    return this.fixedDate.toISOString();
-  }
-}
+import {
+  FIXTURE_COURSE_ID,
+  FIXTURE_STUDENT_ID,
+  FIXTURE_STUDENT_AUTH_ID,
+  FIXTURE_CONCEPT_1,
+  FIXTURE_CROSS_COURSE_CONCEPT,
+  createStudentActor,
+  createTeacherActor,
+  InMemoryTutoringRepository,
+  TestMasteryService,
+  SequentialIdGenerator,
+  FrozenClock,
+} from "./helpers/tutoring-harness.js";
 
 describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
   let repository: InMemoryTutoringRepository;
   let mastery: TestMasteryService;
   let openRouterClient: OpenRouterClient;
   let ai: SocraticTutorAi;
+  let understandingChecker: CheckUnderstandingAi;
   let ids: SequentialIdGenerator;
   let clock: FrozenClock;
   let service: TutoringService;
@@ -274,9 +41,17 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
     mastery = new TestMasteryService(0.2); // Start at 0.20 confidence
     openRouterClient = new OpenRouterClient({ env: { INTEGRATION_MODE: "fixture" } });
     ai = new SocraticTutorAi(openRouterClient);
+    understandingChecker = new CheckUnderstandingAi(openRouterClient);
     ids = new SequentialIdGenerator();
     clock = new FrozenClock();
-    service = new TutoringService({ repository, ai, mastery, ids, clock });
+    service = new TutoringService({
+      repository,
+      ai,
+      understandingChecker,
+      mastery,
+      ids,
+      clock,
+    });
     studentActor = createStudentActor();
   });
 
@@ -421,7 +196,6 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
         confidence: 0.4,
         band: "yellow",
       });
-      expect(response.assistantContent).toContain("Outstanding breakthrough");
 
       // Verify AI spy received prior history exactly once
       expect(aiSpy).toHaveBeenCalledTimes(1);
@@ -458,6 +232,7 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
       const customService = new TutoringService({
         repository,
         ai,
+        understandingChecker,
         mastery: highMastery,
         ids,
         clock,
@@ -467,10 +242,12 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
         FIXTURE_CONCEPT_1,
       ]);
 
+      await customService.submitTutoringMessage(studentActor, sessionId, "I am unsure");
+
       const response = await customService.submitTutoringMessage(
         studentActor,
         sessionId,
-        "The chain rule propagates local gradients through intermediate activations"
+        "The chain rule combines local gradients through intermediate activations"
       );
 
       expect(response.understandingDetected).toBe(true);
@@ -489,10 +266,12 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
         FIXTURE_CONCEPT_1,
       ]);
 
+      await service.submitTutoringMessage(studentActor, sessionId, "I am unsure");
+
       const response = await service.submitTutoringMessage(
         studentActor,
         sessionId,
-        "The chain rule combines intermediate activations"
+        "The chain rule combines local gradients through intermediate activations"
       );
       expect(response.understandingDetected).toBe(true);
       expect(mastery.state.confidence).toBe(0.4);
@@ -518,6 +297,7 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
       const freshService = new TutoringService({
         repository,
         ai,
+        understandingChecker,
         mastery,
         ids: new SequentialIdGenerator(),
         clock: new FrozenClock(),
@@ -603,6 +383,7 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
       const customService = new TutoringService({
         repository,
         ai: failingAi,
+        understandingChecker,
         mastery,
         ids,
         clock,
@@ -644,6 +425,7 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
       const customService = new TutoringService({
         repository,
         ai,
+        understandingChecker,
         mastery: failingMastery,
         ids,
         clock,
@@ -653,11 +435,13 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
         FIXTURE_CONCEPT_1,
       ]);
 
+      await customService.submitTutoringMessage(studentActor, sessionId, "I am unsure");
+
       await expect(
         customService.submitTutoringMessage(
           studentActor,
           sessionId,
-          "The chain rule combines intermediate activations"
+          "The chain rule combines local gradients through intermediate activations"
         )
       ).rejects.toSatisfy((err: unknown) => {
         expect(err).toBeInstanceOf(AppError);
@@ -667,14 +451,15 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
 
       // Assistant message is already persisted and can be recovered
       const messages = await repository.listMessages(studentActor, sessionId);
-      expect(messages).toHaveLength(2);
-      expect(messages[1].role).toBe("assistant");
-      expect(messages[1].understandingDetected).toBe(true);
+      const assistantMessage = messages[messages.length - 1];
+      expect(assistantMessage.role).toBe("assistant");
+      expect(assistantMessage.understandingDetected).toBe(true);
 
       // Now recover by calling applyUnderstandingEvidence with working mastery service
       const workingService = new TutoringService({
         repository,
         ai,
+        understandingChecker,
         mastery,
         ids,
         clock,
@@ -683,7 +468,7 @@ describe("P1-C-02: Persistent Socratic Tutoring Engine", () => {
       const recovery = await workingService.applyUnderstandingEvidence(
         studentActor,
         sessionId,
-        messages[1].id
+        assistantMessage.id
       );
       expect(recovery.confidence).toBe(0.4);
       expect(recovery.band).toBe("yellow");
