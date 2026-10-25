@@ -33,6 +33,11 @@ export {
 } from "./mastery/attendance-evidence";
 
 export {
+  type PollEvidenceResult,
+  PollEvidenceService,
+} from "./mastery/poll-evidence";
+
+export {
   type GraphNodeInput,
   topologicalSort,
   validateGraph,
