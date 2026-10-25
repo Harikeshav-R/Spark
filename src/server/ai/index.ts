@@ -26,3 +26,5 @@ export { SummarizeLectureAi } from "./pipelines/summarize-lecture.js";
 export { fixtureSummarizeLecture } from "./fixtures/summarized-lecture.js";
 export { GeneratePollAi } from "./pipelines/generate-poll.js";
 export { fixturePollQuestion } from "./fixtures/poll-question.js";
+export { EvaluatePollAi } from "./pipelines/evaluate-poll.js";
+export { fixturePollEvaluation } from "./fixtures/poll-evaluation.js";

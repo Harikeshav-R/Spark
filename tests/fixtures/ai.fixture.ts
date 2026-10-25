@@ -14,6 +14,7 @@ import {
   FIXTURE_33_CONCEPTS,
   fixturePrerequisiteGraph,
   fixtureSummarizeLecture,
+  fixturePollEvaluation,
 } from "../../src/server/ai/index.js";
 import { fixtureDetectConcepts } from "../../src/server/ai/fixtures/detected-concepts.js";
 
@@ -160,38 +161,7 @@ export class FakeAiService implements AiService {
     _expectedAnswer: string,
     studentAnswer: string
   ): Promise<{ outcome: PollResponseOutcome; feedback: string }> {
-    const answerLower = studentAnswer.toLowerCase();
-    let outcome: PollResponseOutcome;
-    let feedback: string;
-
-    if (
-      answerLower.includes("overshoot") ||
-      answerLower.includes("diverge") ||
-      answerLower.includes("oscillat")
-    ) {
-      outcome = "correct";
-      feedback =
-        "Excellent reasoning! You correctly recognized that an excessive learning rate destabilizes updates and causes divergence.";
-    } else if (
-      answerLower.includes("fast") ||
-      answerLower.includes("slow") ||
-      answerLower.includes("jump")
-    ) {
-      outcome = "partial";
-      feedback =
-        "Partially correct. While the step size is indeed problematic, specify that updates overshoot the minimum and may diverge.";
-    } else {
-      outcome = "wrong";
-      feedback =
-        "Incorrect. An excessively large step size does not accelerate convergence; it causes divergence or wild oscillations.";
-    }
-
-    // Explicit domain invariant assertion: outcome must strictly be "correct" | "partial" | "wrong"
-    if (!["correct", "partial", "wrong"].includes(outcome)) {
-      throw new Error(`Invalid poll outcome evaluated: ${outcome}`);
-    }
-
-    return { outcome, feedback };
+    return fixturePollEvaluation(studentAnswer);
   }
 
   async socraticTutorTurn(
