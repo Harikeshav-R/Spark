@@ -4,14 +4,27 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import express from "express";
 import type { Express, Request, Response } from "express";
 import type { Clock, IdGenerator } from "../src/contracts/common.js";
-import { OpenRouterClient, SummarizeLectureAi } from "../src/server/ai/index.js";
+import {
+  DetectConceptsAi,
+  OpenRouterClient,
+  SummarizeLectureAi,
+} from "../src/server/ai/index.js";
 import {
   LectureRepository,
   LectureService,
+  TranscriptIngestor,
   TranscriptRepository,
   createLectureSummaryRouter,
+  createTranscriptRouter,
 } from "../src/server/classroom/index.js";
-import { CryptoIdGenerator } from "../src/server/core/id-generator.js";
+import {
+  AttendanceEvidenceService,
+  CourseRepository,
+  CourseService,
+  CryptoIdGenerator,
+  MasteryRepository,
+  MasteryService,
+} from "../src/server/core/index.js";
 import {
   LectureSummaryRepository,
   LectureSummaryService,
@@ -62,13 +75,43 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     dependencies.databaseClient
   );
 
-  const { io, publisher } = createSocketServer(httpServer, {
+  const { io, publisher, presence } = createSocketServer(httpServer, {
     auth: dependencies.auth,
     rooms,
     lectures: lectureRepository,
     origin:
       dependencies.origin ?? process.env.APP_ORIGIN ?? "http://localhost:3000",
   });
+
+  const courses = new CourseService(
+    new CourseRepository(dependencies.databaseClient),
+    new CryptoIdGenerator()
+  );
+  const mastery = new MasteryService(
+    new MasteryRepository(dependencies.databaseClient)
+  );
+  const attendance = new AttendanceEvidenceService(
+    dependencies.databaseClient,
+    courses,
+    mastery
+  );
+  const transcriptIngestor = new TranscriptIngestor({
+    lectures: lectureRepository,
+    transcripts: transcriptRepository,
+    rooms,
+    ai: new DetectConceptsAi(dependencies.aiClient),
+    presence,
+    attendance,
+    publisher,
+    ids: dependencies.ids,
+    clock: dependencies.clock,
+  });
+  app.use(
+    createTranscriptRouter({
+      auth: dependencies.auth,
+      classroom: transcriptIngestor,
+    })
+  );
 
   const summaryRepository = new LectureSummaryRepository(
     dependencies.databaseClient
