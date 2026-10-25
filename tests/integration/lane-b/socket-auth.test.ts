@@ -699,4 +699,239 @@ describe("P3-B-01: Authenticated Socket.IO Server & Room Authorization", () => {
       ]);
     });
   });
+
+  describe("10. Study Group Room Authorization & Subscriptions (P6-B-02)", () => {
+    const matchIdPeer = "77777777-7777-4777-8777-777777777771";
+    const matchIdOutsider = "77777777-7777-4777-8777-777777777772";
+    const matchIdSecond = "77777777-7777-4777-8777-777777777773";
+
+    const otherStudentId1 = "44444444-4444-4444-8444-444444444498";
+    const otherStudentId2 = "44444444-4444-4444-8444-444444444499";
+
+    const studyGroupTableRows = {
+      study_group_matches: [
+        {
+          id: matchIdPeer,
+          course_id: FIXTURE_IDS.teacher1.courseId,
+          student1_id: FIXTURE_IDS.studentDual.studentIdCourse1,
+          student2_id: FIXTURE_IDS.studentCourse1Only.studentIdCourse1,
+          concept_ids: ["88888888-8888-4888-8888-888888888888"],
+          status: "active",
+        },
+        {
+          id: matchIdSecond,
+          course_id: FIXTURE_IDS.teacher1.courseId,
+          student1_id: FIXTURE_IDS.studentDual.studentIdCourse1,
+          student2_id: FIXTURE_IDS.studentCourse1Only.studentIdCourse1,
+          concept_ids: ["88888888-8888-4888-8888-888888888888"],
+          status: "active",
+        },
+        {
+          // A match in Course 1 between two other students
+          id: matchIdOutsider,
+          course_id: FIXTURE_IDS.teacher1.courseId,
+          student1_id: otherStudentId1,
+          student2_id: otherStudentId2,
+          concept_ids: ["88888888-8888-4888-8888-888888888888"],
+          status: "active",
+        },
+      ],
+    };
+
+    it("allows both matched peers to join study-group room successfully", async () => {
+      harness = await createTestRealtimeHarness({
+        tableRows: studyGroupTableRows,
+      });
+
+      const client1 = await harness.connectClient({
+        token: FIXTURE_IDS.studentDual.token,
+      });
+      const client2 = await harness.connectClient({
+        token: FIXTURE_IDS.studentCourse1Only.token,
+      });
+      await Promise.all([waitForConnect(client1), waitForConnect(client2)]);
+
+      const ack1 = await emitWithAck(client1, "study-group:join", {
+        matchId: matchIdPeer,
+      });
+      const ack2 = await emitWithAck(client2, "study-group:join", {
+        matchId: matchIdPeer,
+      });
+
+      expect(ack1).toEqual({ success: true });
+      expect(ack2).toEqual({ success: true });
+    });
+
+    it("rejects same-course non-member student with FORBIDDEN (403)", async () => {
+      harness = await createTestRealtimeHarness({
+        tableRows: studyGroupTableRows,
+      });
+
+      const client = await harness.connectClient({
+        token: FIXTURE_IDS.studentCourse1Only.token,
+      });
+      await waitForConnect(client);
+
+      const ack = await emitWithAck(client, "study-group:join", {
+        matchId: matchIdOutsider,
+      });
+
+      expect(ack).toEqual({
+        success: false,
+        error: "FORBIDDEN",
+      });
+    });
+
+    it("rejects teacher from joining study-group room with FORBIDDEN (403)", async () => {
+      harness = await createTestRealtimeHarness({
+        tableRows: studyGroupTableRows,
+      });
+
+      const client = await harness.connectClient({
+        token: FIXTURE_IDS.teacher1.token,
+      });
+      await waitForConnect(client);
+
+      const ack = await emitWithAck(client, "study-group:join", {
+        matchId: matchIdPeer,
+      });
+
+      expect(ack).toEqual({
+        success: false,
+        error: "FORBIDDEN",
+      });
+    });
+
+    it("rejects invalid matchId with VALIDATION_ERROR (400)", async () => {
+      harness = await createTestRealtimeHarness({
+        tableRows: studyGroupTableRows,
+      });
+
+      const client = await harness.connectClient({
+        token: FIXTURE_IDS.studentDual.token,
+      });
+      await waitForConnect(client);
+
+      const ack = await emitWithAck(client, "study-group:join", {
+        matchId: "not-a-valid-uuid",
+      });
+
+      expect(ack).toEqual({
+        success: false,
+        error: "VALIDATION_ERROR",
+      });
+    });
+
+    it("removes room membership after queued join-then-leave", async () => {
+      harness = await createTestRealtimeHarness({
+        tableRows: studyGroupTableRows,
+      });
+
+      const client = await harness.connectClient({
+        token: FIXTURE_IDS.studentDual.token,
+      });
+      await waitForConnect(client);
+
+      const joinAck = await emitWithAck(client, "study-group:join", {
+        matchId: matchIdPeer,
+      });
+      expect(joinAck).toEqual({ success: true });
+
+      const leaveAck = await emitWithAck(client, "study-group:leave", {
+        matchId: matchIdPeer,
+      });
+      expect(leaveAck).toEqual({ success: true });
+
+      // Verify client no longer receives messages emitted to that room
+      let received = false;
+      client.on("study-group:message", () => {
+        received = true;
+      });
+
+      await harness.publisher.emitToStudyGroup(matchIdPeer, "study-group:message", {
+        eventId: "88888888-8888-4888-8888-888888888888",
+        occurredAt: new Date().toISOString(),
+        messageId: "88888888-8888-4888-8888-888888888889",
+        matchId: matchIdPeer,
+        senderId: FIXTURE_IDS.studentCourse1Only.studentIdCourse1,
+        content: "Test message",
+      });
+
+      // Synchronize with roundtrip ack on another event
+      const testAck = await emitWithAck(client, "study-group:leave", {
+        matchId: matchIdPeer,
+      });
+      expect(testAck.success).toBe(true);
+      expect(received).toBe(false);
+    });
+
+    it("retains subscriptions to other rooms when leaving one match room", async () => {
+      harness = await createTestRealtimeHarness({
+        tableRows: studyGroupTableRows,
+      });
+
+      const client = await harness.connectClient({
+        token: FIXTURE_IDS.studentDual.token,
+      });
+      await waitForConnect(client);
+
+      const join1 = await emitWithAck(client, "study-group:join", {
+        matchId: matchIdPeer,
+      });
+      const join2 = await emitWithAck(client, "study-group:join", {
+        matchId: matchIdSecond,
+      });
+      expect(join1).toEqual({ success: true });
+      expect(join2).toEqual({ success: true });
+
+      // Leave first match room
+      const leave1 = await emitWithAck(client, "study-group:leave", {
+        matchId: matchIdPeer,
+      });
+      expect(leave1).toEqual({ success: true });
+
+      // Receive message from second match room
+      const { promise: messagePromise, resolve: resolveMessage } =
+        Promise.withResolvers<{ content: string }>();
+      client.on("study-group:message", (msg: unknown) => {
+        if (
+          msg &&
+          typeof msg === "object" &&
+          "content" in msg &&
+          typeof msg.content === "string"
+        ) {
+          resolveMessage({ content: msg.content });
+        }
+      });
+
+      await harness.publisher.emitToStudyGroup(matchIdSecond, "study-group:message", {
+        eventId: "88888888-8888-4888-8888-888888888888",
+        occurredAt: new Date().toISOString(),
+        messageId: "88888888-8888-4888-8888-888888888889",
+        matchId: matchIdSecond,
+        senderId: FIXTURE_IDS.studentCourse1Only.studentIdCourse1,
+        content: "Still here on match 2",
+      });
+
+      const msg = await messagePromise;
+      expect(msg.content).toBe("Still here on match 2");
+    });
+
+    it("handles client disconnect during join operation gracefully", async () => {
+      harness = await createTestRealtimeHarness({
+        tableRows: studyGroupTableRows,
+      });
+
+      const client = await harness.connectClient({
+        token: FIXTURE_IDS.studentDual.token,
+      });
+      await waitForConnect(client);
+
+      client.emit("study-group:join", { matchId: matchIdPeer }, () => {});
+      client.disconnect();
+
+      // No unhandled rejections or crashes
+      expect(client.connected).toBe(false);
+    });
+  });
 });

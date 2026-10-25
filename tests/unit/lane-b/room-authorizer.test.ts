@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { ActorContext } from "../../../src/contracts/common.js";
 import { createRoomAuthorizer } from "../../../src/server/realtime/room-authorizer.js";
+import { createFixtureSupabaseClient } from "../../integration/lane-b/helpers/socket-fixture.js";
 
 describe("P3-B-01: RoomAuthorizer", () => {
   const teacherAuthId = "11111111-1111-4111-8111-111111111111";
@@ -13,6 +14,10 @@ describe("P3-B-01: RoomAuthorizer", () => {
   const unownedCourseId = "55555555-5555-4555-8555-555555555559";
   const lectureId1 = "66666666-6666-4666-8666-666666666661";
   const lectureIdUnowned = "66666666-6666-4666-8666-666666666669";
+  const matchId1 = "77777777-7777-4777-8777-777777777771";
+  const studentId3 = "44444444-4444-4444-8444-444444444443";
+  const studentId4 = "44444444-4444-4444-8444-444444444444";
+  const studentAuthId4 = "33333333-3333-4333-8333-333333333334";
 
   const teacherActor: ActorContext = {
     userId: teacherAuthId,
@@ -148,6 +153,14 @@ describe("P3-B-01: RoomAuthorizer", () => {
         message: "Invalid room identifier",
       });
 
+      await expect(
+        authorizer.authorizeRoom(studentActor, "study-group:not-a-valid-uuid")
+      ).rejects.toMatchObject({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid room identifier",
+      });
+
       expect(db.from).not.toHaveBeenCalled();
     });
 
@@ -158,7 +171,6 @@ describe("P3-B-01: RoomAuthorizer", () => {
       const invalidRooms = [
         "",
         "unknown:" + lectureId1,
-        "study-group:" + lectureId1,
         `lecture:${lectureId1}:extra`,
         `student:${studentId1}:child`,
         "random-room",
@@ -402,6 +414,79 @@ describe("P3-B-01: RoomAuthorizer", () => {
         code: "FORBIDDEN",
         statusCode: 403,
         message: "Forbidden room access",
+      });
+    });
+  });
+
+  describe("study-group:<matchId> authorization", () => {
+    const fixtureDb = createFixtureSupabaseClient({
+      tableRows: {
+        students: [
+          { id: studentId1, auth_id: studentAuthId, course_id: courseId1 },
+          { id: studentId2, auth_id: studentAuthId, course_id: courseId2 },
+          { id: studentId3, auth_id: "33333333-3333-4333-8333-333333333339", course_id: courseId1 },
+          { id: studentId4, auth_id: studentAuthId4, course_id: courseId1 },
+        ],
+        study_group_matches: [
+          {
+            id: matchId1,
+            course_id: courseId1,
+            student1_id: studentId1,
+            student2_id: studentId3,
+            concept_ids: ["88888888-8888-4888-8888-888888888888"],
+            status: "active",
+          },
+        ],
+      },
+    });
+
+    it("allows matched student member to authorize study group room", async () => {
+      const authorizer = createRoomAuthorizer(fixtureDb);
+      await expect(
+        authorizer.authorizeRoom(studentActor, `study-group:${matchId1}`)
+      ).resolves.toBeUndefined();
+    });
+
+    it("denies same-course non-member student with FORBIDDEN (403)", async () => {
+      const nonMemberActor: ActorContext = {
+        userId: studentAuthId4,
+        authId: studentAuthId4,
+        role: "student",
+        name: "Non Member",
+        email: "nonmember@example.edu",
+        enrolledCourses: [{ studentId: studentId4, courseId: courseId1 }],
+      };
+
+      const authorizer = createRoomAuthorizer(fixtureDb);
+      await expect(
+        authorizer.authorizeRoom(nonMemberActor, `study-group:${matchId1}`)
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        statusCode: 403,
+        message: "Forbidden study group access",
+      });
+    });
+
+    it("denies teacher actor with FORBIDDEN (403)", async () => {
+      const authorizer = createRoomAuthorizer(fixtureDb);
+      await expect(
+        authorizer.authorizeRoom(teacherActor, `study-group:${matchId1}`)
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        statusCode: 403,
+        message: "Forbidden study group access",
+      });
+    });
+
+    it("denies access to non-existent match with FORBIDDEN (403)", async () => {
+      const nonExistentMatchId = "77777777-7777-4777-8777-777777777779";
+      const authorizer = createRoomAuthorizer(fixtureDb);
+      await expect(
+        authorizer.authorizeRoom(studentActor, `study-group:${nonExistentMatchId}`)
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        statusCode: 403,
+        message: "Forbidden study group access",
       });
     });
   });

@@ -7,6 +7,8 @@ import {
   type RealtimePublisher,
   lectureJoinPayloadSchema,
   lectureLeavePayloadSchema,
+  studyGroupJoinPayloadSchema,
+  studyGroupLeavePayloadSchema,
 } from "../../contracts/realtime.js";
 import type { AuthGateway } from "../platform/index.js";
 import type { LectureRepository } from "../classroom/index.js";
@@ -250,6 +252,89 @@ export function createSocketServer(
           ack({ success: true });
         } catch (err) {
           console.error(`Failed to leave rooms for lecture ${lectureId}:`, err);
+          if (err instanceof AppError) {
+            ack({ success: false, error: err.code });
+          } else {
+            ack({ success: false, error: "INTERNAL_SERVER_ERROR" });
+          }
+          socket.disconnect(true);
+        }
+      });
+    });
+
+    socket.on("study-group:join", (rawPayload, ack) => {
+      if (typeof ack !== "function") {
+        return;
+      }
+
+      enqueueOperation(async () => {
+        const parseResult = studyGroupJoinPayloadSchema.safeParse(rawPayload);
+        if (!parseResult.success) {
+          ack({ success: false, error: "VALIDATION_ERROR" });
+          return;
+        }
+
+        const { matchId } = parseResult.data;
+        const room = `study-group:${matchId}`;
+
+        try {
+          await dependencies.rooms.authorizeRoom(actor, room);
+          if (!socket.connected) {
+            return;
+          }
+
+          try {
+            await socket.join(room);
+          } catch (joinErr) {
+            try {
+              await socket.leave(room);
+            } catch (cleanupErr) {
+              console.error(`Failed to cleanup room ${room} after join error:`, cleanupErr);
+              socket.disconnect(true);
+            }
+            throw joinErr;
+          }
+
+          if (!socket.connected) {
+            try {
+              await socket.leave(room);
+            } catch {
+              // Ignore cleanup if already disconnected
+            }
+            return;
+          }
+
+          ack({ success: true });
+        } catch (err) {
+          if (err instanceof AppError) {
+            ack({ success: false, error: err.code });
+          } else {
+            ack({ success: false, error: "INTERNAL_SERVER_ERROR" });
+          }
+        }
+      });
+    });
+
+    socket.on("study-group:leave", (rawPayload, ack) => {
+      if (typeof ack !== "function") {
+        return;
+      }
+
+      enqueueOperation(async () => {
+        const parseResult = studyGroupLeavePayloadSchema.safeParse(rawPayload);
+        if (!parseResult.success) {
+          ack({ success: false, error: "VALIDATION_ERROR" });
+          return;
+        }
+
+        const { matchId } = parseResult.data;
+        const room = `study-group:${matchId}`;
+
+        try {
+          await socket.leave(room);
+          ack({ success: true });
+        } catch (err) {
+          console.error(`Failed to leave room ${room}:`, err);
           if (err instanceof AppError) {
             ack({ success: false, error: err.code });
           } else {
