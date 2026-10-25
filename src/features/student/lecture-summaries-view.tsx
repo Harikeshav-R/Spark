@@ -1,10 +1,17 @@
 "use client";
 
-import React, { useState, useId } from "react";
+import React, { useState, useEffect, useCallback, useId } from "react";
 import Link from "next/link";
+import { z } from "zod";
 import type { UUID } from "@/contracts/common";
+import { uuidSchema, isoTimestampSchema } from "@/contracts/common";
+import { lectureSessionSchema } from "@/contracts/classroom";
+import { courseGraphResponseSchema } from "@/contracts/course";
+import { summarizedLectureSchema } from "@/contracts/ai";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { requestJson, ClientApiError, getRuntimeAccessToken } from "@/lib/client/http";
+import { FeatureErrorNotice } from "@/features/learning/feature-error-boundary";
 
 export interface LectureTimelineHighlight {
   timestampSec: number;
@@ -25,102 +32,15 @@ export interface LectureSummariesViewProps {
   studentId: UUID;
   courseId?: UUID;
   initialSummaries?: LectureSummaryItem[] | null;
+  initialToken?: string;
+  getAccessToken?: () => Promise<string | null>;
   className?: string;
 }
 
-// Fallback completed lecture summaries adhering to course domain fixtures
-export const DEFAULT_LECTURE_SUMMARIES: LectureSummaryItem[] = [
-  {
-    lectureId: "44444444-4444-4444-8444-444444444441",
-    title: "Lecture 1: Introduction to Deep Learning, Perceptrons & Loss Surfaces",
-    summary:
-      "This opening lecture established the foundational principles of artificial neural networks. We traced the mathematical progression from the Rosenblatt perceptron to multi-layer feed-forward networks, analyzing the representational capacity of linear layers and proving why non-linear activation functions are mathematically indispensable. We concluded with loss surface formulations and convexity characteristics.",
-    keyConceptsCovered: [
-      "Perceptrons",
-      "Activation Functions",
-      "Loss Surfaces",
-      "Convexity",
-    ],
-    timelineHighlights: [
-      {
-        timestampSec: 495,
-        conceptLabel: "Biological vs Artificial Neurons",
-        description: "Comparison of biological dendrite summation to mathematical dot-product weights.",
-      },
-      {
-        timestampSec: 1470,
-        conceptLabel: "Sigmoid and ReLU Nonlinearities",
-        description: "Why non-linear activations prevent collapsing deep architectures into a single linear matrix.",
-      },
-      {
-        timestampSec: 2700,
-        conceptLabel: "Mean Squared Error Formulation",
-        description: "Deriving loss gradients with respect to output predictions and analyzing convexity.",
-      },
-    ],
-    generatedAt: "2026-10-18T11:30:00.000Z",
-  },
-  {
-    lectureId: "44444444-4444-4444-8444-444444444442",
-    title: "Lecture 2: Computational Graphs, Forward Propagation & Vectorization",
-    summary:
-      "An in-depth mathematical exploration of computational graph architecture. The class covered the formalization of forward propagation as a topological sort through DAG operators. We explored matrix calculus and vectorized tensor operations, highlighting performance advantages of mini-batch computations over scalar loops.",
-    keyConceptsCovered: [
-      "Computational Graphs",
-      "Vectorization",
-      "Broadcasting",
-      "Matrix Calculus",
-    ],
-    timelineHighlights: [
-      {
-        timestampSec: 720,
-        conceptLabel: "Directed Acyclic Graphs for Math",
-        description: "Visualizing scalar and tensor operations as topological graph nodes.",
-      },
-      {
-        timestampSec: 1845,
-        conceptLabel: "Vectorized Mini-Batch Processing",
-        description: "How GPU tensor cores leverage SIMD primitives for batch matrix products.",
-      },
-      {
-        timestampSec: 3130,
-        conceptLabel: "Chain Rule on Directed Paths",
-        description: "Decomposing multivariate gradient accumulation along multiple graph branches.",
-      },
-    ],
-    generatedAt: "2026-10-20T11:30:00.000Z",
-  },
-  {
-    lectureId: "44444444-4444-4444-8444-444444444443",
-    title: "Lecture 3: Reverse-Mode Automatic Differentiation & Backpropagation",
-    summary:
-      "This lecture presented the complete mathematical derivation of the backpropagation algorithm. We demonstrated that reverse-mode automatic differentiation computes the gradient of a scalar output with respect to all parameters in computational complexity proportional to the forward pass. We examined Jacobian-vector products and diagnosed vanishing and exploding gradient phenomena.",
-    keyConceptsCovered: [
-      "Backpropagation",
-      "Chain Rule",
-      "Jacobian Matrices",
-      "Gradient Accumulation",
-    ],
-    timelineHighlights: [
-      {
-        timestampSec: 620,
-        conceptLabel: "Forward vs Reverse Mode AD",
-        description: "Why reverse mode scales as O(1) in the number of inputs for scalar loss functions.",
-      },
-      {
-        timestampSec: 1780,
-        conceptLabel: "Jacobian-Vector Products",
-        description: "Efficient backward pass formulation avoiding explicit Jacobian matrix materialization.",
-      },
-      {
-        timestampSec: 3315,
-        conceptLabel: "Vanishing Gradient Breakdown",
-        description: "How repeated sigmoid squashing diminishes gradient norms exponentially in deep nets.",
-      },
-    ],
-    generatedAt: "2026-10-22T11:30:00.000Z",
-  },
-];
+const fetchedSummarySchema = summarizedLectureSchema.extend({
+  lectureId: uuidSchema,
+  generatedAt: isoTimestampSchema,
+});
 
 function formatTimestamp(totalSeconds: number): string {
   const hours = Math.floor(totalSeconds / 3600);
@@ -152,20 +72,153 @@ export function LectureSummariesView({
   studentId,
   courseId,
   initialSummaries,
+  initialToken,
+  getAccessToken,
   className = "",
 }: LectureSummariesViewProps): React.JSX.Element {
-  const summaries =
-    initialSummaries !== undefined && initialSummaries !== null
-      ? initialSummaries
-      : DEFAULT_LECTURE_SUMMARIES;
+  const [summaries, setSummaries] = useState<LectureSummaryItem[]>(
+    initialSummaries !== undefined && initialSummaries !== null ? initialSummaries : []
+  );
+  const [loading, setLoading] = useState<boolean>(
+    (initialSummaries === undefined || initialSummaries === null) && Boolean(courseId)
+  );
+  const [error, setError] = useState<string | null>(null);
+  const [searchFilter, setSearchFilter] = useState<string>("");
+  const searchInputId = useId();
+
+  const resolveToken = useCallback(async (): Promise<string | null> => {
+    if (getAccessToken) {
+      const t = await getAccessToken();
+      if (t) return t;
+    }
+    if (initialToken) return initialToken;
+    return getRuntimeAccessToken();
+  }, [getAccessToken, initialToken]);
+
+  const loadSummaries = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!courseId) return;
+      setLoading(true);
+      setError(null);
+
+      try {
+        const token = await resolveToken();
+        if (!token) {
+          setError("Authentication required to view lecture summaries.");
+          setLoading(false);
+          return;
+        }
+
+        const tokenGetter = async () => token;
+
+        // Fetch lectures and graph in parallel
+        const [lectures, graph] = await Promise.all([
+          requestJson(`/api/courses/${encodeURIComponent(courseId)}/lectures`, z.array(lectureSessionSchema), {
+            getAccessToken: tokenGetter,
+            signal,
+          }),
+          requestJson(`/api/courses/${encodeURIComponent(courseId)}/graph`, courseGraphResponseSchema, {
+            getAccessToken: tokenGetter,
+            signal,
+          }).catch(() => null),
+        ]);
+
+        if (signal?.aborted) return;
+
+        const conceptLabelMap = new Map<UUID, string>();
+        if (graph) {
+          for (const node of graph.nodes) {
+            conceptLabelMap.set(node.id, node.label);
+          }
+        }
+
+        const completedLectures = lectures.filter((l) => l.status === "completed");
+        if (completedLectures.length === 0) {
+          setSummaries([]);
+          setLoading(false);
+          return;
+        }
+
+        // Fetch summaries for completed lectures
+        const summaryResults = await Promise.allSettled(
+          completedLectures.map((lecture) =>
+            requestJson(
+              `/api/lectures/${encodeURIComponent(lecture.id)}/summary`,
+              fetchedSummarySchema,
+              {
+                getAccessToken: tokenGetter,
+                signal,
+              }
+            ).then((res) => ({ lecture, res }))
+          )
+        );
+
+        if (signal?.aborted) return;
+
+        const loadedItems: LectureSummaryItem[] = [];
+        for (const item of summaryResults) {
+          if (item.status === "fulfilled") {
+            const { lecture, res } = item.value;
+            const keyConceptsCovered = res.keyConceptsCovered.map(
+              (cId) => conceptLabelMap.get(cId) ?? cId
+            );
+            loadedItems.push({
+              lectureId: res.lectureId,
+              title: lecture.title,
+              summary: res.summary,
+              keyConceptsCovered,
+              timelineHighlights: res.timelineHighlights,
+              generatedAt: res.generatedAt,
+            });
+          }
+          // 404s for individual summaries indicate a lecture without a summary yet, which is safely omitted
+        }
+
+        setSummaries(loadedItems);
+      } catch (err: unknown) {
+        if (signal?.aborted) return;
+        setError(
+          err instanceof ClientApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to load past lecture summaries."
+        );
+      } finally {
+        if (!signal?.aborted) {
+          setLoading(false);
+        }
+      }
+    },
+    [courseId, resolveToken]
+  );
+
+  useEffect(() => {
+    if (initialSummaries !== undefined && initialSummaries !== null) {
+      setSummaries(initialSummaries);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    if (!courseId) {
+      setSummaries([]);
+      setLoading(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    void loadSummaries(controller.signal);
+
+    return () => {
+      controller.abort();
+    };
+  }, [courseId, initialSummaries, loadSummaries, studentId]);
 
   // Sort summaries chronologically (newest first for student study priority)
   const sortedSummaries = [...summaries].sort(
     (a, b) => new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime()
   );
-
-  const [searchFilter, setSearchFilter] = useState<string>("");
-  const searchInputId = useId();
 
   const filteredSummaries = sortedSummaries.filter((item) => {
     if (!searchFilter.trim()) return true;
@@ -231,8 +284,52 @@ export function LectureSummariesView({
         )}
       </Card>
 
-      {/* Empty State Invariant Case */}
-      {summaries.length === 0 && (
+      {/* Missing Course Selection Invariant */}
+      {!courseId && initialSummaries === undefined && (
+        <Card
+          data-testid="missing-course-guidance"
+          className="p-8 text-center border-dashed border-2 border-[#e6d8bd] bg-[#fffdf8]"
+        >
+          <div className="max-w-md mx-auto space-y-3">
+            <h3 className="text-lg font-semibold text-[#2b2a2e]">
+              Course Not Selected
+            </h3>
+            <p className="text-sm text-[#5f5b54] leading-relaxed">
+              Please select a course to review lecture summaries and study notes.
+            </p>
+            <div className="pt-2">
+              <Link
+                href={`/student/${studentId}`}
+                className="inline-flex items-center min-h-[44px] px-4 py-2 text-sm font-semibold rounded-md bg-[#f4e9d7] text-[#2b2a2e] border border-[#3a3a3d] hover:bg-[#ecdcc0] transition-colors"
+              >
+                Return to Course Selection
+              </Link>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <Card className="p-8 text-center bg-[#fffdf8]">
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <div className="w-8 h-8 border-2 border-[#ed793c] border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-[#5f5b54]">Loading past lecture summaries…</p>
+          </div>
+        </Card>
+      )}
+
+      {/* Error / Retry State */}
+      {!loading && error && (
+        <FeatureErrorNotice
+          message={error}
+          onRetry={() => void loadSummaries()}
+          className="my-4"
+        />
+      )}
+
+      {/* Empty State Invariant Case (Only when successfully loaded and really empty) */}
+      {!loading && !error && courseId && summaries.length === 0 && (
         <Card
           data-testid="empty-summaries-guidance"
           className="p-8 text-center border-dashed border-2 border-[#e6d8bd] bg-[#fffdf8]"
@@ -264,7 +361,7 @@ export function LectureSummariesView({
       )}
 
       {/* No Search Results */}
-      {summaries.length > 0 && filteredSummaries.length === 0 && (
+      {!loading && !error && summaries.length > 0 && filteredSummaries.length === 0 && (
         <Card className="p-8 text-center bg-[#fffdf8]">
           <p className="text-sm text-[#5f5b54] mb-2">
             No lecture summaries match the filter &ldquo;{searchFilter}&rdquo;.
@@ -276,93 +373,95 @@ export function LectureSummariesView({
       )}
 
       {/* Chronological List of Summaries */}
-      <div className="space-y-6" data-testid="summaries-list">
-        {filteredSummaries.map((item, index) => (
-          <Card
-            key={item.lectureId}
-            data-testid={`lecture-summary-card-${index}`}
-            className="overflow-hidden border border-[#e6d8bd] hover:border-[#cf951f] transition-colors shadow-sm"
-          >
-            <CardHeader className="bg-[#faf6ee]/60 border-b border-[#e6d8bd] pb-4">
-              <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs px-2 py-0.5 rounded font-mono font-semibold bg-[#dff1e5] text-[#2b7f55] border border-[#2b7f55]">
-                      COMPLETED
-                    </span>
-                    <span className="text-xs text-[#5f5b54]">
-                      {formatDate(item.generatedAt)}
-                    </span>
+      {!loading && !error && (
+        <div className="space-y-6" data-testid="summaries-list">
+          {filteredSummaries.map((item, index) => (
+            <Card
+              key={item.lectureId}
+              data-testid={`lecture-summary-card-${index}`}
+              className="overflow-hidden border border-[#e6d8bd] hover:border-[#cf951f] transition-colors shadow-sm"
+            >
+              <CardHeader className="bg-[#faf6ee]/60 border-b border-[#e6d8bd] pb-4">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-2 py-0.5 rounded font-mono font-semibold bg-[#dff1e5] text-[#2b7f55] border border-[#2b7f55]">
+                        COMPLETED
+                      </span>
+                      <span className="text-xs text-[#5f5b54]">
+                        {formatDate(item.generatedAt)}
+                      </span>
+                    </div>
+                    <CardTitle as="h3" className="text-lg font-bold text-[#2b2a2e]">
+                      {item.title}
+                    </CardTitle>
                   </div>
-                  <CardTitle as="h3" className="text-lg font-bold text-[#2b2a2e]">
-                    {item.title}
-                  </CardTitle>
+
+                  <Link
+                    href={`/student/${studentId}/tutor?courseId=${courseId ?? ""}&lectureId=${item.lectureId}`}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-[#fffdf8] text-[#2b2a2e] border border-[#3a3a3d] hover:bg-[#f4e9d7] transition-colors shrink-0 self-start min-h-[36px]"
+                  >
+                    <span>✨ Tutor on this Lecture</span>
+                  </Link>
                 </div>
+              </CardHeader>
 
-                <Link
-                  href={`/student/${studentId}/tutor?courseId=${courseId ?? ""}&lectureId=${item.lectureId}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-[#fffdf8] text-[#2b2a2e] border border-[#3a3a3d] hover:bg-[#f4e9d7] transition-colors shrink-0 self-start min-h-[36px]"
-                >
-                  <span>✨ Tutor on this Lecture</span>
-                </Link>
-              </div>
-            </CardHeader>
-
-            <CardContent className="p-6 space-y-6">
-              {/* Executive Summary */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#5f5b54] mb-2">
-                  Lecture Summary &amp; Key Takeaways
-                </h4>
-                <p className="text-sm text-[#2b2a2e] leading-relaxed whitespace-pre-line bg-[#fffdf8] p-4 rounded-lg border border-[#ecdcc0]">
-                  {item.summary}
-                </p>
-              </div>
-
-              {/* Key Concepts Covered */}
-              <div>
-                <h4 className="text-xs font-bold uppercase tracking-wider text-[#5f5b54] mb-2.5">
-                  Core Concepts Covered ({item.keyConceptsCovered.length})
-                </h4>
-                <div className="flex flex-wrap gap-2">
-                  {item.keyConceptsCovered.map((concept, cIdx) => (
-                    <span
-                      key={cIdx}
-                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-[#fbeac2] text-[#2b2a2e] border border-[#cf951f]"
-                    >
-                      {`#${concept}`}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Timeline Highlights */}
-              {item.timelineHighlights && item.timelineHighlights.length > 0 && (
+              <CardContent className="p-6 space-y-6">
+                {/* Executive Summary */}
                 <div>
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#5f5b54] mb-3">
-                    Lecture Timeline Highlights
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#5f5b54] mb-2">
+                    Lecture Summary &amp; Key Takeaways
                   </h4>
-                  <div className="space-y-2.5 border-l-2 border-[#ed793c] pl-4 ml-1">
-                    {item.timelineHighlights.map((hl, hlIdx) => (
-                      <div key={hlIdx} className="space-y-0.5 text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono font-semibold px-1.5 py-0.5 rounded bg-[#f4e9d7] text-[#a9481a] border border-[#e6d8bd]">
-                            {formatTimestamp(hl.timestampSec)}
-                          </span>
-                          <span className="font-semibold text-[#2b2a2e]">
-                            {hl.conceptLabel}
-                          </span>
-                        </div>
-                        <p className="text-[#5f5b54] pl-1">{hl.description}</p>
-                      </div>
+                  <p className="text-sm text-[#2b2a2e] leading-relaxed whitespace-pre-line bg-[#fffdf8] p-4 rounded-lg border border-[#ecdcc0]">
+                    {item.summary}
+                  </p>
+                </div>
+
+                {/* Key Concepts Covered */}
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#5f5b54] mb-2.5">
+                    Core Concepts Covered ({item.keyConceptsCovered.length})
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {item.keyConceptsCovered.map((concept, cIdx) => (
+                      <span
+                        key={cIdx}
+                        className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-[#fbeac2] text-[#2b2a2e] border border-[#cf951f]"
+                      >
+                        {`#${concept}`}
+                      </span>
                     ))}
                   </div>
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+
+                {/* Timeline Highlights */}
+                {item.timelineHighlights && item.timelineHighlights.length > 0 && (
+                  <div>
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-[#5f5b54] mb-3">
+                      Lecture Timeline Highlights
+                    </h4>
+                    <div className="space-y-2.5 border-l-2 border-[#ed793c] pl-4 ml-1">
+                      {item.timelineHighlights.map((hl, hlIdx) => (
+                        <div key={hlIdx} className="space-y-0.5 text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-semibold px-1.5 py-0.5 rounded bg-[#f4e9d7] text-[#a9481a] border border-[#e6d8bd]">
+                              {formatTimestamp(hl.timestampSec)}
+                            </span>
+                            <span className="font-semibold text-[#2b2a2e]">
+                              {hl.conceptLabel}
+                            </span>
+                          </div>
+                          <p className="text-[#5f5b54] pl-1">{hl.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

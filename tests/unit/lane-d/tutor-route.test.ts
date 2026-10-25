@@ -8,6 +8,7 @@ import {
   LectureSummariesView,
   type LectureSummaryItem,
 } from "@/features/student/lecture-summaries-view";
+import { FIXTURE_LECTURE_SUMMARIES } from "../../fixtures/lecture-summaries.fixture";
 
 // Mock next/navigation notFound
 const mockNotFound = vi.fn(() => {
@@ -88,6 +89,7 @@ describe("P5-D-02: Student Tutoring & Lecture Summaries Shell Mounting", () => {
       const page = await StudentSummariesPage({
         params: Promise.resolve({ studentId }),
         searchParams: Promise.resolve({ courseId }),
+        initialSummaries: FIXTURE_LECTURE_SUMMARIES,
       });
 
       const html = renderToString(page);
@@ -180,6 +182,7 @@ describe("P5-D-02: Student Tutoring & Lecture Summaries Shell Mounting", () => {
       const summariesComponent = React.createElement(LectureSummariesView, {
         studentId,
         courseId,
+        initialSummaries: FIXTURE_LECTURE_SUMMARIES,
       });
       const summariesHtml = renderToString(summariesComponent);
 

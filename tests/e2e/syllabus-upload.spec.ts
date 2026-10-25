@@ -20,6 +20,21 @@ async function get11PagePdfBuffer(): Promise<Buffer> {
 }
 
 test.describe("Lane D: Syllabus Upload & Graph Commit E2E (P2-D-01)", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route("**/api/auth/refresh", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: {
+            accessToken: "mock-teacher-token",
+            expiresAt: Math.floor(Date.now() / 1000) + 3600,
+          },
+        }),
+      });
+    });
+  });
+
   test("1. Full lifecycle: valid course -> upload multipart -> preview -> confirm commit", async ({
     page,
   }) => {
@@ -461,5 +476,108 @@ test.describe("Lane D: Syllabus Upload & Graph Commit E2E (P2-D-01)", () => {
     await expect(modal).toBeVisible();
     await expect(modal).toContainText("Invalid server response");
     await expect(page.locator("text=Knowledge graph committed")).toHaveCount(0);
+  });
+
+  test("7. Student progression outage displays honest unavailable states without fabricated data (503 seam)", async ({
+    page,
+  }) => {
+    const studentId = "44444444-4444-4444-8444-444444444402";
+    const courseId = "22222222-2222-4222-8222-222222222222";
+
+    // Intercept auth refresh to grant valid student token
+    await page.route("**/api/auth/refresh", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          session: {
+            accessToken: "mock-student-token",
+            expiresAt: Math.floor(Date.now() / 1000) + 3600,
+          },
+        }),
+      });
+    });
+
+    // Mock course graph & lectures so workspace loads
+    await page.route(`**/api/courses/${courseId}/graph`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          nodes: [
+            {
+              id: "33333333-3333-4333-8333-333333333317",
+              label: "Backpropagation",
+              description: "Gradient computation",
+              category: "Optimization",
+              difficulty: 3,
+              importance: 1,
+            },
+          ],
+          edges: [],
+        }),
+      });
+    });
+
+    await page.route(`**/api/courses/${courseId}/lectures`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([]),
+      });
+    });
+
+    // Deliberate 503 outage on all progression endpoints
+    await page.route("**/api/students/*/daily-quest", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "SERVICE_UNAVAILABLE",
+            message: "Progression database down",
+            requestId: "11111111-1111-4111-8111-111111111111",
+          },
+        }),
+      });
+    });
+
+    await page.route("**/api/students/*/game-summary*", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "SERVICE_UNAVAILABLE",
+            message: "Progression database down",
+            requestId: "11111111-1111-4111-8111-111111111111",
+          },
+        }),
+      });
+    });
+
+    await page.route("**/api/students/*/eclipse*", async (route) => {
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: {
+            code: "SERVICE_UNAVAILABLE",
+            message: "Progression database down",
+            requestId: "11111111-1111-4111-8111-111111111111",
+          },
+        }),
+      });
+    });
+
+    await page.goto(`/student/${studentId}?courseId=${courseId}`);
+
+    // 1. GameSummaryPill renders "Progression unavailable", NEVER fabricated 420 XP or 3 days
+    await expect(page.locator("text=Progression unavailable")).toBeVisible();
+    await expect(page.locator("text=420 XP")).toHaveCount(0);
+    await expect(page.locator("text=3 days")).toHaveCount(0);
+
+    // 2. Error notice displayed for daily quest
+    await expect(page.locator("text=Progression database down").first()).toBeVisible();
   });
 });

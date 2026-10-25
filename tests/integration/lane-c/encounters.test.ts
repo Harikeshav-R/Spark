@@ -601,7 +601,7 @@ describe("P5-C-06: Practice Encounters Offline Scenarios", () => {
     // Skip tier: level 2 before level 1 -> 409
     await expect(service.getHint(studentActor, encounter.id, q0Id, 2)).rejects.toThrowError(
       expect.objectContaining({
-        code: DomainErrorCode.CONFLICT,
+        code: "HINT_OUT_OF_SEQUENCE",
         statusCode: 409,
       }),
     );
@@ -708,7 +708,7 @@ describe("P5-C-06: Practice Encounters Offline Scenarios", () => {
       service.getHint(studentActor, encounter.id, encounter.questions[0].questionId, 1),
     ).rejects.toThrowError(
       expect.objectContaining({
-        code: DomainErrorCode.CONFLICT,
+        code: "ENCOUNTER_ALREADY_SUBMITTED",
         statusCode: 409,
       }),
     );
@@ -745,7 +745,7 @@ describe("P5-C-06: Practice Encounters Offline Scenarios", () => {
       service.submitEncounter(studentActor, encounter.id, conflictingAnswers),
     ).rejects.toThrowError(
       expect.objectContaining({
-        code: DomainErrorCode.CONFLICT,
+        code: "ENCOUNTER_ALREADY_SUBMITTED",
         statusCode: 409,
       }),
     );

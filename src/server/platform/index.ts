@@ -19,3 +19,8 @@ export {
 export {
   apiErrorHandler,
 } from "./middleware/api-error-handler";
+
+export {
+  createAuthRouter,
+  type AuthRouterDependencies,
+} from "./auth-router";

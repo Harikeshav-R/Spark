@@ -19,13 +19,15 @@ const courseNameSchema = z.string().min(1).max(255);
 const courseDescriptionSchema = z.string().optional();
 
 export class CourseService
-  implements Pick<CourseServicePort, "createCourse" | "getCourse">
+  implements Pick<CourseServicePort, "createCourse" | "getCourse" | "listCourses">
 {
   constructor(
     private readonly repository: Pick<
       CourseRepository,
       "insertCourse" | "getCourse"
-    >,
+    > & {
+      listCourses?: (actor: ActorContext) => Promise<Course[]>;
+    },
     private readonly ids: IdGenerator,
   ) {}
 
@@ -132,5 +134,11 @@ export class CourseService
     }
 
     return this.repository.getCourse(actor, parsedId.data);
+  }
+  async listCourses(actor: ActorContext): Promise<Course[]> {
+    if (!this.repository.listCourses) {
+      return [];
+    }
+    return this.repository.listCourses(actor);
   }
 }

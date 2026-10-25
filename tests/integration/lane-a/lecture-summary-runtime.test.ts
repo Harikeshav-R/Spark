@@ -225,7 +225,7 @@ describe("P3-C-02 / Lane A: Runtime Server Composition & Post-Lecture Summary In
       expect(summaryBody.generatedAt).toBe("2026-10-23T11:00:00.000Z");
     });
 
-    it("duplicate POST end returns 409 CONFLICT and does not overwrite summary", async () => {
+    it("duplicate POST end recovers summary and returns completed session without duplicate end event", async () => {
       await startTestServer();
 
       // First end succeeds
@@ -237,8 +237,9 @@ describe("P3-C-02 / Lane A: Runtime Server Composition & Post-Lecture Summary In
         }
       );
       expect(firstRes.status).toBe(200);
+      const firstData = await firstRes.json();
 
-      // Second end fails with 409
+      // Second end recovers summary and returns completed lecture without mutating endedAt
       const secondRes = await fetch(
         `${serverUrl}/api/lectures/${FIXTURE_IDS.teacher1.lectureId}/end`,
         {
@@ -246,9 +247,11 @@ describe("P3-C-02 / Lane A: Runtime Server Composition & Post-Lecture Summary In
           headers: { Authorization: `Bearer ${FIXTURE_IDS.teacher1.token}` },
         }
       );
-      expect(secondRes.status).toBe(409);
-      const errorBody = (await secondRes.json()) as { error: { code: string } };
-      expect(errorBody.error.code).toBe("CONFLICT");
+      expect(secondRes.status).toBe(200);
+      const secondData = await secondRes.json();
+      expect(secondData.id).toBe(firstData.id);
+      expect(secondData.endedAt).toBe(firstData.endedAt);
+      expect(secondData.status).toBe("completed");
     });
   });
 

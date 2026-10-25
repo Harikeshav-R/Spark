@@ -11,9 +11,7 @@ import { MathMarkdown } from "@/features/learning/math-markdown";
 import { FeatureErrorBoundary } from "@/features/learning/feature-error-boundary";
 import { StudyGroupFeature } from "@/features/study-groups/study-group-feature";
 
-interface SparkWindow {
-  __spark_token?: string;
-}
+import { setRuntimeSession } from "@/lib/client/session";
 
 function setInputValue(el: HTMLInputElement | HTMLTextAreaElement, value: string): void {
   const prototype =
@@ -150,7 +148,10 @@ describe("P5-C-05 Feature Components Suite", () => {
     root = createRoot(container);
     global.fetch = mockFetch;
     mockFetch.mockReset();
-    (window as unknown as SparkWindow).__spark_token = "mock-auth-token-12345";
+    setRuntimeSession({
+      accessToken: "mock-auth-token-12345",
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
     activeMockSocket = null;
   });
 
@@ -159,7 +160,7 @@ describe("P5-C-05 Feature Components Suite", () => {
       root.unmount();
     });
     container.remove();
-    delete (window as unknown as SparkWindow).__spark_token;
+    setRuntimeSession(null);
     vi.restoreAllMocks();
   });
 

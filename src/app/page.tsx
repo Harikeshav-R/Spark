@@ -8,6 +8,7 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
+import { SignInForm } from "@/features/auth/sign-in-form";
 
 export default function HomePage(): React.JSX.Element {
   return (
@@ -52,15 +53,13 @@ export default function HomePage(): React.JSX.Element {
       <section id="sign-in" className="mt-8 border-t border-[var(--color-border-default)] pt-8">
         <Card className="max-w-2xl">
           <CardHeader>
-            <CardTitle as="h2">Sign in</CardTitle>
+            <CardTitle as="h2">Sign in to Spark</CardTitle>
             <CardDescription>
-              Authentication is not yet available in this environment. Once enabled, instructors and students will sign in here using verified credentials.
+              Sign in with your university email to access live lectures, track topic mastery, and engage with Socratic practice.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-[var(--color-fg-muted)]">
-              In this preview environment, route navigation and page structures are accessible in anonymous demonstration mode.
-            </p>
+            <SignInForm />
           </CardContent>
         </Card>
       </section>

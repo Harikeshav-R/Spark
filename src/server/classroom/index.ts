@@ -3,6 +3,9 @@ export {
   type LectureCompletionDependencies,
 } from "./lecture-service.js";
 export {
+  LectureOperationCoordinator,
+} from "./lecture-operation-coordinator.js";
+export {
   LectureRepository,
   type LectureDatabaseClientPort,
 } from "./lecture-repository.js";

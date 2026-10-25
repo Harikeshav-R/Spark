@@ -26,6 +26,7 @@ import type { RoomAuthorizer, PresenceTracker } from "../realtime/index.js";
 import type { AttendanceEvidenceService } from "../core/index.js";
 import type { LectureRepository } from "./lecture-repository.js";
 import type { TranscriptRepository } from "./transcript-repository.js";
+import type { LectureOperationCoordinator } from "./lecture-operation-coordinator.js";
 export interface TranscriptIngestorDependencies {
   lectures: Pick<LectureRepository, "getLecture">;
   transcripts: Pick<
@@ -39,6 +40,7 @@ export interface TranscriptIngestorDependencies {
   publisher: Pick<RealtimePublisher, "emitToLecture">;
   ids: Pick<IdGenerator, "generateId">;
   clock: Clock;
+  operations: Pick<LectureOperationCoordinator, "runExclusive">;
 }
 
 export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscriptChunk"> {
@@ -100,7 +102,8 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
     }
 
 
-    // 2. Authorize actor
+    return this.deps.operations.runExclusive(lectureId, async () => {
+      // 2. Authorize actor
     if (!actor || actor.role !== "teacher" || !actor.teacherId) {
       throw new AppError({
         code: "FORBIDDEN",
@@ -225,6 +228,7 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
       ...storedChunk,
       detectedConceptIds: acceptedConceptIds,
     };
-    return transcriptChunkSchema.parse(finalChunk);
+      return transcriptChunkSchema.parse(finalChunk);
+    });
   }
 }

@@ -8,6 +8,16 @@ export {
 } from "./courses/course-service";
 
 export {
+  createCourseRouter,
+  type CourseRouterDependencies,
+} from "./courses/course-router";
+
+export {
+  ConceptContextRepository,
+  type ConceptContext,
+} from "./courses/concept-context-repository";
+
+export {
   CryptoIdGenerator,
 } from "./id-generator";
 
@@ -99,6 +109,11 @@ export {
   type SyllabusGraphExtractor,
   SyllabusIngestionService,
 } from "./ingestion/syllabus-ingestion-service";
+
+export {
+  createSyllabusRouter,
+  type SyllabusRouterDependencies,
+} from "./ingestion/syllabus-router";
 
 export {
   GameRepository,

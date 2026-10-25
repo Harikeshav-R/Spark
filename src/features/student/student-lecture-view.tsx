@@ -47,6 +47,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SignInPrompt } from "@/features/auth/sign-in-prompt";
+import { FeatureErrorNotice } from "@/features/learning/feature-error-boundary";
 import { KnowledgeGraph } from "@/features/graph/knowledge-graph";
 import { SparkMascot } from "@/features/mascot/spark-mascot";
 import {
@@ -136,13 +137,27 @@ export function StudentLectureView({
   const [gameLoading, setGameLoading] = useState<boolean>(
     !initialGameSummary && !initialDailyQuest
   );
+  const [questError, setQuestError] = useState<string | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [eclipseError, setEclipseError] = useState<string | null>(null);
 
   // Encounter Drawer state (P5-D-03)
   const [isEncounterDrawerOpen, setIsEncounterDrawerOpen] = useState<boolean>(false);
   const [activeEncounter, setActiveEncounter] = useState<EncounterDTO | null>(null);
   const [activeEncounterLoading, setActiveEncounterLoading] = useState<boolean>(false);
   const [activeEncounterConceptId, setActiveEncounterConceptId] = useState<UUID | null>(null);
+  const [encounterError, setEncounterError] = useState<string | null>(null);
+  const encounterRequestIdRef = useRef<number>(0);
 
+  useEffect(() => {
+    setDailyQuest(initialDailyQuest ?? null);
+    setGameSummary(initialGameSummary ?? null);
+    setEclipse(initialEclipse ?? null);
+    setQuestError(null);
+    setSummaryError(null);
+    setEclipseError(null);
+    setEncounterError(null);
+  }, [studentId, courseId, initialDailyQuest, initialGameSummary, initialEclipse]);
   // Refs for race control & socket
   const socketRef = useRef<LectureSocket | null>(null);
   const lectureStateRef = useRef<StudentLectureState | null>(null);
@@ -397,118 +412,115 @@ export function StudentLectureView({
       abort = true;
     };
   }, [courseId, initialLectureId, token]);
+  const loadDailyQuest = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!token) return;
+      try {
+        const res = await requestJson(
+          `/api/students/${encodeURIComponent(studentId)}/daily-quest`,
+          dailyQuestSchema,
+          { getAccessToken: async () => token, signal }
+        );
+        if (signal?.aborted) return;
+        setDailyQuest(res);
+        setQuestError(null);
+      } catch (err: unknown) {
+        if (signal?.aborted) return;
+        if (err instanceof ClientApiError && (err.status === 401 || err.status === 403)) {
+          setDailyQuest(null);
+          if (err.status === 403) setAuthForbidden(true);
+          return;
+        }
+        setQuestError(err instanceof Error ? err.message : "Daily quest unavailable.");
+      }
+    },
+    [studentId, token]
+  );
+
+  const loadGameSummary = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!token) return;
+      try {
+        const res = await requestJson(
+          `/api/students/${encodeURIComponent(studentId)}/game-summary?courseId=${encodeURIComponent(courseId)}`,
+          gameSummarySchema,
+          { getAccessToken: async () => token, signal }
+        );
+        if (signal?.aborted) return;
+        setGameSummary(res);
+        setSummaryError(null);
+      } catch (err: unknown) {
+        if (signal?.aborted) return;
+        if (err instanceof ClientApiError && (err.status === 401 || err.status === 403)) {
+          setGameSummary(null);
+          if (err.status === 403) setAuthForbidden(true);
+          return;
+        }
+        setSummaryError(err instanceof Error ? err.message : "Progression summary unavailable.");
+      }
+    },
+    [courseId, studentId, token]
+  );
+
+  const loadEclipse = useCallback(
+    async (signal?: AbortSignal) => {
+      if (!token) return;
+      try {
+        const res = await requestJson(
+          `/api/students/${encodeURIComponent(studentId)}/eclipse?courseId=${encodeURIComponent(courseId)}`,
+          eclipseSchema,
+          { getAccessToken: async () => token, signal }
+        );
+        if (signal?.aborted) return;
+        setEclipse(res);
+        setEclipseError(null);
+      } catch (err: unknown) {
+        if (signal?.aborted) return;
+        if (err instanceof ClientApiError && (err.status === 401 || err.status === 403)) {
+          setEclipse(null);
+          if (err.status === 403) setAuthForbidden(true);
+          return;
+        }
+        setEclipseError(err instanceof Error ? err.message : "Eclipse diagnostic unavailable.");
+      }
+    },
+    [courseId, studentId, token]
+  );
+
   // 3. Fetch Student Game Progression State (P5-D-03)
   useEffect(() => {
     if (!token) return;
-
-    let abort = false;
     if (initialGameSummary && initialDailyQuest && initialEclipse) {
       setGameLoading(false);
       return;
     }
 
+    const controller = new AbortController();
     setGameLoading(true);
 
-    void (async () => {
-      try {
-        const [questRes, summaryRes, eclipseRes] = await Promise.allSettled([
-          requestJson(
-            `/api/students/${encodeURIComponent(studentId)}/daily-quest`,
-            dailyQuestSchema,
-            { getAccessToken: async () => token }
-          ),
-          requestJson(
-            `/api/students/${encodeURIComponent(studentId)}/game-summary?courseId=${encodeURIComponent(courseId)}`,
-            gameSummarySchema,
-            { getAccessToken: async () => token }
-          ),
-          requestJson(
-            `/api/students/${encodeURIComponent(studentId)}/eclipse?courseId=${encodeURIComponent(courseId)}`,
-            eclipseSchema,
-            { getAccessToken: async () => token }
-          ),
-        ]);
+    const promises: Promise<unknown>[] = [];
+    if (!initialDailyQuest) promises.push(loadDailyQuest(controller.signal));
+    if (!initialGameSummary) promises.push(loadGameSummary(controller.signal));
+    if (!initialEclipse) promises.push(loadEclipse(controller.signal));
 
-        if (abort) return;
-
-        if (questRes.status === "fulfilled") {
-          setDailyQuest(questRes.value);
-        } else if (!initialDailyQuest) {
-          // Fallback fixture for test / offline environments
-          setDailyQuest({
-            id: "77777777-7777-4777-8777-777777777701",
-            studentId,
-            date: new Date().toISOString().slice(0, 10),
-            items: [
-              {
-                conceptId: "33333333-3333-4333-8333-333333333317",
-                confidence: 0.2,
-                band: "red",
-                reviewState: "overdue",
-                completed: false,
-              },
-              {
-                conceptId: "33333333-3333-4333-8333-333333333318",
-                confidence: 0.35,
-                band: "red",
-                reviewState: "unreviewed",
-                completed: false,
-              },
-            ],
-            clearedAt: null,
-            version: 1,
-          });
-        }
-
-        if (summaryRes.status === "fulfilled") {
-          setGameSummary(summaryRes.value);
-        } else if (!initialGameSummary) {
-          setGameSummary({
-            studentId,
-            courseId,
-            xp: 420,
-            streakDays: 3,
-            skyBrightness: 0.58,
-            form: "glow",
-            formProgress: 0.15,
-            updatedAt: new Date().toISOString(),
-          });
-        }
-
-        if (eclipseRes.status === "fulfilled") {
-          setEclipse(eclipseRes.value);
-        } else if (!initialEclipse) {
-          setEclipse({
-            studentId,
-            strength: 39,
-            targets: [
-              {
-                conceptId: "33333333-3333-4333-8333-333333333317",
-                confidence: 0.35,
-                band: "red",
-              },
-            ],
-            examAt: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString(),
-          });
-        }
-      } catch (err: unknown) {
-        console.warn("[StudentLectureView] Game state initialization failed:", err);
-      } finally {
-        if (!abort) {
-          setGameLoading(false);
-        }
+    void Promise.allSettled(promises).finally(() => {
+      if (!controller.signal.aborted) {
+        setGameLoading(false);
       }
-    })();
+    });
 
     return () => {
-      abort = true;
+      controller.abort();
     };
-  }, [courseId, initialDailyQuest, initialEclipse, initialGameSummary, studentId, token]);
+  }, [initialDailyQuest, initialEclipse, initialGameSummary, loadDailyQuest, loadEclipse, loadGameSummary, token]);
 
   // Encounter Launching and Completion Handlers (P5-D-03)
   const handleOpenEncounter = useCallback(
     async (conceptId: UUID, questId?: UUID) => {
+      const requestId = ++encounterRequestIdRef.current;
       setActiveEncounterConceptId(conceptId);
+      setActiveEncounter(null);
+      setEncounterError(null);
       setIsEncounterDrawerOpen(true);
       setActiveEncounterLoading(true);
 
@@ -518,7 +530,7 @@ export function StudentLectureView({
           : { conceptId, source: "star" as const };
 
         const encounter = await requestJson(
-          "/api/encounters",
+          `/api/students/${encodeURIComponent(studentId)}/encounters`,
           encounterSchema,
           {
             method: "POST",
@@ -526,114 +538,44 @@ export function StudentLectureView({
             getAccessToken: async () => token,
           }
         );
+
+        if (encounterRequestIdRef.current !== requestId) return;
         setActiveEncounter(encounter);
       } catch (err: unknown) {
-        console.warn("[StudentLectureView] Encounter API unavailable, using fallback encounter:", err);
-        const label = conceptLabels.get(conceptId) ?? "Target Concept";
-        const fallbackEncounter: EncounterDTO = {
-          id: "88888888-8888-4888-8888-888888888801",
-          studentId,
-          conceptId,
-          source: questId ? "daily" : "star",
-          questId: questId ?? null,
-          partyQuestId: null,
-          status: "active",
-          questions: [
-            {
-              questionId: "dddddddd-dddd-4ddd-8ddd-dddddddddd01",
-              question: `Why are intermediate activations saved during the forward pass of ${label}?`,
-              options: [
-                "To speed up future inference passes",
-                "Because local gradients evaluate partial derivatives at forward activation values",
-                "To reduce total GPU memory allocation during training",
-                "To prevent numerical underflow in floating-point operations",
-              ],
-              hintsUsed: 0,
-            },
-            {
-              questionId: "dddddddd-dddd-4ddd-8ddd-dddddddddd02",
-              question: `What mathematical rule underpins ${label} through a computational graph?`,
-              options: [
-                "Multivariate Chain Rule",
-                "L'Hôpital's Rule",
-                "Taylor Series Expansion",
-                "Fundamental Theorem of Calculus",
-              ],
-              hintsUsed: 0,
-            },
-            {
-              questionId: "dddddddd-dddd-4ddd-8ddd-dddddddddd03",
-              question: `In a node computing z = x * y in ${label}, what is the partial derivative with respect to x?`,
-              options: ["y", "x", "1", "0"],
-              hintsUsed: 0,
-            },
-            {
-              questionId: "dddddddd-dddd-4ddd-8ddd-dddddddddd04",
-              question: `What is the time complexity of the backward pass in ${label} relative to the forward pass?`,
-              options: [
-                "Constant multiple of forward pass time",
-                "Exponential in depth of graph",
-                "Quadratic in number of parameters",
-                "Independent of forward pass complexity",
-              ],
-              hintsUsed: 0,
-            },
-            {
-              questionId: "dddddddd-dddd-4ddd-8ddd-dddddddddd05",
-              question: `What problem occurs if intermediate activation values are discarded prematurely during ${label}?`,
-              options: [
-                "Activations must be recomputed on the backward pass, increasing compute cost",
-                "Gradient values become mathematically non-zero",
-                "Loss function changes value dynamically",
-                "Weights cannot be initialized properly",
-              ],
-              hintsUsed: 0,
-            },
-          ],
-          version: 1,
-        };
-        setActiveEncounter(fallbackEncounter);
+        if (encounterRequestIdRef.current !== requestId) return;
+        setActiveEncounter(null);
+        setEncounterError(
+          err instanceof ClientApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to load practice encounter."
+        );
       } finally {
-        setActiveEncounterLoading(false);
+        if (encounterRequestIdRef.current === requestId) {
+          setActiveEncounterLoading(false);
+        }
       }
     },
-    [conceptLabels, studentId, token]
+    [studentId, token]
   );
 
   const handleEncounterCompleted = useCallback(
-    (completedResult: EncounterResultDTO) => {
+    async (completedResult: EncounterResultDTO) => {
       if (completedResult.summary) {
         setGameSummary(completedResult.summary);
-      } else {
-        setGameSummary((prev) =>
-          prev ? { ...prev, xp: prev.xp + completedResult.xpAwarded } : null
-        );
       }
-
       if (completedResult.dailyQuest) {
         setDailyQuest(completedResult.dailyQuest);
-      } else if (activeEncounterConceptId) {
-        setDailyQuest((prev) => {
-          if (!prev) return prev;
-          const updatedItems = prev.items.map((item) =>
-            item.conceptId === activeEncounterConceptId
-              ? { ...item, completed: true }
-              : item
-          );
-          const allDone = updatedItems.length > 0 && updatedItems.every((i) => i.completed);
-          return {
-            ...prev,
-            items: updatedItems,
-            clearedAt: allDone ? (prev.clearedAt ?? new Date().toISOString()) : prev.clearedAt,
-          };
-        });
+      } else {
+        void loadDailyQuest();
       }
 
       setActiveAnnouncement(
         `Encounter submitted. Score: ${completedResult.correctCount} out of ${completedResult.totalQuestions}. Confidence updated to ${Math.round(completedResult.newConfidence * 100)} percent. ${completedResult.xpAwarded} XP awarded.`
       );
     },
-    [activeEncounterConceptId]
+    [loadDailyQuest]
   );
 
   // 3. Manage Live Realtime Connection
@@ -1131,7 +1073,18 @@ export function StudentLectureView({
       ]}
       sessionStatus="authenticated"
       headerActions={
-        <GameSummaryPill summary={gameSummary} loading={gameLoading} />
+        <div className="flex items-center gap-2">
+          {summaryError && !gameSummary && (
+            <span
+              role="status"
+              className="text-xs text-[var(--color-fg-muted)]"
+              title={summaryError}
+            >
+              Progression offline
+            </span>
+          )}
+          <GameSummaryPill summary={gameSummary} loading={gameLoading} />
+        </div>
       }
     >
       {/* Screen reader polite announcement region for concept detection */}
@@ -1172,11 +1125,19 @@ export function StudentLectureView({
           </div>
         )}
         {/* Eclipse Diagnostic Banner (P5-D-03) */}
-        <EclipseBanner
-          eclipse={eclipse}
-          conceptLabels={conceptLabels}
-          onPracticeConcept={(cId) => handleOpenEncounter(cId)}
-        />
+        {eclipseError && !eclipse ? (
+          <FeatureErrorNotice
+            message={eclipseError}
+            onRetry={() => void loadEclipse()}
+            className="mb-4"
+          />
+        ) : (
+          <EclipseBanner
+            eclipse={eclipse}
+            conceptLabels={conceptLabels}
+            onPracticeConcept={(cId) => handleOpenEncounter(cId)}
+          />
+        )}
 
         {/* Active Concepts Notice (Non-color indicator) */}
         {displayedActiveConceptIds.length > 0 && (
@@ -1350,6 +1311,13 @@ export function StudentLectureView({
             </Card>
 
             {/* Daily Quest Panel (P5-D-03) */}
+            {questError && !dailyQuest && (
+              <FeatureErrorNotice
+                message={questError}
+                onRetry={() => void loadDailyQuest()}
+                className="mb-4"
+              />
+            )}
             <QuestPanel
               dailyQuest={dailyQuest}
               conceptLabels={conceptLabels}
@@ -1490,7 +1458,11 @@ export function StudentLectureView({
       {/* Practice Encounter Slide-Over Drawer (P5-D-03) */}
       <EncounterDrawer
         isOpen={isEncounterDrawerOpen}
-        onClose={() => setIsEncounterDrawerOpen(false)}
+        onClose={() => {
+          setIsEncounterDrawerOpen(false);
+          setActiveEncounter(null);
+          setEncounterError(null);
+        }}
         encounter={activeEncounter}
         conceptLabel={
           activeEncounterConceptId
@@ -1498,6 +1470,12 @@ export function StudentLectureView({
             : "Practice Encounter"
         }
         loading={activeEncounterLoading}
+        error={encounterError}
+        onRetry={() => {
+          if (activeEncounterConceptId) {
+            void handleOpenEncounter(activeEncounterConceptId);
+          }
+        }}
         onCompleted={handleEncounterCompleted}
       />
     </AppShell>

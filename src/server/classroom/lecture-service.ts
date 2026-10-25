@@ -15,11 +15,14 @@ import type { RealtimePublisher } from "../../contracts/realtime.js";
 import { lectureEndedEventSchema } from "../../contracts/realtime.js";
 import type { RoomAuthorizer } from "../realtime/index.js";
 import type { LectureRepository } from "./lecture-repository.js";
+import type { LectureOperationCoordinator } from "./lecture-operation-coordinator.js";
 
 export interface LectureCompletionDependencies {
   rooms: Pick<RoomAuthorizer, "authorizeRoom">;
   publisher: Pick<RealtimePublisher, "emitToLecture">;
   summarize: (actor: ActorContext, lectureId: UUID) => Promise<void>;
+  operations: Pick<LectureOperationCoordinator, "runExclusive">;
+  stopSpeech: (lectureId: UUID) => Promise<void>;
 }
 export class LectureService
   implements Pick<ClassroomService, "startLecture" | "endLecture">
@@ -100,39 +103,42 @@ export class LectureService
       `professor:${lectureId}`
     );
 
-    const current = await this.repository.getLecture(lectureId);
+    // Stop speech stream OUTSIDE coordinator lock to prevent deadlock
+    await this.completion.stopSpeech(lectureId).catch(() => {});
 
-    if (current.status === "completed") {
-      throw new AppError({
-        code: "CONFLICT",
-        statusCode: 409,
-        message: "Lecture session is already completed",
+    return this.completion.operations.runExclusive(lectureId, async () => {
+      const current = await this.repository.getLecture(lectureId);
+
+      if (current.status === "completed") {
+        // Recover summary for completed lecture without emitting duplicate end event
+        await this.completion.summarize(actor, lectureId);
+        return current;
+      }
+
+      const endedAt = this.clock.nowISO();
+      const completed = await this.repository.updateLectureStatus(
+        lectureId,
+        "completed",
+        endedAt
+      );
+
+      const endedEvent = lectureEndedEventSchema.parse({
+        eventId: this.ids.generateId(),
+        occurredAt: this.clock.nowISO(),
+        lectureId,
+        endedAt: completed.endedAt ?? endedAt,
       });
-    }
 
-    const endedAt = this.clock.nowISO();
-    const completed = await this.repository.updateLectureStatus(
-      lectureId,
-      "completed",
-      endedAt
-    );
+      await this.completion.publisher.emitToLecture(
+        lectureId,
+        "lecture:ended",
+        endedEvent
+      );
 
-    const endedEvent = lectureEndedEventSchema.parse({
-      eventId: this.ids.generateId(),
-      occurredAt: this.clock.nowISO(),
-      lectureId,
-      endedAt: completed.endedAt ?? endedAt,
+      await this.completion.summarize(actor, lectureId);
+
+      return completed;
     });
-
-    await this.completion.publisher.emitToLecture(
-      lectureId,
-      "lecture:ended",
-      endedEvent
-    );
-
-    await this.completion.summarize(actor, lectureId);
-
-    return completed;
   }
 
   async getLecture(lectureId: UUID): Promise<LectureSession> {

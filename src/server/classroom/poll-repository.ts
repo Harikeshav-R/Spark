@@ -825,4 +825,82 @@ export class PollRepository {
 
     return publicPollQuestionSchema.parse(publicPoll);
   }
+
+  async getEvaluatedResponses(
+    actor: ActorContext,
+    lectureId: UUID
+  ): Promise<Array<{ answer: string; outcome: "correct" | "partial" | "wrong" }>> {
+    if (!uuidSchema.safeParse(lectureId).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid lecture ID format",
+      });
+    }
+
+    if (actor.role !== "teacher" || !actor.teacherId) {
+      throw new AppError({
+        code: "FORBIDDEN",
+        statusCode: 403,
+        message: "Only teachers can retrieve evaluated poll responses",
+      });
+    }
+
+    const { data: pollsData, error: pollsErr } = await (
+      this.client.from("polls") as unknown as {
+        select(cols: string): {
+          eq(col: string, val: string): Promise<{ data: unknown; error: unknown }>;
+        };
+      }
+    )
+      .select("id")
+      .eq("lecture_id", lectureId);
+
+    if (pollsErr) {
+      throw mapDatabaseError(pollsErr as { code?: string; message?: string });
+    }
+
+    if (!Array.isArray(pollsData) || pollsData.length === 0) {
+      return [];
+    }
+
+    const pollIds = (pollsData as Array<{ id: string }>).map((p) => p.id);
+    const results: Array<{ answer: string; outcome: "correct" | "partial" | "wrong" }> = [];
+
+    for (const pollId of pollIds) {
+      const { data: respData, error: respErr } = await (
+        this.client.from("poll_responses") as unknown as {
+          select(cols: string): {
+            eq(col: string, val: string): {
+              eq(col: string, val: string): Promise<{ data: unknown; error: unknown }>;
+            };
+          };
+        }
+      )
+        .select("answer,evaluation")
+        .eq("question_id", pollId)
+        .eq("status", "evaluated");
+
+      if (respErr) {
+        throw mapDatabaseError(respErr as { code?: string; message?: string });
+      }
+
+      if (Array.isArray(respData)) {
+        for (const row of respData as Array<{
+          answer: string;
+          evaluation: { outcome?: string } | null;
+        }>) {
+          const outcome = row.evaluation?.outcome;
+          if (outcome === "correct" || outcome === "partial" || outcome === "wrong") {
+            results.push({
+              answer: row.answer,
+              outcome,
+            });
+          }
+        }
+      }
+    }
+
+    return results;
+  }
 }

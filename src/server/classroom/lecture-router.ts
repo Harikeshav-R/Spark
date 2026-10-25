@@ -16,6 +16,8 @@ import type { LectureRepository } from "./lecture-repository.js";
 import type { LectureService } from "./lecture-service.js";
 import type { PollRepository } from "./poll-repository.js";
 import type { TranscriptRepository } from "./transcript-repository.js";
+import type { LectureSpeechService } from "./speech-source.js";
+import type { SuggestInterventionsAi } from "../ai/index.js";
 
 const startLectureBodySchema = z
   .object({
@@ -31,6 +33,9 @@ export interface LectureRouterDependencies {
   polls: Pick<PollRepository, "getActivePoll">;
   transcripts: Pick<TranscriptRepository, "getRecentChunks">;
   rooms: Pick<RoomAuthorizer, "authorizeRoom">;
+  speech?: Pick<LectureSpeechService, "start">;
+  interventionsAi?: Pick<SuggestInterventionsAi, "suggestInterventions">;
+  pollRepository?: Pick<PollRepository, "getEvaluatedResponses">;
 }
 
 export function createLectureRouter(dependencies: LectureRouterDependencies): Router {
@@ -210,6 +215,114 @@ export function createLectureRouter(dependencies: LectureRouterDependencies): Ro
 
         const validSnapshot = lectureSnapshotSchema.parse(snapshot);
         res.status(200).json(validSnapshot);
+      } catch (err: unknown) {
+        next(err);
+      }
+    }
+  );
+
+  // 4. POST /api/lectures/:lectureId/speech - Start speech stream
+  router.post(
+    "/api/lectures/:lectureId/speech",
+    authMiddleware,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const actor = req.actor!;
+        if (actor.role !== "teacher" || !actor.teacherId) {
+          throw new AppError({
+            code: "FORBIDDEN",
+            statusCode: 403,
+            message: "Only teachers can start speech streams",
+          });
+        }
+
+        const rawLectureId = req.params["lectureId"];
+        const lectureIdParam = typeof rawLectureId === "string" ? rawLectureId : "";
+        if (!uuidSchema.safeParse(lectureIdParam).success) {
+          throw new AppError({
+            code: "VALIDATION_ERROR",
+            statusCode: 400,
+            message: "Invalid lecture ID format in request URL",
+          });
+        }
+
+        if (!dependencies.speech) {
+          throw new AppError({
+            code: "SERVICE_UNAVAILABLE",
+            statusCode: 503,
+            message: "Speech streaming service not configured",
+          });
+        }
+
+        const strictBody = z.object({}).strict().safeParse(req.body ?? {});
+        if (!strictBody.success) {
+          throw new AppError({
+            code: "VALIDATION_ERROR",
+            statusCode: 400,
+            message: "Speech start request body must be empty object",
+            cause: strictBody.error,
+          });
+        }
+
+        await dependencies.speech.start(actor, lectureIdParam as UUID);
+
+        res.status(202).json({ started: true, source: "simulator" });
+      } catch (err: unknown) {
+        next(err);
+      }
+    }
+  );
+
+  // 5. POST /api/lectures/:lectureId/interventions - Pedagogical interventions
+  router.post(
+    "/api/lectures/:lectureId/interventions",
+    authMiddleware,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+      try {
+        const actor = req.actor!;
+        if (actor.role !== "teacher" || !actor.teacherId) {
+          throw new AppError({
+            code: "FORBIDDEN",
+            statusCode: 403,
+            message: "Only teachers can request pedagogical interventions",
+          });
+        }
+
+        const rawLectureId = req.params["lectureId"];
+        const lectureIdParam = typeof rawLectureId === "string" ? rawLectureId : "";
+        if (!uuidSchema.safeParse(lectureIdParam).success) {
+          throw new AppError({
+            code: "VALIDATION_ERROR",
+            statusCode: 400,
+            message: "Invalid lecture ID format in request URL",
+          });
+        }
+
+        // Authorize teacher room access
+        await dependencies.rooms.authorizeRoom(actor, `professor:${lectureIdParam}`);
+
+        if (!dependencies.interventionsAi || !dependencies.pollRepository) {
+          throw new AppError({
+            code: "SERVICE_UNAVAILABLE",
+            statusCode: 503,
+            message: "Interventions service not configured",
+          });
+        }
+
+        const responses = await dependencies.pollRepository.getEvaluatedResponses(
+          actor,
+          lectureIdParam as UUID
+        );
+
+        const result = await dependencies.interventionsAi.suggestInterventions(
+          lectureIdParam as UUID,
+          responses
+        );
+
+        res.status(200).json({
+          lectureId: lectureIdParam,
+          ...result,
+        });
       } catch (err: unknown) {
         next(err);
       }
