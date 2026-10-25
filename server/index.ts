@@ -35,8 +35,10 @@ import {
   MasteryRepository,
   MasteryService,
   PollEvidenceService,
+  createCourseEffortRouter,
   createGraphRouter,
   createHeatmapRouter,
+  CourseEffortService,
 } from "../src/server/core/index.js";
 import {
   LectureSummaryRepository,
@@ -120,6 +122,18 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       heatmap,
     })
   );
+  const courseEffort = new CourseEffortService({
+    client: dependencies.databaseClient,
+    courses,
+    heatmap,
+  });
+  app.use(
+    createCourseEffortRouter({
+      auth: dependencies.auth,
+      game: courseEffort,
+    })
+  );
+
 
   const graphRepository = new GraphRepository(
     dependencies.databaseClient,
