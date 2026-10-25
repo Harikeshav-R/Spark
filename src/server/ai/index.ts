@@ -36,6 +36,12 @@ export { GenerateLearningPageAi } from "./pipelines/generate-learning-page.js";
 export { fixtureGenerateLearningPage } from "./fixtures/learning-page.js";
 export { GenerateQuizAi } from "./pipelines/generate-quiz.js";
 export { fixtureGenerateQuizQuestions } from "./fixtures/quiz-questions.js";
+export {
+  GenerateQuizHintsAi,
+  type QuizHintTuple,
+  type QuizQuestionHints,
+} from "./pipelines/generate-quiz-hints.js";
+export { fixtureGenerateQuizHints } from "./fixtures/quiz-hints.js";
 export { SearchResourcesAi } from "./pipelines/search-resources.js";
 export {
   fixtureSearchAcademicResources,
