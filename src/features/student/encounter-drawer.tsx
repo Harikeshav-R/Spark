@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useRef } from "react";
 import type { EncounterDTO, EncounterResultDTO } from "@/contracts/game";
 import { EncounterFeature } from "@/features/encounters/encounter-feature";
 import { Button } from "@/components/ui/button";
@@ -35,22 +35,128 @@ export function EncounterDrawer({
   onRetry,
   onCompleted,
 }: EncounterDrawerProps): React.JSX.Element | null {
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape" && isOpen) {
-        onClose();
-      }
-    },
-    [isOpen, onClose]
-  );
+  const panelRef = useRef<HTMLDivElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const priorFocusRef = useRef<HTMLElement | null>(null);
 
+  // Capture prior focus when drawer opens; restore on close/unmount
   useEffect(() => {
-    if (!isOpen) return;
-    window.addEventListener("keydown", handleKeyDown);
+    if (isOpen && typeof document !== "undefined") {
+      priorFocusRef.current = document.activeElement as HTMLElement | null;
+      const timer = setTimeout(() => {
+        if (closeButtonRef.current) {
+          closeButtonRef.current.focus();
+        } else if (panelRef.current) {
+          panelRef.current.focus();
+        }
+      }, 50);
+
+      return () => {
+        clearTimeout(timer);
+        if (priorFocusRef.current && typeof document !== "undefined") {
+          if (document.contains(priorFocusRef.current)) {
+            priorFocusRef.current.focus();
+          } else {
+            const fallback = document.getElementById("main-content");
+            if (fallback) {
+              fallback.setAttribute("tabindex", "-1");
+              fallback.focus();
+            }
+          }
+        }
+      };
+    }
+  }, [isOpen]);
+
+  // Body scroll lock
+  useEffect(() => {
+    if (!isOpen || typeof document === "undefined") return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = originalOverflow;
     };
-  }, [isOpen, handleKeyDown]);
+  }, [isOpen]);
+
+  // Keyboard navigation: Escape and Tab trapping
+  useEffect(() => {
+    if (!isOpen || typeof document === "undefined") return;
+
+    const getFocusableElements = (): HTMLElement[] => {
+      if (!panelRef.current) return [];
+      const selector =
+        'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+      const nodes = Array.from(
+        panelRef.current.querySelectorAll<HTMLElement>(selector)
+      );
+      return nodes.filter((el) => {
+        return (
+          el.offsetParent !== null &&
+          !el.hasAttribute("disabled") &&
+          !el.getAttribute("aria-hidden") &&
+          window.getComputedStyle(el).visibility !== "hidden"
+        );
+      });
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      if (e.key !== "Tab" || !panelRef.current) return;
+
+      const focusable = getFocusableElements();
+      if (focusable.length === 0) {
+        e.preventDefault();
+        panelRef.current.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+
+      if (e.shiftKey) {
+        if (
+          document.activeElement === first ||
+          !panelRef.current.contains(document.activeElement)
+        ) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (
+          document.activeElement === last ||
+          !panelRef.current.contains(document.activeElement)
+        ) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    };
+
+    const handleFocusIn = (e: FocusEvent) => {
+      if (!panelRef.current) return;
+      if (!panelRef.current.contains(e.target as Node)) {
+        const focusable = getFocusableElements();
+        if (focusable.length > 0) {
+          focusable[0].focus();
+        } else {
+          panelRef.current.focus();
+        }
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("focusin", handleFocusIn);
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("focusin", handleFocusIn);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -71,10 +177,12 @@ export function EncounterDrawer({
 
       {/* Slide-over panel */}
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className={cn(
           "relative z-10 w-full max-w-2xl h-full bg-[var(--color-bg-canvas,#faf6ee)]",
           "border-l border-[var(--color-border-default,#e6d8bd)] shadow-2xl",
-          "flex flex-col overflow-y-auto p-4 sm:p-6"
+          "flex flex-col overflow-y-auto overscroll-contain p-4 sm:p-6"
         )}
       >
         <div className="flex items-center justify-between pb-4 mb-4 border-b border-[var(--color-border-default,#e6d8bd)]">
@@ -88,6 +196,7 @@ export function EncounterDrawer({
           </div>
 
           <Button
+            ref={closeButtonRef}
             variant="outline"
             size="sm"
             onClick={onClose}

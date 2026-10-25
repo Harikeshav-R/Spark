@@ -29,6 +29,12 @@ export function AppShell({
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--color-bg-canvas)] text-[var(--color-fg-default)]">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--color-bg-canvas,#faf6ee)] focus:text-[var(--color-ink,#2b2a2e)] focus:border focus:border-[var(--color-border-default,#e6d8bd)] focus:shadow-md focus:rounded-md focus:font-medium focus:ring-2 focus:ring-[var(--color-orange,#ed793c)]"
+      >
+        Skip to main content
+      </a>
       <header className="border-b border-[var(--color-border-default)] bg-[var(--color-bg-canvas)]">
         <div className="mx-auto max-w-[80rem] px-4 md:px-6 lg:px-8 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-6">
           <div className="flex items-center">

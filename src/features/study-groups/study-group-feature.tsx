@@ -622,17 +622,17 @@ function InnerStudyGroupView({
               <div
                 role="status"
                 aria-live="polite"
-                className="p-5 rounded-xl border border-[#2b7f55] bg-[#dff1e5] text-[#2b7f55] space-y-2 shadow-xs"
+                className="p-5 rounded-xl border border-[#2b7f55] bg-[#dff1e5] text-[#1b5e3b] space-y-2 shadow-xs"
                 data-testid="study-pool-matched"
               >
-                <h4 className="font-bold text-base text-[#2b7f55]">✨ Study Partner Matched!</h4>
+                <h4 className="font-bold text-base text-[#1b5e3b]">✨ Study Partner Matched!</h4>
                 {matchedPeerName ? (
                   <p className="text-sm font-medium">Matched peer: {matchedPeerName}</p>
                 ) : (
                   <p className="text-sm font-medium">Study partner matched</p>
                 )}
                 {matchId && (
-                  <p className="text-xs font-mono text-[#5f5b54]">Match ID: {matchId}</p>
+                  <p className="text-xs font-mono text-[#2b2a2e]">Match ID: {matchId}</p>
                 )}
               </div>
 

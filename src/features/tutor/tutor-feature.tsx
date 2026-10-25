@@ -557,7 +557,7 @@ function InnerTutorView({
                     <div
                       role="status"
                       aria-live="polite"
-                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#2b7f55] bg-[#dff1e5] text-[#2b7f55] text-xs font-semibold"
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1b5e3b] bg-[#dff1e5] text-[#1b5e3b] text-xs font-semibold"
                     >
                       <span>✨</span>
                       <span>Understanding detected</span>

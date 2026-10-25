@@ -320,19 +320,30 @@ export function CourseEntry({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleEnroll} className="flex gap-2 max-w-sm">
-                <input
-                  type="text"
-                  required
-                  maxLength={8}
-                  value={joinCode}
-                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
-                  placeholder="e.g. ABC12345"
-                  className="flex-1 px-3 py-2 text-sm font-mono tracking-wider uppercase rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-canvas)] text-[var(--color-fg-default)]"
-                />
-                <Button type="submit" disabled={enrolling} size="sm">
-                  {enrolling ? "Enrolling…" : "Enroll"}
-                </Button>
+              <form onSubmit={handleEnroll} className="flex flex-col gap-2 max-w-sm">
+                <label
+                  htmlFor="course-join-code"
+                  className="text-sm font-medium text-[var(--color-ink,#2b2a2e)]"
+                >
+                  Course join code
+                </label>
+                <div className="flex gap-2 min-w-0">
+                  <input
+                    id="course-join-code"
+                    name="joinCode"
+                    type="text"
+                    required
+                    autoComplete="off"
+                    maxLength={8}
+                    value={joinCode}
+                    onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. ABC12345"
+                    className="flex-1 min-w-0 px-3 py-2 text-sm font-mono tracking-wider uppercase rounded-md border border-[var(--color-border-default)] bg-[var(--color-bg-canvas)] text-[var(--color-fg-default)]"
+                  />
+                  <Button type="submit" disabled={enrolling} size="sm">
+                    {enrolling ? "Enrolling…" : "Enroll"}
+                  </Button>
+                </div>
               </form>
             </CardContent>
           </Card>

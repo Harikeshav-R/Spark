@@ -205,7 +205,7 @@ export function HintDrawer({
                       ? "border-[var(--color-border-default,#e6d8bd)] bg-[var(--color-cream,#f4e9d7)]/40"
                       : isNext
                       ? "border-[var(--color-orange,#ed793c)]/40 bg-[var(--color-panel,#fffdf8)]"
-                      : "border-[var(--color-border-default,#e6d8bd)]/50 bg-[var(--color-paper,#faf6ee)]/60 opacity-60"
+                      : "border-[var(--color-border-default,#e6d8bd)]/50 bg-[var(--color-paper,#faf6ee)]/60"
                   )}
                   data-testid={`hint-tier-${level}`}
                 >

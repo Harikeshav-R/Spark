@@ -90,12 +90,12 @@ export function TranscriptFeed({
                 : "No transcript was recorded."}
             </div>
           ) : (
-            <ol
+            <div
               role="log"
               aria-live="polite"
               aria-relevant="additions text"
-              className="space-y-4"
             >
+              <ol className="space-y-4">
               {chunks.map((chunk) => {
                 const speaker = chunk.speakerName?.trim() || "Unknown speaker";
                 const timestamp = formatElapsedTimer(chunk.timestampSec);
@@ -138,7 +138,8 @@ export function TranscriptFeed({
                   </li>
                 );
               })}
-            </ol>
+              </ol>
+            </div>
           )}
         </div>
 

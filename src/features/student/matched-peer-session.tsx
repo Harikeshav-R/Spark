@@ -386,7 +386,7 @@ export function MatchedPeerSession({
             <span
               className={`text-xs px-2 py-0.5 rounded-full font-medium ${
                 roomJoined
-                  ? "bg-[#dff1e5] text-[#2b7f55]"
+                  ? "bg-[#dff1e5] text-[#1b5e3b] font-semibold"
                   : "bg-[#fbf2ef] text-[#8a2414]"
               }`}
               data-testid="chat-connection-status"
@@ -436,7 +436,7 @@ export function MatchedPeerSession({
                     <div
                       className={`max-w-[85%] rounded-lg px-3 py-2 text-sm break-words whitespace-pre-wrap ${
                         isYou
-                          ? "bg-[#ed793c] text-white"
+                          ? "bg-[#ed793c] text-[#2b2a2e] font-medium"
                           : "bg-[#fbf5ec] border border-[#e6d8bd] text-[#2b2a2e]"
                       }`}
                     >
@@ -498,7 +498,7 @@ export function MatchedPeerSession({
                 size="sm"
                 onClick={handleSendMessage}
                 disabled={!roomJoined || isSendingMessage || !draft.trim()}
-                className="bg-[#ed793c] text-white hover:bg-[#db692b]"
+                className="bg-[#ed793c] text-[#2b2a2e] hover:bg-[#db692b] font-medium"
               >
                 {isSendingMessage ? "Sending..." : "Send message"}
               </Button>
@@ -577,7 +577,7 @@ export function MatchedPeerSession({
 
           {/* Meeting creation state */}
           {schedulingState.meetingStatus === "created" && (
-            <div className="p-4 rounded-lg bg-[#dff1e5] border border-[#2b7f55] text-[#2b7f55] space-y-3">
+            <div className="p-4 rounded-lg bg-[#dff1e5] border border-[#1b5e3b] text-[#1b5e3b] space-y-3">
               <div>
                 <h5 className="font-bold text-sm">✨ Mutual Time Confirmed!</h5>
                 <p className="text-xs mt-0.5">

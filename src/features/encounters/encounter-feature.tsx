@@ -750,7 +750,7 @@ function EncounterSession({
                   size="sm"
                   onClick={() => void handleSubmit()}
                   disabled={!canSubmit}
-                  className="bg-[var(--color-orange,#ed793c)] hover:bg-[var(--color-orange-deep,#d46227)] text-white"
+                  className="bg-[var(--color-orange,#ed793c)] hover:bg-[var(--color-orange-deep,#d46227)] text-[#2b2a2e] font-medium"
                 >
                   {isSubmitting ? "Submitting…" : "Submit"}
                 </Button>

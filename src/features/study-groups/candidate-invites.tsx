@@ -354,7 +354,7 @@ export function CandidateInvites({
                         variant="soft"
                         className={
                           candidate.fitKind === "reciprocal"
-                            ? "border-[#2b7f55]/30 bg-[#dff1e5] text-[#2b7f55]"
+                            ? "border-[#1b5e3b]/30 bg-[#dff1e5] text-[#1b5e3b]"
                             : "border-[#cf951f]/30 bg-[#fef5e7] text-[#a9481a]"
                         }
                       >

@@ -454,7 +454,7 @@ function InnerLearningView({
           >
             Practice Quiz
             {quizSubmitted && quizResult && (
-              <span className="text-xs px-1.5 py-0.2 rounded font-mono bg-[#dff1e5] text-[#2b7f55]">
+              <span className="text-xs px-1.5 py-0.2 rounded font-mono bg-[#dff1e5] text-[#1b5e3b]">
                 {Math.round(quizResult.score * 100)}%
               </span>
             )}
