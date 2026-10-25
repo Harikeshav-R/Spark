@@ -1,5 +1,6 @@
 import express from "express";
 import type { NextFunction, Request, Response, Router } from "express";
+import type { UUID } from "../../../contracts/common.js";
 import { uuidSchema } from "../../../contracts/common.js";
 import { AppError } from "../../../contracts/errors.js";
 import type { GameService } from "../../../contracts/game.js";
@@ -9,6 +10,21 @@ import { apiErrorHandler, requireAuth } from "../../platform/index.js";
 export interface GameRouterDependencies {
   auth: Pick<AuthGateway, "verifyToken">;
   game: Pick<GameService, "getDailyQuest" | "getSummary" | "getEclipse">;
+}
+
+function parseStudentIdParam(req: Request): UUID {
+  const rawStudentId = req.params["studentId"];
+  const studentIdParam = typeof rawStudentId === "string" ? rawStudentId : "";
+  const parsedStudentId = uuidSchema.safeParse(studentIdParam);
+  if (!parsedStudentId.success) {
+    throw new AppError({
+      code: "VALIDATION_ERROR",
+      statusCode: 400,
+      message: "Invalid student ID format in request URL",
+      cause: parsedStudentId.error,
+    });
+  }
+  return parsedStudentId.data;
 }
 
 export function createGameRouter(dependencies: GameRouterDependencies): Router {
@@ -39,21 +55,10 @@ export function createGameRouter(dependencies: GameRouterDependencies): Router {
           });
         }
 
-        const rawStudentId = req.params["studentId"];
-        const studentIdParam = typeof rawStudentId === "string" ? rawStudentId : "";
-        const parsedStudentId = uuidSchema.safeParse(studentIdParam);
-        if (!parsedStudentId.success) {
-          throw new AppError({
-            code: "VALIDATION_ERROR",
-            statusCode: 400,
-            message: "Invalid student ID format in request URL",
-            cause: parsedStudentId.error,
-          });
-        }
-
+        const studentId = parseStudentIdParam(req);
         const dailyQuest = await dependencies.game.getDailyQuest(
           actor,
-          parsedStudentId.data,
+          studentId,
         );
         res.status(200).json(dailyQuest);
       } catch (err: unknown) {
@@ -77,21 +82,10 @@ export function createGameRouter(dependencies: GameRouterDependencies): Router {
           });
         }
 
-        const rawStudentId = req.params["studentId"];
-        const studentIdParam = typeof rawStudentId === "string" ? rawStudentId : "";
-        const parsedStudentId = uuidSchema.safeParse(studentIdParam);
-        if (!parsedStudentId.success) {
-          throw new AppError({
-            code: "VALIDATION_ERROR",
-            statusCode: 400,
-            message: "Invalid student ID format in request URL",
-            cause: parsedStudentId.error,
-          });
-        }
-
+        const studentId = parseStudentIdParam(req);
         const summary = await dependencies.game.getSummary(
           actor,
-          parsedStudentId.data,
+          studentId,
         );
         res.status(200).json(summary);
       } catch (err: unknown) {
@@ -115,21 +109,10 @@ export function createGameRouter(dependencies: GameRouterDependencies): Router {
           });
         }
 
-        const rawStudentId = req.params["studentId"];
-        const studentIdParam = typeof rawStudentId === "string" ? rawStudentId : "";
-        const parsedStudentId = uuidSchema.safeParse(studentIdParam);
-        if (!parsedStudentId.success) {
-          throw new AppError({
-            code: "VALIDATION_ERROR",
-            statusCode: 400,
-            message: "Invalid student ID format in request URL",
-            cause: parsedStudentId.error,
-          });
-        }
-
+        const studentId = parseStudentIdParam(req);
         const eclipse = await dependencies.game.getEclipse(
           actor,
-          parsedStudentId.data,
+          studentId,
         );
         res.status(200).json(eclipse);
       } catch (err: unknown) {

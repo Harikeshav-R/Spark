@@ -94,14 +94,14 @@ describe("daily-quest-generator", () => {
         [c2, 0.5],
       ]);
 
-      const candidates = selectDailyQuestCandidates(
+      const candidates = selectDailyQuestCandidates({
         nodes,
         edges,
         masteries,
         latestReviews,
-        importance,
+        importanceMap: importance,
         now,
-      );
+      });
 
       // c1 is a root and ready, c2 is blocked
       expect(candidates).toEqual([c1]);
@@ -142,14 +142,14 @@ describe("daily-quest-generator", () => {
         [c5, 0.5],
       ]);
 
-      const candidates = selectDailyQuestCandidates(
+      const candidates = selectDailyQuestCandidates({
         nodes,
         edges,
         masteries,
         latestReviews,
-        importance,
+        importanceMap: importance,
         now,
-      );
+      });
 
       // Eligible:
       // Overdue-priority: c3 (conf 0.2, imp 0.9), c4 (conf 0.2, imp 0.3), c1 (conf 0.8, imp 0.5)
@@ -176,14 +176,14 @@ describe("daily-quest-generator", () => {
         [c3, 0.5],
       ]);
 
-      const candidates = selectDailyQuestCandidates(
+      const candidates = selectDailyQuestCandidates({
         nodes,
         edges,
         masteries,
         latestReviews,
-        importance,
+        importanceMap: importance,
         now,
-      );
+      });
 
       expect(candidates).toEqual([c1, c2, c3]);
     });
@@ -255,15 +255,18 @@ describe("eclipse-service (INV-XP07)", () => {
 
 describe("calculateStreakDays (INV-XP04)", () => {
   it("returns 0 for no cleared quests", () => {
-    expect(calculateStreakDays([])).toBe(0);
+    expect(calculateStreakDays([], new Date("2026-10-22T12:00:00.000Z"))).toBe(0);
   });
 
   it("ignores empty quests (conceptIds = [])", () => {
     expect(
-      calculateStreakDays([
-        { questDate: "2026-10-20", conceptIds: [] },
-        { questDate: "2026-10-21", conceptIds: [] },
-      ]),
+      calculateStreakDays(
+        [
+          { questDate: "2026-10-20", conceptIds: [] },
+          { questDate: "2026-10-21", conceptIds: [] },
+        ],
+        new Date("2026-10-21T12:00:00.000Z"),
+      ),
     ).toBe(0);
   });
 
@@ -273,7 +276,7 @@ describe("calculateStreakDays (INV-XP04)", () => {
       { questDate: "2026-10-21", conceptIds: [c1, c2] },
       { questDate: "2026-10-22", conceptIds: [c1] },
     ];
-    expect(calculateStreakDays(clears)).toBe(3);
+    expect(calculateStreakDays(clears, new Date("2026-10-22T12:00:00.000Z"))).toBe(3);
   });
 
   it("deduplicates multiple clears on same date without artificially inflating streak", () => {
@@ -282,7 +285,7 @@ describe("calculateStreakDays (INV-XP04)", () => {
       { questDate: "2026-10-21", conceptIds: [c1] },
       { questDate: "2026-10-21", conceptIds: [c2] },
     ];
-    expect(calculateStreakDays(clears)).toBe(2);
+    expect(calculateStreakDays(clears, new Date("2026-10-21T12:00:00.000Z"))).toBe(2);
   });
 
   it("resets streak to 1 after a skipped calendar date", () => {
@@ -291,7 +294,35 @@ describe("calculateStreakDays (INV-XP04)", () => {
       { questDate: "2026-10-19", conceptIds: [c1] },
       { questDate: "2026-10-22", conceptIds: [c1] }, // 20 and 21 skipped
     ];
-    expect(calculateStreakDays(clears)).toBe(1);
+    expect(calculateStreakDays(clears, new Date("2026-10-22T12:00:00.000Z"))).toBe(1);
+  });
+
+  it("evaluates a run ending October 22 on October 23 as active (3) vs October 24 as lapsed (0)", () => {
+    const clears = [
+      { questDate: "2026-10-20", conceptIds: [c1] },
+      { questDate: "2026-10-21", conceptIds: [c1] },
+      { questDate: "2026-10-22", conceptIds: [c1] },
+    ];
+    expect(calculateStreakDays(clears, new Date("2026-10-23T12:00:00.000Z"))).toBe(3);
+    expect(calculateStreakDays(clears, new Date("2026-10-24T12:00:00.000Z"))).toBe(0);
+  });
+
+  it("treats 2026-10-23T20:00:00-04:00 as UTC October 24 midnight, lapsing an October 22 run to 0", () => {
+    const clears = [
+      { questDate: "2026-10-20", conceptIds: [c1] },
+      { questDate: "2026-10-21", conceptIds: [c1] },
+      { questDate: "2026-10-22", conceptIds: [c1] },
+    ];
+    expect(calculateStreakDays(clears, new Date("2026-10-23T20:00:00-04:00"))).toBe(0);
+  });
+
+  it("handles year boundary: clears December 30-31, 2025 and January 1, 2026 evaluated on January 2 (3)", () => {
+    const clears = [
+      { questDate: "2025-12-30", conceptIds: [c1] },
+      { questDate: "2025-12-31", conceptIds: [c1] },
+      { questDate: "2026-01-01", conceptIds: [c1] },
+    ];
+    expect(calculateStreakDays(clears, new Date("2026-01-02T12:00:00.000Z"))).toBe(3);
   });
 });
 

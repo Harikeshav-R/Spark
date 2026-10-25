@@ -416,8 +416,23 @@ describe.skipIf(!isLocalSupabase)(
         { studentId: student.id, courseId: course.courseId },
       ]);
 
-      // Insert cleared quests directly on UTC dates
-      // Day 1: 2026-10-20
+      let simulatedNow = new Date("2026-10-20T12:00:00.000Z");
+      const localClock = {
+        now: () => simulatedNow,
+        nowISO: () => simulatedNow.toISOString(),
+      };
+      const localGameService = new ConcreteGameService({
+        repository: gameRepository,
+        courses: courseService,
+        graph: graphRepository,
+        mastery: masteryService,
+        courseEffort: courseEffortService,
+        publisher: { emitToStudent: async () => {} },
+        clock: localClock,
+        ids: new CryptoIdGenerator(),
+      });
+
+      // Day 1: 2026-10-20 clear -> streak 1
       await harness.serviceClient.from("daily_quests").insert({
         student_id: student.id,
         quest_date: "2026-10-20",
@@ -425,11 +440,11 @@ describe.skipIf(!isLocalSupabase)(
         completed_ids: [conceptId],
         cleared_at: "2026-10-20T10:00:00.000Z",
       });
-
-      let summary = await gameService.getSummary(studentActor, student.id);
+      let summary = await localGameService.getSummary(studentActor, student.id);
       expect(summary.streakDays).toBe(1);
 
-      // Day 2: 2026-10-21 (consecutive) -> streak = 2
+      // Advance and clear October 21 -> streak 2
+      simulatedNow = new Date("2026-10-21T12:00:00.000Z");
       await harness.serviceClient.from("daily_quests").insert({
         student_id: student.id,
         quest_date: "2026-10-21",
@@ -437,10 +452,20 @@ describe.skipIf(!isLocalSupabase)(
         completed_ids: [conceptId],
         cleared_at: "2026-10-21T10:00:00.000Z",
       });
-      summary = await gameService.getSummary(studentActor, student.id);
+      summary = await localGameService.getSummary(studentActor, student.id);
       expect(summary.streakDays).toBe(2);
 
-      // Day 4: 2026-10-23 (skipped 10-22) -> streak quietly resets to 1
+      // October 22 without clear -> retains active streak 2 (ending yesterday)
+      simulatedNow = new Date("2026-10-22T12:00:00.000Z");
+      summary = await localGameService.getSummary(studentActor, student.id);
+      expect(summary.streakDays).toBe(2);
+
+      // October 23 before clearing -> streak lapses to 0 (October 22 was not cleared)
+      simulatedNow = new Date("2026-10-23T12:00:00.000Z");
+      summary = await localGameService.getSummary(studentActor, student.id);
+      expect(summary.streakDays).toBe(0);
+
+      // Clear October 23 -> streak 1
       await harness.serviceClient.from("daily_quests").insert({
         student_id: student.id,
         quest_date: "2026-10-23",
@@ -448,8 +473,35 @@ describe.skipIf(!isLocalSupabase)(
         completed_ids: [conceptId],
         cleared_at: "2026-10-23T10:00:00.000Z",
       });
-      summary = await gameService.getSummary(studentActor, student.id);
+      summary = await localGameService.getSummary(studentActor, student.id);
       expect(summary.streakDays).toBe(1);
+
+      // Repeated read -> remains 1
+      summary = await localGameService.getSummary(studentActor, student.id);
+      expect(summary.streakDays).toBe(1);
+
+      // October 24 -> retains active streak 1 (ending yesterday)
+      simulatedNow = new Date("2026-10-24T12:00:00.000Z");
+      summary = await localGameService.getSummary(studentActor, student.id);
+      expect(summary.streakDays).toBe(1);
+
+      // October 25 without another clear -> lapses to 0
+      simulatedNow = new Date("2026-10-25T12:00:00.000Z");
+      summary = await localGameService.getSummary(studentActor, student.id);
+      expect(summary.streakDays).toBe(0);
+
+      // Verify read did not create/clear quests or award XP
+      const { data: quests } = await harness.serviceClient
+        .from("daily_quests")
+        .select("id")
+        .eq("student_id", student.id);
+      expect(quests).toHaveLength(3);
+
+      const { data: xpRows } = await harness.serviceClient
+        .from("xp_events")
+        .select("id")
+        .eq("student_id", student.id);
+      expect(xpRows).toHaveLength(0);
     });
 
     it("6: Transactional rollback proof via trigger and PL/pgSQL sub-block", async () => {
@@ -697,12 +749,22 @@ describe.skipIf(!isLocalSupabase)(
       });
       expect(resTeacher.status).toBe(403);
 
-      // Malformed UUID -> 400
-      const resMalformed = await fetch(`${baseUrl}/api/students/not-a-uuid/game-summary`, {
-        headers: { Authorization: `Bearer ${s1Token}` },
-      });
-      expect(resMalformed.status).toBe(400);
+      // Malformed student IDs across daily-quest, game-summary, and eclipse:
+      // Missing token with malformed studentId -> 401
+      for (const endpoint of ["daily-quest", "game-summary", "eclipse"]) {
+        const unauthMalformed = await fetch(`${baseUrl}/api/students/not-a-uuid/${endpoint}`);
+        expect(unauthMalformed.status).toBe(401);
+      }
 
+      // Authenticated with malformed studentId -> 400 VALIDATION_ERROR
+      for (const endpoint of ["daily-quest", "game-summary", "eclipse"]) {
+        const authMalformed = await fetch(`${baseUrl}/api/students/not-a-uuid/${endpoint}`, {
+          headers: { Authorization: `Bearer ${s1Token}` },
+        });
+        expect(authMalformed.status).toBe(400);
+        const errBody = (await authMalformed.json()) as { error?: { code?: string } };
+        expect(errBody.error?.code).toBe("VALIDATION_ERROR");
+      }
       // Student 1 accessing self -> 200 with Cache-Control: private, no-store
       const resSelf = await fetch(`${baseUrl}/api/students/${student1.id}/game-summary`, {
         headers: { Authorization: `Bearer ${s1Token}` },
@@ -784,5 +846,180 @@ describe.skipIf(!isLocalSupabase)(
         expect(parsedEvent.data.summary.xp).toBeGreaterThan(0);
       }
     });
+
+    it(
+      "7: Mascot evolution selects form from unrounded mean across concepts (INV-XP08)",
+      async () => {
+        currentContext = { users: [], teacherIds: [], courseIds: [] };
+        const course = await harness.createTestCourse(currentContext, { conceptCount: 25 });
+        expect(course.conceptIds).toHaveLength(25);
+
+        const studentUser = await harness.createTestUser(currentContext, "student");
+        const student = await enrollmentService.enrollStudent(
+          harness.buildStudentActor(studentUser),
+          course.joinCode,
+        );
+        const studentActor = harness.buildStudentActor(studentUser, [
+          { studentId: student.id, courseId: course.courseId },
+        ]);
+
+        // 24 concepts: 0.25 confidence via two quiz attempts (scores 0.8 then 0.6)
+        for (let i = 0; i < 24; i++) {
+          const conceptId = course.conceptIds[i]!;
+          await masteryService.applyEvidence(studentActor, student.id, conceptId, {
+            type: "quiz",
+            score: 0.8,
+            sourceId: randomUUID(),
+          });
+          await masteryService.applyEvidence(studentActor, student.id, conceptId, {
+            type: "quiz",
+            score: 0.6,
+            sourceId: randomUUID(),
+          });
+        }
+
+        // 25th concept: 0.24 confidence via tutor (+0.20) and two quiz attempts with score 0 (+0.02 each)
+        const lastConceptId = course.conceptIds[24]!;
+        await masteryService.applyEvidence(studentActor, student.id, lastConceptId, {
+          type: "tutor",
+          sourceId: randomUUID(),
+        });
+        await masteryService.applyEvidence(studentActor, student.id, lastConceptId, {
+          type: "quiz",
+          score: 0.0,
+          sourceId: randomUUID(),
+        });
+        await masteryService.applyEvidence(studentActor, student.id, lastConceptId, {
+          type: "quiz",
+          score: 0.0,
+          sourceId: randomUUID(),
+        });
+
+        // Summary must compute unrounded mean: 6.24 / 25 = 0.2496 -> form "ember"
+        const summary = await gameService.getSummary(studentActor, student.id);
+        expect(summary.skyBrightness).toBeCloseTo(0.2496, 4);
+        expect(summary.form).toBe("ember");
+      },
+      30_000,
+    );
+
+    it(
+      "8: Repository pagination over 501 rows preserves chronological boundaries and latest updates",
+      async () => {
+        currentContext = { users: [], teacherIds: [], courseIds: [] };
+        const course = await harness.createTestCourse(currentContext, { conceptCount: 2 });
+        const conceptA = course.conceptIds[0]!;
+        const conceptB = course.conceptIds[1]!;
+
+        const studentUser = await harness.createTestUser(currentContext, "student");
+        const student = await enrollmentService.enrollStudent(
+          harness.buildStudentActor(studentUser),
+          course.joinCode,
+        );
+
+        const baseTime = new Date("2025-01-01T12:00:00.000Z").getTime();
+        const msPerDay = 86_400_000;
+
+        const xpRows: Array<{
+          id: string;
+          student_id: string;
+          amount: number;
+          reason: "encounter";
+          source_id: string;
+          award_date: string;
+          concept_id: string;
+          created_at: string;
+        }> = [];
+
+        const questRows: Array<{
+          id: string;
+          student_id: string;
+          quest_date: string;
+          concept_ids: string[];
+          completed_ids: string[];
+          cleared_at: string;
+          version: number;
+        }> = [];
+
+        const evidenceRows: Array<{
+          id: string;
+          student_id: string;
+          concept_id: string;
+          evidence_type: "quiz";
+          source_id: string;
+          prior_confidence: number;
+          new_confidence: number;
+          created_at: string;
+        }> = [];
+
+        for (let i = 0; i < 501; i++) {
+          const timestamp = new Date(baseTime + i * msPerDay).toISOString();
+          const dateStr = timestamp.slice(0, 10);
+          const isLast = i === 500;
+
+          xpRows.push({
+            id: randomUUID(),
+            student_id: student.id,
+            amount: isLast ? 9 : 1,
+            reason: "encounter",
+            source_id: randomUUID(),
+            award_date: dateStr,
+            concept_id: conceptA,
+            created_at: timestamp,
+          });
+
+          questRows.push({
+            id: randomUUID(),
+            student_id: student.id,
+            quest_date: dateStr,
+            concept_ids: isLast ? [conceptA, conceptB] : [conceptA],
+            completed_ids: isLast ? [conceptA, conceptB] : [conceptA],
+            cleared_at: timestamp,
+            version: 1,
+          });
+
+          evidenceRows.push({
+            id: randomUUID(),
+            student_id: student.id,
+            concept_id: i === 0 ? conceptB : conceptA,
+            evidence_type: "quiz",
+            source_id: randomUUID(),
+            prior_confidence: 0.0,
+            new_confidence: 0.0,
+            created_at: timestamp,
+          });
+        }
+
+        const insertXp = await harness.serviceClient.from("xp_events").insert(xpRows);
+        expect(insertXp.error).toBeNull();
+
+        const insertQuests = await harness.serviceClient.from("daily_quests").insert(questRows);
+        expect(insertQuests.error).toBeNull();
+
+        const insertEvidence = await harness.serviceClient.from("mastery_evidence").insert(evidenceRows);
+        expect(insertEvidence.error).toBeNull();
+
+        // 1. Verify XP pagination: 500*1 + 9 = 509 total XP, latest timestamp 2026-05-16T12:00:00.000Z
+        const xpResult = await gameRepository.getTotalXpAndLatestTimestamp(student.id);
+        expect(xpResult.totalXp).toBe(509);
+        expect(xpResult.latestXpTimestamp).toBe("2026-05-16T12:00:00.000Z");
+
+        // 2. Verify Review evidence pagination:
+        // Concept B only on oldest date (2025-01-01), Concept A on all other 500 dates (latest 2026-05-16)
+        const reviews = await gameRepository.getLatestCommittedReviews(student.id);
+        expect(reviews.get(conceptB)?.toISOString()).toBe("2025-01-01T12:00:00.000Z");
+        expect(reviews.get(conceptA)?.toISOString()).toBe("2026-05-16T12:00:00.000Z");
+
+        // 3. Verify Cleared quests pagination:
+        // 501 cleared quests, final row is May 16 with [conceptA, conceptB]
+        const clearedQuests = await gameRepository.getAllClearedQuests(student.id);
+        expect(clearedQuests).toHaveLength(501);
+        const lastQuest = clearedQuests[clearedQuests.length - 1]!;
+        expect(lastQuest.questDate).toBe("2026-05-16");
+        expect(lastQuest.conceptIds).toEqual([conceptA, conceptB]);
+        expect(lastQuest.completedIds).toEqual([conceptA, conceptB]);
+      },
+      30_000,
+    );
   },
 );

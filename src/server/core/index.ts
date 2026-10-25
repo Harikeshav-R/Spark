@@ -126,6 +126,7 @@ export {
   selectDailyQuestCandidates,
   hydrateDailyQuestItems,
   type ReviewState,
+  type SelectDailyQuestCandidatesInput,
 } from "./game/daily-quest-generator";
 
 export {

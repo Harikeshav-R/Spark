@@ -127,6 +127,37 @@ function rowToDailyQuestRecord(row: z.infer<typeof dailyQuestRowSchema>): DailyQ
   };
 }
 
+async function forEachPage(
+  fetchPage: (from: number, to: number) => PromiseLike<{
+    data: readonly unknown[] | null;
+    error: unknown;
+  }>,
+  visitPage: (rows: readonly unknown[]) => void,
+  errorMessage: string,
+): Promise<void> {
+  let from = 0;
+  while (true) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await fetchPage(from, to);
+
+    if (error) {
+      throw mapPostgrestError(error, errorMessage);
+    }
+
+    if (!data || data.length === 0) {
+      return;
+    }
+
+    visitPage(data);
+
+    if (data.length < PAGE_SIZE) {
+      return;
+    }
+
+    from += PAGE_SIZE;
+  }
+}
+
 export class GameRepository {
   constructor(private readonly client: Pick<SupabaseClient, "from" | "rpc">) {}
 
@@ -203,48 +234,34 @@ export class GameRepository {
     studentId: UUID,
   ): Promise<Map<UUID, Date>> {
     const result = new Map<UUID, Date>();
-    let from = 0;
-    let hasMore = true;
 
-    while (hasMore) {
-      const { data, error } = await this.client
-        .from("mastery_evidence")
-        .select("concept_id, created_at")
-        .eq("student_id", studentId)
-        .in("evidence_type", ["quiz", "tutor"])
-        .order("created_at", { ascending: false })
-        .range(from, from + PAGE_SIZE - 1);
-
-      if (error) {
-        throw mapPostgrestError(error, "Failed to query mastery evidence review history");
-      }
-
-      if (!data || data.length === 0) {
-        break;
-      }
-
-      for (const row of data) {
-        const parsed = masteryEvidenceRowSchema.safeParse(row);
-        if (!parsed.success) {
-          throw new AppError({
-            code: "INTERNAL_SERVER_ERROR",
-            statusCode: 500,
-            message: "Malformed mastery evidence record in database",
-            cause: parsed.error,
-          });
+    await forEachPage(
+      (from, to) =>
+        this.client
+          .from("mastery_evidence")
+          .select("concept_id, created_at")
+          .eq("student_id", studentId)
+          .in("evidence_type", ["quiz", "tutor"])
+          .order("created_at", { ascending: false })
+          .range(from, to),
+      (rows) => {
+        for (const row of rows) {
+          const parsed = masteryEvidenceRowSchema.safeParse(row);
+          if (!parsed.success) {
+            throw new AppError({
+              code: "INTERNAL_SERVER_ERROR",
+              statusCode: 500,
+              message: "Malformed mastery evidence record in database",
+              cause: parsed.error,
+            });
+          }
+          if (!result.has(parsed.data.concept_id)) {
+            result.set(parsed.data.concept_id, new Date(parsed.data.created_at));
+          }
         }
-        if (!result.has(parsed.data.concept_id)) {
-          result.set(parsed.data.concept_id, new Date(parsed.data.created_at));
-        }
-      }
-
-      if (data.length < PAGE_SIZE) {
-        hasMore = false;
-      } else {
-        from += PAGE_SIZE;
-      }
-    }
-
+      },
+      "Failed to query mastery evidence review history",
+    );
     return result;
   }
 
@@ -321,46 +338,32 @@ export class GameRepository {
     studentId: UUID,
   ): Promise<DailyQuestRecord[]> {
     const result: DailyQuestRecord[] = [];
-    let from = 0;
-    let hasMore = true;
 
-    while (hasMore) {
-      const { data, error } = await this.client
-        .from("daily_quests")
-        .select("id, student_id, quest_date, concept_ids, completed_ids, cleared_at, version, created_at, updated_at")
-        .eq("student_id", studentId)
-        .not("cleared_at", "is", null)
-        .order("quest_date", { ascending: true })
-        .range(from, from + PAGE_SIZE - 1);
-
-      if (error) {
-        throw mapPostgrestError(error, "Failed to query cleared daily quests");
-      }
-
-      if (!data || data.length === 0) {
-        break;
-      }
-
-      for (const row of data) {
-        const parsed = dailyQuestRowSchema.safeParse(row);
-        if (!parsed.success) {
-          throw new AppError({
-            code: "INTERNAL_SERVER_ERROR",
-            statusCode: 500,
-            message: "Malformed cleared daily quest row",
-            cause: parsed.error,
-          });
+    await forEachPage(
+      (from, to) =>
+        this.client
+          .from("daily_quests")
+          .select("id, student_id, quest_date, concept_ids, completed_ids, cleared_at, version, created_at, updated_at")
+          .eq("student_id", studentId)
+          .not("cleared_at", "is", null)
+          .order("quest_date", { ascending: true })
+          .range(from, to),
+      (rows) => {
+        for (const row of rows) {
+          const parsed = dailyQuestRowSchema.safeParse(row);
+          if (!parsed.success) {
+            throw new AppError({
+              code: "INTERNAL_SERVER_ERROR",
+              statusCode: 500,
+              message: "Malformed cleared daily quest row",
+              cause: parsed.error,
+            });
+          }
+          result.push(rowToDailyQuestRecord(parsed.data));
         }
-        result.push(rowToDailyQuestRecord(parsed.data));
-      }
-
-      if (data.length < PAGE_SIZE) {
-        hasMore = false;
-      } else {
-        from += PAGE_SIZE;
-      }
-    }
-
+      },
+      "Failed to query cleared daily quests",
+    );
     return result;
   }
 
@@ -369,48 +372,34 @@ export class GameRepository {
   ): Promise<{ totalXp: number; latestXpTimestamp: string | null }> {
     let totalXp = 0;
     let latestTimestamp: string | null = null;
-    let from = 0;
-    let hasMore = true;
 
-    while (hasMore) {
-      const { data, error } = await this.client
-        .from("xp_events")
-        .select("amount, created_at")
-        .eq("student_id", studentId)
-        .order("created_at", { ascending: true })
-        .range(from, from + PAGE_SIZE - 1);
-
-      if (error) {
-        throw mapPostgrestError(error, "Failed to query xp events");
-      }
-
-      if (!data || data.length === 0) {
-        break;
-      }
-
-      for (const row of data) {
-        const parsed = xpEventRowSchema.safeParse(row);
-        if (!parsed.success) {
-          throw new AppError({
-            code: "INTERNAL_SERVER_ERROR",
-            statusCode: 500,
-            message: "Malformed xp event row",
-            cause: parsed.error,
-          });
+    await forEachPage(
+      (from, to) =>
+        this.client
+          .from("xp_events")
+          .select("amount, created_at")
+          .eq("student_id", studentId)
+          .order("created_at", { ascending: true })
+          .range(from, to),
+      (rows) => {
+        for (const row of rows) {
+          const parsed = xpEventRowSchema.safeParse(row);
+          if (!parsed.success) {
+            throw new AppError({
+              code: "INTERNAL_SERVER_ERROR",
+              statusCode: 500,
+              message: "Malformed xp event row",
+              cause: parsed.error,
+            });
+          }
+          totalXp += parsed.data.amount;
+          if (!latestTimestamp || new Date(parsed.data.created_at) > new Date(latestTimestamp)) {
+            latestTimestamp = new Date(parsed.data.created_at).toISOString();
+          }
         }
-        totalXp += parsed.data.amount;
-        if (!latestTimestamp || new Date(parsed.data.created_at) > new Date(latestTimestamp)) {
-          latestTimestamp = new Date(parsed.data.created_at).toISOString();
-        }
-      }
-
-      if (data.length < PAGE_SIZE) {
-        hasMore = false;
-      } else {
-        from += PAGE_SIZE;
-      }
-    }
-
+      },
+      "Failed to query xp events",
+    );
     return { totalXp, latestXpTimestamp: latestTimestamp };
   }
 

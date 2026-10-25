@@ -80,14 +80,19 @@ export interface CandidateConcept {
  *   3. Graph importance descending: highest prerequisite importance first
  *   4. Lexicographical UUID ascending tie-break
  */
+export interface SelectDailyQuestCandidatesInput {
+  readonly nodes: readonly NodeLike[];
+  readonly edges: readonly EdgeLike[];
+  readonly masteries: ReadonlyMap<UUID, number>;
+  readonly latestReviews: ReadonlyMap<UUID, Date>;
+  readonly importanceMap: ReadonlyMap<UUID, number>;
+  readonly now: Date;
+}
+
 export function selectDailyQuestCandidates(
-  nodes: readonly NodeLike[],
-  edges: readonly EdgeLike[],
-  masteries: ReadonlyMap<UUID, number>,
-  latestReviews: ReadonlyMap<UUID, Date>,
-  importanceMap: ReadonlyMap<UUID, number>,
-  now: Date,
+  input: SelectDailyQuestCandidatesInput,
 ): UUID[] {
+  const { nodes, edges, masteries, latestReviews, importanceMap, now } = input;
   const candidates: CandidateConcept[] = [];
 
   for (const node of nodes) {

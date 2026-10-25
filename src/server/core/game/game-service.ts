@@ -62,46 +62,42 @@ const practiceAnswerItemSchema = z.object({
 
 const practiceAnswersSchema = z.array(practiceAnswerItemSchema).length(5);
 
+const MILLISECONDS_PER_DAY = 86_400_000;
+
 export function calculateStreakDays(
   clearedQuests: readonly { questDate: string; conceptIds: readonly string[] }[],
+  now: Date,
 ): number {
-  const nonEmptyClears = clearedQuests.filter((q) => q.conceptIds.length > 0);
-  if (nonEmptyClears.length === 0) {
+  const clearDays = new Set<number>();
+  for (const quest of clearedQuests) {
+    if (quest.conceptIds.length > 0) {
+      const parsed = Date.parse(quest.questDate);
+      if (!Number.isNaN(parsed)) {
+        clearDays.add(Math.floor(parsed / MILLISECONDS_PER_DAY));
+      }
+    }
+  }
+
+  if (clearDays.size === 0) {
     return 0;
   }
 
-  // Deduplicate UTC dates and sort ascending
-  const uniqueDates = Array.from(
-    new Set(nonEmptyClears.map((q) => q.questDate.slice(0, 10))),
-  ).sort();
+  const today = Math.floor(now.getTime() / MILLISECONDS_PER_DAY);
+  const yesterday = today - 1;
 
-  if (uniqueDates.length === 0) {
+  let currentDay: number;
+  if (clearDays.has(today)) {
+    currentDay = today;
+  } else if (clearDays.has(yesterday)) {
+    currentDay = yesterday;
+  } else {
     return 0;
   }
 
-  const parseUtcMidnight = (dateStr: string): number => {
-    const parts = dateStr.split("-").map(Number);
-    const y = parts[0] ?? 1970;
-    const m = parts[1] ?? 1;
-    const d = parts[2] ?? 1;
-    return Date.UTC(y, m - 1, d);
-  };
-
-  let streak = 1;
-  for (let i = uniqueDates.length - 1; i > 0; i--) {
-    const currentDate = uniqueDates[i];
-    const prevDate = uniqueDates[i - 1];
-    if (!currentDate || !prevDate) {
-      break;
-    }
-    const current = parseUtcMidnight(currentDate);
-    const prev = parseUtcMidnight(prevDate);
-    const diffDays = Math.round((current - prev) / (24 * 60 * 60 * 1000));
-    if (diffDays === 1) {
-      streak += 1;
-    } else {
-      break;
-    }
+  let streak = 0;
+  while (clearDays.has(currentDay)) {
+    streak += 1;
+    currentDay -= 1;
   }
 
   return streak;
@@ -240,14 +236,14 @@ export class ConcreteGameService implements GameService {
         topology.edges,
       );
 
-      const candidateIds = selectDailyQuestCandidates(
-        topology.nodes,
-        topology.edges,
-        masteryMap,
+      const candidateIds = selectDailyQuestCandidates({
+        nodes: topology.nodes,
+        edges: topology.edges,
+        masteries: masteryMap,
         latestReviews,
         importanceMap,
         now,
-      );
+      });
 
       questRecord = await this.dependencies.repository.persistDailyQuestQueue(
         student.id,
@@ -296,12 +292,11 @@ export class ConcreteGameService implements GameService {
       (sum, node) => sum + (masteryMap.get(node.id) ?? 0.0),
       0,
     );
-    const rawSkyBrightness =
+    const skyBrightness =
       topology.nodes.length > 0 ? totalConfidence / topology.nodes.length : 0.0;
-    const skyBrightness = Math.round(rawSkyBrightness * 1000) / 1000;
 
     const { form, formProgress } = calculateMascotEvolution(skyBrightness);
-    const streakDays = calculateStreakDays(clearedQuests);
+    const streakDays = calculateStreakDays(clearedQuests, this.dependencies.clock.now());
 
     // Summary updatedAt is maximum persisted timestamp among entities used
     const candidateTimestamps: number[] = [
