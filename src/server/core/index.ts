@@ -37,6 +37,18 @@ export {
   type HeatmapRouterDependencies,
   createHeatmapRouter,
 } from "./mastery/heatmap-router";
+export {
+  CourseEffortService,
+  type CourseEffortServiceDependencies,
+  type ClassSkyConcept,
+  type ClassSkySnapshot,
+} from "./game/course-effort-service";
+
+export {
+  createCourseEffortRouter,
+  type CourseEffortRouterDependencies,
+} from "./game/course-effort-router";
+
 
 export {
   type AttendanceEvidenceResult,
