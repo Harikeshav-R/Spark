@@ -23,11 +23,20 @@ import {
 } from "@/features/learning/feature-error-boundary";
 import { z } from "zod";
 
+export interface StudyGroupMatchedSessionContext {
+  matchId: UUID;
+  peerName?: string;
+  socket: LectureSocket | null;
+  roomJoined: boolean;
+  roomRevision: number;
+}
+
 export interface StudyGroupFeatureProps {
   studentId: UUID;
   courseId: UUID;
   initialConcepts?: ConceptNode[];
   className?: string;
+  renderMatchedSession?: (context: StudyGroupMatchedSessionContext) => React.ReactNode;
 }
 
 export type ConceptView = {
@@ -57,6 +66,7 @@ function InnerStudyGroupView({
   courseId,
   initialConcepts,
   className = "",
+  renderMatchedSession,
 }: StudyGroupFeatureProps): React.JSX.Element {
   const baseId = useId();
 
@@ -92,13 +102,15 @@ function InnerStudyGroupView({
   const matchIdRef = useRef<UUID | null>(null);
   matchIdRef.current = matchId;
 
-  // Socket state
+  // Socket and room state
+  const [socket, setSocket] = useState<LectureSocket | null>(null);
+  const [roomJoined, setRoomJoined] = useState<boolean>(false);
+  const [roomRevision, setRoomRevision] = useState<number>(0);
   const [socketDisconnected, setSocketDisconnected] = useState<boolean>(false);
   const socketRef = useRef<LectureSocket | null>(null);
   const bufferedMatchEventRef = useRef<StudyGroupMatchedEvent | null>(null);
   const selectedConceptIdsRef = useRef<UUID[]>(selectedConceptIds);
   selectedConceptIdsRef.current = selectedConceptIds;
-
   // Fetch course graph if initialConcepts omitted
   const fetchConcepts = useCallback(
     async (signal?: AbortSignal) => {
@@ -162,26 +174,30 @@ function InnerStudyGroupView({
       const token = await getRuntimeAccessToken();
       if (cancelled || !token) return;
 
-      const socket = createLectureSocket(token);
-      socketRef.current = socket;
+      const newSocket = createLectureSocket(token);
+      socketRef.current = newSocket;
+      setSocket(newSocket);
 
-      socket.on("connect", () => {
+      newSocket.on("connect", () => {
         setSocketDisconnected(false);
         if (matchIdRef.current) {
           const currentMatch = matchIdRef.current;
-          socket.emit(
+          newSocket.emit(
             "study-group:join",
             { matchId: currentMatch },
             (rawAck: unknown) => {
-              if (matchIdRef.current !== currentMatch) return;
+              if (matchIdRef.current !== currentMatch || socketRef.current !== newSocket) return;
               const ack = socketAckResponseSchema.safeParse(rawAck);
               if (!ack.success || !ack.data.success) {
+                setRoomJoined(false);
                 setErrorNotice(
                   ack.success && ack.data.error
                     ? ack.data.error
                     : "Failed to join study group realtime session."
                 );
               } else {
+                setRoomJoined(true);
+                setRoomRevision((r) => r + 1);
                 setPartyRefreshKey((k) => k + 1);
               }
             }
@@ -189,15 +205,16 @@ function InnerStudyGroupView({
         }
       });
 
-      socket.on("disconnect", () => {
+      newSocket.on("disconnect", () => {
         setSocketDisconnected(true);
+        setRoomJoined(false);
       });
 
-      socket.on("connect_error", () => {
+      newSocket.on("connect_error", () => {
         setSocketDisconnected(true);
+        setRoomJoined(false);
       });
-
-      socket.on("party:quest-updated", (rawData: unknown) => {
+      newSocket.on("party:quest-updated", (rawData: unknown) => {
         const parsed = partyQuestUpdatedEventSchema.safeParse(rawData);
         if (!parsed.success) return;
 
@@ -207,7 +224,7 @@ function InnerStudyGroupView({
         setPartyRefreshKey((k) => k + 1);
       });
 
-      socket.on("study-group:matched", (rawData: unknown) => {
+      newSocket.on("study-group:matched", (rawData: unknown) => {
         const parsed = studyGroupMatchedEventSchema.safeParse(rawData);
         if (!parsed.success) return;
 
@@ -229,51 +246,59 @@ function InnerStudyGroupView({
         setErrorNotice(null);
       });
 
-      socket.connect();
+      newSocket.connect();
     }
 
     initSocket();
 
     return () => {
       cancelled = true;
+      setRoomJoined(false);
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
+      setSocket(null);
     };
   }, [courseId]);
   // Join active match room when matchId becomes known
+  // Join active match room when matchId becomes known or socket is ready
   useEffect(() => {
-    const socket = socketRef.current;
     if (!socket || !matchId) {
+      setRoomJoined(false);
       return;
     }
 
     const currentMatch = matchId;
-    socket.emit(
+    const currentSocket = socket;
+    currentSocket.emit(
       "study-group:join",
       { matchId: currentMatch },
       (rawAck: unknown) => {
-        if (matchIdRef.current !== currentMatch) return;
+        if (matchIdRef.current !== currentMatch || socketRef.current !== currentSocket) return;
         const ack = socketAckResponseSchema.safeParse(rawAck);
         if (!ack.success || !ack.data.success) {
+          setRoomJoined(false);
           setErrorNotice(
             ack.success && ack.data.error
               ? ack.data.error
               : "Failed to join study group realtime session."
           );
         } else {
+          setRoomJoined(true);
+          setRoomRevision((r) => r + 1);
           setPartyRefreshKey((k) => k + 1);
         }
       }
     );
 
     return () => {
-      if (socket.connected) {
-        socket.emit("study-group:leave", { matchId: currentMatch }, () => {});
+      setRoomJoined(false);
+      if (currentSocket.connected) {
+        currentSocket.emit("study-group:leave", { matchId: currentMatch }, () => {});
       }
     };
-  }, [matchId]);
+  }, [socket, matchId]);
 
 
   // Expiration timer countdown
@@ -611,6 +636,17 @@ function InnerStudyGroupView({
                 )}
               </div>
 
+              {matchId && renderMatchedSession && (
+                <div className="pt-2">
+                  {renderMatchedSession({
+                    matchId,
+                    peerName: matchedPeerName ?? undefined,
+                    socket,
+                    roomJoined,
+                    roomRevision,
+                  })}
+                </div>
+              )}
               {matchId && (
                 <div className="pt-2">
                   <PartyQuestPanel
