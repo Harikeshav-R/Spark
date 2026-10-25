@@ -9,6 +9,7 @@ export interface AppShellProps {
   breadcrumbs: readonly { label: string; href?: string }[];
   children: React.ReactNode;
   sessionStatus?: "anonymous" | "authenticated";
+  headerActions?: React.ReactNode;
 }
 
 export function AppShell({
@@ -18,6 +19,7 @@ export function AppShell({
   breadcrumbs,
   children,
   sessionStatus = "anonymous",
+  headerActions,
 }: AppShellProps): React.JSX.Element {
   const studentHref =
     breadcrumbs.find((b) => b.label === "Student workspace")?.href ||
@@ -126,13 +128,20 @@ export function AppShell({
           </div>
         )}
 
-        <div className="mb-8">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-fg-default)] leading-[1.2] mb-3 break-words min-w-0">
-            {title}
-          </h1>
-          <p className="text-base sm:text-lg text-[var(--color-fg-muted)] max-w-[65ch] leading-relaxed">
-            {description}
-          </p>
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-8">
+          <div className="space-y-3 max-w-[65ch]">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-[var(--color-fg-default)] leading-[1.2] break-words min-w-0">
+              {title}
+            </h1>
+            <p className="text-base sm:text-lg text-[var(--color-fg-muted)] leading-relaxed">
+              {description}
+            </p>
+          </div>
+          {headerActions && (
+            <div className="shrink-0 self-start md:self-center" data-testid="app-shell-header-actions">
+              {headerActions}
+            </div>
+          )}
         </div>
 
         <div>{children}</div>

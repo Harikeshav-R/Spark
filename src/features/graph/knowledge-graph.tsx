@@ -27,6 +27,7 @@ export interface KnowledgeGraphProps {
   className?: string;
   activeConceptIds?: readonly string[];
   taughtConceptIds?: readonly string[];
+  onPracticeConcept?: (conceptId: string) => void;
 }
 
 const DEFAULT_ACTIVE_CONCEPT_IDS: readonly string[] = [];
@@ -77,6 +78,7 @@ export function KnowledgeGraph({
   className,
   activeConceptIds = DEFAULT_ACTIVE_CONCEPT_IDS,
   taughtConceptIds,
+  onPracticeConcept,
 }: KnowledgeGraphProps): React.JSX.Element {
   // 1. Invariant and empty validations (run during SSR as well)
   if (graph.nodes.length === 0) {
@@ -764,6 +766,18 @@ export function KnowledgeGraph({
               )}
             </div>
           </div>
+          {onPracticeConcept && (
+            <div className="pt-2 border-t border-paper-line flex items-center justify-between">
+              <Button
+                size="sm"
+                variant="default"
+                onClick={() => onPracticeConcept(selectedNode.id)}
+                data-testid={`practice-encounter-${selectedNode.id}`}
+              >
+                Practice Encounter
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
