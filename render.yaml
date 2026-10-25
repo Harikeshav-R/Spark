@@ -1,0 +1,43 @@
+services:
+  - type: web
+    name: spark
+    runtime: docker
+    plan: starter
+    branch: main
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    numInstances: 1
+    healthCheckPath: /api/health
+    maxShutdownDelaySeconds: 15
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "10000"
+      - key: INTEGRATION_MODE
+        value: live
+      - key: LECTURE_SOURCE
+        value: zoom
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: APP_ORIGIN
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: ZOOM_CLIENT_ID
+        sync: false
+      - key: ZOOM_CLIENT_SECRET
+        sync: false
+      - key: ZOOM_SECRET_TOKEN
+        sync: false
+      - key: ZOOM_REDIRECT_URI
+        sync: false
