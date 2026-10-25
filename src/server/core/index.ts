@@ -59,6 +59,11 @@ export {
 } from "./mastery/poll-evidence";
 
 export {
+  type LearningEvidenceResult,
+  LearningEvidenceService,
+} from "./mastery/learning-evidence";
+
+export {
   type GraphNodeInput,
   topologicalSort,
   validateGraph,
