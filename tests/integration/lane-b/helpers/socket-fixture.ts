@@ -231,6 +231,25 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
         }
 
         const itemsToInsert = Array.isArray(bodyParsed) ? bodyParsed : [bodyParsed];
+        if (tableName === "lecture_summaries") {
+          for (const item of itemsToInsert) {
+            if (item && typeof item === "object" && "lecture_id" in item) {
+              const exists = records.some((r) => r["lecture_id"] === (item as Record<string, unknown>)["lecture_id"]);
+              if (exists) {
+                return new Response(
+                  JSON.stringify({
+                    code: "23505",
+                    message: "duplicate key value violates unique constraint",
+                  }),
+                  {
+                    status: 409,
+                    headers: { "Content-Type": "application/json" },
+                  }
+                );
+              }
+            }
+          }
+        }
         for (const item of itemsToInsert) {
           if (item && typeof item === "object") {
             records.push(item as Record<string, unknown>);
@@ -247,6 +266,63 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
 
         return new Response(JSON.stringify(itemsToInsert), {
           status: 201,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (method === "PATCH") {
+        let bodyParsed: unknown;
+        try {
+          bodyParsed = typeof init?.body === "string" ? JSON.parse(init.body) : {};
+        } catch {
+          return new Response(JSON.stringify({ message: "Invalid JSON in PATCH", status: 400 }), {
+            status: 400,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        const updatedRecords: Record<string, unknown>[] = [];
+        for (let i = 0; i < records.length; i++) {
+          const r = records[i]!;
+          let matches = true;
+          for (const [key, val] of url.searchParams.entries()) {
+            if (key === "select" || key === "order" || key === "offset" || key === "limit") continue;
+            if (val.startsWith("eq.")) {
+              const target = val.slice(3);
+              if (String(r[key]) !== target) {
+                matches = false;
+                break;
+              }
+            }
+          }
+          if (matches && bodyParsed && typeof bodyParsed === "object") {
+            records[i] = { ...r, ...(bodyParsed as Record<string, unknown>) };
+            updatedRecords.push(records[i]!);
+          }
+        }
+
+        if (acceptHeader.includes("application/vnd.pgrst.object+json")) {
+          if (updatedRecords.length === 0) {
+            return new Response(
+              JSON.stringify({
+                code: "PGRST116",
+                details: "The result contains 0 rows",
+                message: "JSON object requested, multiple (or no) rows returned",
+              }),
+              {
+                status: 406,
+                headers: { "Content-Type": "application/json" },
+              }
+            );
+          }
+          return new Response(JSON.stringify(updatedRecords[0]), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          });
+        }
+
+        return new Response(JSON.stringify(updatedRecords), {
+          status: 200,
           headers: { "Content-Type": "application/json" },
         });
       }

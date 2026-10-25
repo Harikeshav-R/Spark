@@ -13,6 +13,7 @@ import { fixtureSocraticTutorTurn } from "../../src/server/ai/fixtures/tutoring-
 import {
   FIXTURE_33_CONCEPTS,
   fixturePrerequisiteGraph,
+  fixtureSummarizeLecture,
 } from "../../src/server/ai/index.js";
 import { fixtureDetectConcepts } from "../../src/server/ai/fixtures/detected-concepts.js";
 
@@ -244,29 +245,13 @@ export class FakeAiService implements AiService {
   }
 
   async summarizeLecture(
-    _transcriptChunks: { text: string; timestampSec: number }[]
+    transcriptChunks: { text: string; timestampSec: number }[]
   ): Promise<{
     summary: string;
     keyConceptsCovered: UUID[];
     timelineHighlights: { timestampSec: number; conceptLabel: string; description: string }[];
   }> {
-    return {
-      summary:
-        "In this lecture, we explored gradient descent optimization algorithms, analyzed the impact of learning rate schedules on convergence, and derived backpropagation updates across deep neural network computational graphs.",
-      keyConceptsCovered: [FIXTURE_CONCEPT_ID_1, FIXTURE_CONCEPT_ID_2],
-      timelineHighlights: [
-        {
-          timestampSec: 120,
-          conceptLabel: "Gradient Descent",
-          description: "Introduction to loss function surfaces and negative gradient direction.",
-        },
-        {
-          timestampSec: 480,
-          conceptLabel: "Learning Rate",
-          description: "Analysis of step sizes, oscillation boundaries, and divergence criteria.",
-        },
-      ],
-    };
+    return fixtureSummarizeLecture(transcriptChunks, FIXTURE_33_CONCEPTS);
   }
 
   async suggestInterventions(

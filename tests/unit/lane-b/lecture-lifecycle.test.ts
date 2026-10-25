@@ -11,8 +11,10 @@ import {
   LectureRepository,
   type LectureDatabaseClientPort,
 } from "../../../src/server/classroom/lecture-repository.js";
-import { LectureService } from "../../../src/server/classroom/lecture-service.js";
-
+import {
+  LectureService,
+  type LectureCompletionDependencies,
+} from "../../../src/server/classroom/lecture-service.js";
 describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
   const teacherAuthId = "11111111-1111-4111-8111-111111111111";
   const teacherId = "22222222-2222-4222-8222-222222222222";
@@ -52,6 +54,30 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
     generateId: () => lectureId,
     generateJoinCode: () => "LEC001",
   };
+
+  interface MockCompletionFixture extends LectureCompletionDependencies {
+    callOrder: string[];
+  }
+
+  function createCompletionFixture(): MockCompletionFixture {
+    const callOrder: string[] = [];
+    return {
+      callOrder,
+      rooms: {
+        authorizeRoom: vi.fn(async () => {
+          callOrder.push("authorizeRoom");
+        }),
+      },
+      publisher: {
+        emitToLecture: vi.fn(async () => {
+          callOrder.push("emitToLecture");
+        }),
+      },
+      summarize: vi.fn(async () => {
+        callOrder.push("summarize");
+      }),
+    };
+  }
 
   describe("LectureService state machine & lifecycle", () => {
     it("Teacher starts lecture in live state with timestamp", async () => {
@@ -94,7 +120,7 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
         ),
       };
 
-      const service = new LectureService(mockRepo, mockIds, mockClock);
+      const service = new LectureService(mockRepo, mockIds, mockClock, createCompletionFixture());
 
       const created = await service.startLecture(
         teacherActor,
@@ -138,20 +164,39 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
         nowISO: () => endTime,
       };
 
-      const service = new LectureService(mockRepo, mockIds, endClock);
+      const completion = createCompletionFixture();
+      const service = new LectureService(mockRepo, mockIds, endClock, completion);
 
       const completed = await service.endLecture(teacherActor, lectureId);
 
       expect(completed.id).toBe(lectureId);
       expect(completed.status).toBe("completed");
       expect(completed.endedAt).toBe(endTime);
+      expect(completion.rooms.authorizeRoom).toHaveBeenCalledWith(
+        teacherActor,
+        `professor:${lectureId}`
+      );
       expect(mockRepo.updateLectureStatus).toHaveBeenCalledWith(
         lectureId,
         "completed",
         endTime,
       );
+      expect(completion.publisher.emitToLecture).toHaveBeenCalledWith(
+        lectureId,
+        "lecture:ended",
+        expect.objectContaining({
+          eventId: lectureId,
+          lectureId,
+          endedAt: endTime,
+        })
+      );
+      expect(completion.summarize).toHaveBeenCalledWith(teacherActor, lectureId);
+      expect(completion.callOrder).toEqual([
+        "authorizeRoom",
+        "emitToLecture",
+        "summarize",
+      ]);
     });
-
     it("Ending already-completed lecture returns 409 CONFLICT", async () => {
       const completedLecture: LectureSession = {
         id: lectureId,
@@ -168,7 +213,7 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
         updateLectureStatus: vi.fn(),
       };
 
-      const service = new LectureService(mockRepo, mockIds, mockClock);
+      const service = new LectureService(mockRepo, mockIds, mockClock, createCompletionFixture());
 
       await expect(
         service.endLecture(teacherActor, lectureId),
@@ -188,7 +233,7 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
         updateLectureStatus: vi.fn(),
       };
 
-      const service = new LectureService(mockRepo, mockIds, mockClock);
+      const service = new LectureService(mockRepo, mockIds, mockClock, createCompletionFixture());
 
       await expect(
         service.startLecture(studentActor, courseId, "Student Session"),
@@ -208,7 +253,7 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
         updateLectureStatus: vi.fn(),
       };
 
-      const service = new LectureService(mockRepo, mockIds, mockClock);
+      const service = new LectureService(mockRepo, mockIds, mockClock, createCompletionFixture());
 
       await expect(
         service.endLecture(studentActor, lectureId),
@@ -228,7 +273,7 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
         updateLectureStatus: vi.fn(),
       };
 
-      const service = new LectureService(mockRepo, mockIds, mockClock);
+      const service = new LectureService(mockRepo, mockIds, mockClock, createCompletionFixture());
 
       await expect(
         service.startLecture(teacherActor, "not-a-uuid", "Invalid Course"),
@@ -247,7 +292,7 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
         updateLectureStatus: vi.fn(),
       };
 
-      const service = new LectureService(mockRepo, mockIds, mockClock);
+      const service = new LectureService(mockRepo, mockIds, mockClock, createCompletionFixture());
 
       await expect(
         service.endLecture(teacherActor, "not-a-uuid"),
@@ -266,7 +311,7 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
         updateLectureStatus: vi.fn(),
       };
 
-      const service = new LectureService(mockRepo, mockIds, mockClock);
+      const service = new LectureService(mockRepo, mockIds, mockClock, createCompletionFixture());
 
       await expect(
         service.startLecture(teacherActor, courseId, ""),
@@ -283,6 +328,93 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
       });
 
       expect(mockRepo.insertLecture).not.toHaveBeenCalled();
+    });
+
+    it("Room authorization failure rejects endLecture before reading or mutating lecture state", async () => {
+      const mockRepo = {
+        insertLecture: vi.fn(),
+        getLecture: vi.fn(),
+        updateLectureStatus: vi.fn(),
+      };
+
+      const completion = createCompletionFixture();
+      completion.rooms.authorizeRoom = vi.fn().mockRejectedValue(
+        new AppError({
+          code: "FORBIDDEN",
+          statusCode: 403,
+          message: "Room authorization failed",
+        })
+      );
+
+      const service = new LectureService(mockRepo, mockIds, mockClock, completion);
+
+      await expect(
+        service.endLecture(teacherActor, lectureId)
+      ).rejects.toMatchObject({
+        code: "FORBIDDEN",
+        statusCode: 403,
+      });
+
+      expect(completion.rooms.authorizeRoom).toHaveBeenCalledWith(
+        teacherActor,
+        `professor:${lectureId}`
+      );
+      expect(mockRepo.getLecture).not.toHaveBeenCalled();
+      expect(mockRepo.updateLectureStatus).not.toHaveBeenCalled();
+      expect(completion.publisher.emitToLecture).not.toHaveBeenCalled();
+      expect(completion.summarize).not.toHaveBeenCalled();
+    });
+
+    it("Summarize failure propagates error while preserving completed state and emitted lecture:ended", async () => {
+      const liveLecture: LectureSession = {
+        id: lectureId,
+        courseId,
+        title: "Introduction to Quantum Algorithms",
+        status: "live",
+        startedAt: startTime,
+      };
+
+      const mockRepo = {
+        insertLecture: vi.fn(),
+        getLecture: vi.fn(async () => liveLecture),
+        updateLectureStatus: vi.fn(
+          async (id: UUID, status: "live" | "completed", endedAt?: string) => ({
+            ...liveLecture,
+            id,
+            status,
+            endedAt,
+          })
+        ),
+      };
+
+      const completion = createCompletionFixture();
+      completion.summarize = vi.fn().mockRejectedValue(
+        new AppError({
+          code: "BAD_GATEWAY",
+          statusCode: 502,
+          message: "AI provider failed during summarization",
+        })
+      );
+
+      const service = new LectureService(mockRepo, mockIds, mockClock, completion);
+
+      await expect(
+        service.endLecture(teacherActor, lectureId)
+      ).rejects.toMatchObject({
+        code: "BAD_GATEWAY",
+        statusCode: 502,
+      });
+
+      expect(mockRepo.updateLectureStatus).toHaveBeenCalledWith(
+        lectureId,
+        "completed",
+        startTime
+      );
+      expect(completion.publisher.emitToLecture).toHaveBeenCalledWith(
+        lectureId,
+        "lecture:ended",
+        expect.anything()
+      );
     });
   });
 

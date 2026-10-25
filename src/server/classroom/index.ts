@@ -1,4 +1,7 @@
-export { LectureService } from "./lecture-service.js";
+export {
+  LectureService,
+  type LectureCompletionDependencies,
+} from "./lecture-service.js";
 export {
   LectureRepository,
   type LectureDatabaseClientPort,
@@ -7,6 +10,7 @@ export {
 export {
   TranscriptRepository,
   type TranscriptDatabaseClientPort,
+  type LectureTranscriptChunk,
 } from "./transcript-repository.js";
 
 export {
@@ -18,6 +22,11 @@ export {
   createTranscriptRouter,
   type TranscriptRouterDependencies,
 } from "./transcript-router.js";
+
+export {
+  createLectureSummaryRouter,
+  type LectureSummaryRouterDependencies,
+} from "./lecture-summary-router.js";
 
 export {
   CS229_TRANSCRIPT_SCRIPT,

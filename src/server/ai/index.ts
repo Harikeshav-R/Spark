@@ -22,3 +22,5 @@ export {
 export { ExtractGraphAi } from "./pipelines/extract-graph.js";
 export { DetectConceptsAi } from "./pipelines/detect-concepts.js";
 export { fixtureDetectConcepts } from "./fixtures/detected-concepts.js";
+export { SummarizeLectureAi } from "./pipelines/summarize-lecture.js";
+export { fixtureSummarizeLecture } from "./fixtures/summarized-lecture.js";

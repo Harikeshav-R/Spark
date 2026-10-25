@@ -11,8 +11,16 @@ import type {
 } from "../../contracts/common.js";
 import { uuidSchema } from "../../contracts/common.js";
 import { AppError } from "../../contracts/errors.js";
+import type { RealtimePublisher } from "../../contracts/realtime.js";
+import { lectureEndedEventSchema } from "../../contracts/realtime.js";
+import type { RoomAuthorizer } from "../realtime/index.js";
 import type { LectureRepository } from "./lecture-repository.js";
 
+export interface LectureCompletionDependencies {
+  rooms: Pick<RoomAuthorizer, "authorizeRoom">;
+  publisher: Pick<RealtimePublisher, "emitToLecture">;
+  summarize: (actor: ActorContext, lectureId: UUID) => Promise<void>;
+}
 export class LectureService
   implements Pick<ClassroomService, "startLecture" | "endLecture">
 {
@@ -23,6 +31,7 @@ export class LectureService
     >,
     private readonly ids: Pick<IdGenerator, "generateId">,
     private readonly clock: Clock,
+    private readonly completion: LectureCompletionDependencies,
   ) {}
 
   async startLecture(
@@ -86,6 +95,11 @@ export class LectureService
       });
     }
 
+    await this.completion.rooms.authorizeRoom(
+      actor,
+      `professor:${lectureId}`
+    );
+
     const current = await this.repository.getLecture(lectureId);
 
     if (current.status === "completed") {
@@ -97,7 +111,28 @@ export class LectureService
     }
 
     const endedAt = this.clock.nowISO();
-    return this.repository.updateLectureStatus(lectureId, "completed", endedAt);
+    const completed = await this.repository.updateLectureStatus(
+      lectureId,
+      "completed",
+      endedAt
+    );
+
+    const endedEvent = lectureEndedEventSchema.parse({
+      eventId: this.ids.generateId(),
+      occurredAt: this.clock.nowISO(),
+      lectureId,
+      endedAt: completed.endedAt ?? endedAt,
+    });
+
+    await this.completion.publisher.emitToLecture(
+      lectureId,
+      "lecture:ended",
+      endedEvent
+    );
+
+    await this.completion.summarize(actor, lectureId);
+
+    return completed;
   }
 
   async getLecture(lectureId: UUID): Promise<LectureSession> {
