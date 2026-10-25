@@ -8,7 +8,7 @@ This document defines the canonical seed dataset, student confidence baseline, c
 
 The seed curriculum replicates the machine learning foundations course (CS229), comprising **exactly 33 concept nodes** and **34 prerequisite edges**.
 
-### 1.1 Concept Nodes (33 Topics across 8 Categories)
+### 1.1 Concept Nodes (33 Topics across 9 Categories)
 1. **Linear Algebra**: `Vectors` (Diff 1), `Matrices` (Diff 2), `Eigenvalues` (Diff 4), `Matrix Multiplication` (Diff 2)
 2. **Calculus**: `Derivatives` (Diff 2), `Partial Derivatives` (Diff 3), `Chain Rule` (Diff 3), `Gradients` (Diff 3)
 3. **Probability**: `Bayes' Theorem` (Diff 3), `Distributions` (Diff 2), `Conditional Probability` (Diff 2)
@@ -70,27 +70,33 @@ The seed script creates **1 teacher** and **4 enrolled students**, producing exa
 - **Student 3 (Praj)**: `praj@example.test` (Developing profile)
 - **Student 4 (Vamshi)**: `vamshi@example.test` (Unassessed / Fresh profile)
 
-### 2.2 Baseline Confidence Matrix (Selected Core Concepts)
+### 2.2 Baseline Confidence Matrix (Complete 132-Row Specification)
+All 33 concepts default to student base levels before 6 specific foundational overrides:
+- Default: Hari 0.81, Rahul 0.40, Praj 0.65, Vamshi 0.00
+
 | Concept | Hari | Rahul | Praj | Vamshi |
 |---|---|---|---|---|
+| **Default (27 topics)** | 0.81 (`green`) | 0.40 (`yellow`) | 0.65 (`yellow`) | 0.00 (`gray`) |
+| **Matrices** | 0.84 (`green`) | 0.39 (`red`) | 0.80 (`green`) | 0.00 (`gray`) |
 | **Vectors** | 0.95 (`green`) | 0.45 (`yellow`) | 0.80 (`green`) | 0.00 (`gray`) |
 | **Derivatives** | 0.90 (`green`) | 0.35 (`red`) | 0.75 (`green`) | 0.00 (`gray`) |
 | **Gradients** | 0.85 (`green`) | 0.20 (`red`) | 0.65 (`yellow`) | 0.00 (`gray`) |
 | **Gradient Descent**| 0.85 (`green`) | 0.20 (`red`) | 0.50 (`yellow`) | 0.00 (`gray`) |
 | **Backpropagation** | 0.80 (`green`) | 0.15 (`red`) | 0.40 (`yellow`) | 0.00 (`gray`) |
 
-*Complementary Match Check*: Hari ($0.80$) and Rahul ($0.15$) on Backpropagation have gap $|0.80 - 0.15| = 0.65 \ge 0.30$, making them an ideal complementary study pair.
+*Mean Confidence*: Hari = 0.82 (`nova`), Rahul = 0.38 (`spark`), Praj = 0.65 (`glow`), Vamshi = 0.00 (`ember`).
 
+*Complementary Match Check*: Hari ($0.80$) and Rahul ($0.15$) on Backpropagation have gap $|0.80 - 0.15| = 0.65 \ge 0.30$, making them an ideal complementary study pair.
 
 ### 2.3 Baseline Game Progression & Effort Seed State
 | Persona | Baseline XP | Streak | Sky Brightness | Mascot Form | Intervention Flag |
 |---|---|---|---|---|---|
 | **Hari** | 620 | 4 Days | 0.82 | `nova` | None |
-| **Rahul** | 508 | 3 Days | 0.38 | `spark` | `high_effort_low_mastery` |
+| **Rahul** | 508 | 3 Days | 0.38 | `spark` | None (XP percentile = 67 < 75) |
 | **Praj** | 320 | 2 Days | 0.65 | `glow` | None |
 | **Vamshi** | 0 | 0 Days | 0.00 | `ember` | None (Unassessed) |
 
-*Rahul Daily Quest Seed*: 3 ready concepts: "Backpropagation" (overdue), "Derivatives" (unreviewed), "Computational Graphs" (current).
+*Rahul Daily Quest Seed*: 3 ready concepts selected by the DAG scheduler: "Derivatives" (unreviewed root, $c=0.35$), "Distributions" (overdue at D-4, $c=0.40$), "Perceptron" (current at D-1, $c=0.40$). Backpropagation is NOT ready because its prerequisites (Gradients=0.20) are not mastered ($< 0.70$).
 ---
 
 ## 3. Demo Mode Implementation Architecture
@@ -123,10 +129,11 @@ Mounted in `src/components/demo/demo-toolbar.tsx`, the toolbar provides floating
   - `[Speed: 1x / 2x / 5x]`: Accelerates speech chunk frequency.
 - **Poll Simulation Trigger**:
   - `[Auto-Submit Responses]`: When the teacher activates a poll, clicking this button injects pre-scripted responses for Hari and Rahul:
-    - Hari submits: `"The chain rule requires intermediate activations computed during the forward pass to evaluate the local gradients for parameter updates."` (Evaluates `correct` $\to$ green).
-    - Rahul submits: `"To make the network run faster during inference."` (Evaluates `wrong` $\to$ red).
+    - Hari submits: `"An excessive learning rate causes updates to overshoot the minimum and diverge."` (Evaluates `correct` $\to$ green).
+    - Rahul submits: `"The learning rate has no effect on parameter updates."` (Evaluates `wrong` $\to$ red).
+  - *Responses require verified Socket.IO presence before submission and honor response idempotency.*
 - **Fast-Forward Peer Matchmaker**:
-  - `[Instant Match]`: Immediately matches Rahul and Hari for "Backpropagation", skipping the 5-minute pool waiting timeout and creating the match with pre-computed availability.
+  - `[Instant Match]`: Immediately matches Rahul and Hari for "Backpropagation", registering tomorrow 15:00–15:30 UTC availability and pairing complementary opted-in peers through `StudyGroupService.optIntoPool`.
 
 ### 3.3 Instant Reset & Rehearsal (`npm run demo:reset`)
 Between demo takes or video rehearsals, running `npm run demo:reset` wipes demo state and restores baseline data in under 2 seconds:
@@ -138,6 +145,22 @@ What it executes:
 2. Resets `student_mastery` back to the exact baseline confidence matrix (Hari at $0.80$, Rahul at $0.15$ on Backpropagation).
 3. Clears active study group pool entries and matches.
 4. Restores CS229 course join code to `CS229-8F`.
+
+### 3.4 Database Schema Migrations Applied
+The demo database seed and reset run on a PostgreSQL schema featuring all 13 project migrations:
+1. `20261020000001_initial_schema.sql` (Foundation base tables)
+2. `20261020000002_mastery_rpc.sql` (Mastery calculation RPCs)
+3. `20261021000001_enrollment_rpc.sql` (Student enrollment and initialization RPCs)
+4. `20261021000003_spark_learning.sql` (Learning guides and concept quiz questions)
+5. `20261022000004_study_groups.sql` (Study group base tables)
+6. `20261022000005_spark_collaboration.sql` (Study group collaboration)
+7. `20261022005107_commit_knowledge_graph.sql` (Knowledge graph commitment RPC)
+8. `20261023033101_add_transcript_chunk_is_simulated.sql` (Simulated transcript chunk flag)
+9. `20261023151418_add_lecture_summaries.sql` (Lecture summaries)
+10. `20261023200008_poll_lifecycle_guards.sql` (Poll lifecycle guards)
+11. `20261024023802_game_progression.sql` (Encounters, daily quests, XP events)
+12. `20261024030001_replace_student_availability_rpc.sql` (Availability RPC replacement)
+13. `20261024040001_party_quest_lifecycle.sql` (Party quest lifecycle)
 
 ---
 
