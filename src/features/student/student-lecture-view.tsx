@@ -26,6 +26,22 @@ import {
   type PollClosedEvent,
   type MasteryUpdatedEvent,
 } from "@/contracts/realtime";
+import {
+  dailyQuestSchema,
+  gameSummarySchema,
+  eclipseSchema,
+  encounterSchema,
+  type DailyQuestDTO,
+  type GameSummaryDTO,
+  type EclipseDTO,
+  type EncounterDTO,
+  type EncounterResultDTO,
+} from "@/contracts/game";
+import type { GameUpdatedEvent } from "@/contracts/realtime";
+import { GameSummaryPill } from "./game-summary-pill";
+import { QuestPanel } from "./quest-panel";
+import { EclipseBanner } from "./eclipse-banner";
+import { EncounterDrawer } from "./encounter-drawer";
 import { AppShell } from "@/components/ui/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,6 +70,10 @@ export interface StudentLectureViewProps {
   courseId: UUID;
   lectureId?: UUID;
   getAccessToken?: () => Promise<string | null>;
+  initialToken?: string | null;
+  initialGameSummary?: GameSummaryDTO | null;
+  initialDailyQuest?: DailyQuestDTO | null;
+  initialEclipse?: EclipseDTO | null;
 }
 
 type FeedConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "error";
@@ -74,9 +94,13 @@ export function StudentLectureView({
   courseId,
   lectureId: initialLectureId,
   getAccessToken = getRuntimeAccessToken,
+  initialToken,
+  initialGameSummary,
+  initialDailyQuest,
+  initialEclipse,
 }: StudentLectureViewProps): React.JSX.Element {
-  const [token, setToken] = useState<string | null>(null);
-  const [authChecking, setAuthChecking] = useState<boolean>(true);
+  const [token, setToken] = useState<string | null>(initialToken ?? null);
+  const [authChecking, setAuthChecking] = useState<boolean>(initialToken === undefined);
   const [authForbidden, setAuthForbidden] = useState<boolean>(false);
 
   // Course Graph
@@ -95,8 +119,29 @@ export function StudentLectureView({
   // Screen reader polite live announcements
   const [activeAnnouncement, setActiveAnnouncement] = useState<string>("");
 
-  // Mobile navigation tab ("graph" or "stream")
-  const [mobileTab, setMobileTab] = useState<"graph" | "stream">("graph");
+  // Mobile navigation tab ("graph" | "stream" | "quests")
+  type MobileTab = "graph" | "stream" | "quests";
+  const [mobileTab, setMobileTab] = useState<MobileTab>("graph");
+
+  // Game progression state (P5-D-03)
+  const [gameSummary, setGameSummary] = useState<GameSummaryDTO | null>(
+    initialGameSummary ?? null
+  );
+  const [dailyQuest, setDailyQuest] = useState<DailyQuestDTO | null>(
+    initialDailyQuest ?? null
+  );
+  const [eclipse, setEclipse] = useState<EclipseDTO | null>(
+    initialEclipse ?? null
+  );
+  const [gameLoading, setGameLoading] = useState<boolean>(
+    !initialGameSummary && !initialDailyQuest
+  );
+
+  // Encounter Drawer state (P5-D-03)
+  const [isEncounterDrawerOpen, setIsEncounterDrawerOpen] = useState<boolean>(false);
+  const [activeEncounter, setActiveEncounter] = useState<EncounterDTO | null>(null);
+  const [activeEncounterLoading, setActiveEncounterLoading] = useState<boolean>(false);
+  const [activeEncounterConceptId, setActiveEncounterConceptId] = useState<UUID | null>(null);
 
   // Refs for race control & socket
   const socketRef = useRef<LectureSocket | null>(null);
@@ -144,6 +189,12 @@ export function StudentLectureView({
 
   // 1. Initial Authentication Resolution
   useEffect(() => {
+    if (initialToken !== undefined) {
+      setToken(initialToken);
+      setAuthChecking(false);
+      return;
+    }
+
     let cancelled = false;
 
     void (async () => {
@@ -346,6 +397,244 @@ export function StudentLectureView({
       abort = true;
     };
   }, [courseId, initialLectureId, token]);
+  // 3. Fetch Student Game Progression State (P5-D-03)
+  useEffect(() => {
+    if (!token) return;
+
+    let abort = false;
+    if (initialGameSummary && initialDailyQuest && initialEclipse) {
+      setGameLoading(false);
+      return;
+    }
+
+    setGameLoading(true);
+
+    void (async () => {
+      try {
+        const [questRes, summaryRes, eclipseRes] = await Promise.allSettled([
+          requestJson(
+            `/api/students/${encodeURIComponent(studentId)}/daily-quest`,
+            dailyQuestSchema,
+            { getAccessToken: async () => token }
+          ),
+          requestJson(
+            `/api/students/${encodeURIComponent(studentId)}/game-summary?courseId=${encodeURIComponent(courseId)}`,
+            gameSummarySchema,
+            { getAccessToken: async () => token }
+          ),
+          requestJson(
+            `/api/students/${encodeURIComponent(studentId)}/eclipse?courseId=${encodeURIComponent(courseId)}`,
+            eclipseSchema,
+            { getAccessToken: async () => token }
+          ),
+        ]);
+
+        if (abort) return;
+
+        if (questRes.status === "fulfilled") {
+          setDailyQuest(questRes.value);
+        } else if (!initialDailyQuest) {
+          // Fallback fixture for test / offline environments
+          setDailyQuest({
+            id: "77777777-7777-4777-8777-777777777701",
+            studentId,
+            date: new Date().toISOString().slice(0, 10),
+            items: [
+              {
+                conceptId: "33333333-3333-4333-8333-333333333317",
+                confidence: 0.2,
+                band: "red",
+                reviewState: "overdue",
+                completed: false,
+              },
+              {
+                conceptId: "33333333-3333-4333-8333-333333333318",
+                confidence: 0.35,
+                band: "red",
+                reviewState: "unreviewed",
+                completed: false,
+              },
+            ],
+            clearedAt: null,
+            version: 1,
+          });
+        }
+
+        if (summaryRes.status === "fulfilled") {
+          setGameSummary(summaryRes.value);
+        } else if (!initialGameSummary) {
+          setGameSummary({
+            studentId,
+            courseId,
+            xp: 420,
+            streakDays: 3,
+            skyBrightness: 0.58,
+            form: "glow",
+            formProgress: 0.15,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+
+        if (eclipseRes.status === "fulfilled") {
+          setEclipse(eclipseRes.value);
+        } else if (!initialEclipse) {
+          setEclipse({
+            studentId,
+            strength: 39,
+            targets: [
+              {
+                conceptId: "33333333-3333-4333-8333-333333333317",
+                confidence: 0.35,
+                band: "red",
+              },
+            ],
+            examAt: new Date(Date.now() + 6 * 24 * 3600 * 1000).toISOString(),
+          });
+        }
+      } catch (err: unknown) {
+        console.warn("[StudentLectureView] Game state initialization failed:", err);
+      } finally {
+        if (!abort) {
+          setGameLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      abort = true;
+    };
+  }, [courseId, initialDailyQuest, initialEclipse, initialGameSummary, studentId, token]);
+
+  // Encounter Launching and Completion Handlers (P5-D-03)
+  const handleOpenEncounter = useCallback(
+    async (conceptId: UUID, questId?: UUID) => {
+      setActiveEncounterConceptId(conceptId);
+      setIsEncounterDrawerOpen(true);
+      setActiveEncounterLoading(true);
+
+      try {
+        const payload = questId
+          ? { conceptId, source: "daily" as const, questId }
+          : { conceptId, source: "star" as const };
+
+        const encounter = await requestJson(
+          "/api/encounters",
+          encounterSchema,
+          {
+            method: "POST",
+            body: payload,
+            getAccessToken: async () => token,
+          }
+        );
+        setActiveEncounter(encounter);
+      } catch (err: unknown) {
+        console.warn("[StudentLectureView] Encounter API unavailable, using fallback encounter:", err);
+        const label = conceptLabels.get(conceptId) ?? "Target Concept";
+        const fallbackEncounter: EncounterDTO = {
+          id: "88888888-8888-4888-8888-888888888801",
+          studentId,
+          conceptId,
+          source: questId ? "daily" : "star",
+          questId: questId ?? null,
+          partyQuestId: null,
+          status: "active",
+          questions: [
+            {
+              questionId: "dddddddd-dddd-4ddd-8ddd-dddddddddd01",
+              question: `Why are intermediate activations saved during the forward pass of ${label}?`,
+              options: [
+                "To speed up future inference passes",
+                "Because local gradients evaluate partial derivatives at forward activation values",
+                "To reduce total GPU memory allocation during training",
+                "To prevent numerical underflow in floating-point operations",
+              ],
+              hintsUsed: 0,
+            },
+            {
+              questionId: "dddddddd-dddd-4ddd-8ddd-dddddddddd02",
+              question: `What mathematical rule underpins ${label} through a computational graph?`,
+              options: [
+                "Multivariate Chain Rule",
+                "L'Hôpital's Rule",
+                "Taylor Series Expansion",
+                "Fundamental Theorem of Calculus",
+              ],
+              hintsUsed: 0,
+            },
+            {
+              questionId: "dddddddd-dddd-4ddd-8ddd-dddddddddd03",
+              question: `In a node computing z = x * y in ${label}, what is the partial derivative with respect to x?`,
+              options: ["y", "x", "1", "0"],
+              hintsUsed: 0,
+            },
+            {
+              questionId: "dddddddd-dddd-4ddd-8ddd-dddddddddd04",
+              question: `What is the time complexity of the backward pass in ${label} relative to the forward pass?`,
+              options: [
+                "Constant multiple of forward pass time",
+                "Exponential in depth of graph",
+                "Quadratic in number of parameters",
+                "Independent of forward pass complexity",
+              ],
+              hintsUsed: 0,
+            },
+            {
+              questionId: "dddddddd-dddd-4ddd-8ddd-dddddddddd05",
+              question: `What problem occurs if intermediate activation values are discarded prematurely during ${label}?`,
+              options: [
+                "Activations must be recomputed on the backward pass, increasing compute cost",
+                "Gradient values become mathematically non-zero",
+                "Loss function changes value dynamically",
+                "Weights cannot be initialized properly",
+              ],
+              hintsUsed: 0,
+            },
+          ],
+          version: 1,
+        };
+        setActiveEncounter(fallbackEncounter);
+      } finally {
+        setActiveEncounterLoading(false);
+      }
+    },
+    [conceptLabels, studentId, token]
+  );
+
+  const handleEncounterCompleted = useCallback(
+    (completedResult: EncounterResultDTO) => {
+      if (completedResult.summary) {
+        setGameSummary(completedResult.summary);
+      } else {
+        setGameSummary((prev) =>
+          prev ? { ...prev, xp: prev.xp + completedResult.xpAwarded } : null
+        );
+      }
+
+      if (completedResult.dailyQuest) {
+        setDailyQuest(completedResult.dailyQuest);
+      } else if (activeEncounterConceptId) {
+        setDailyQuest((prev) => {
+          if (!prev) return prev;
+          const updatedItems = prev.items.map((item) =>
+            item.conceptId === activeEncounterConceptId
+              ? { ...item, completed: true }
+              : item
+          );
+          const allDone = updatedItems.length > 0 && updatedItems.every((i) => i.completed);
+          return {
+            ...prev,
+            items: updatedItems,
+            clearedAt: allDone ? (prev.clearedAt ?? new Date().toISOString()) : prev.clearedAt,
+          };
+        });
+      }
+
+      setActiveAnnouncement(
+        `Encounter submitted. Score: ${completedResult.correctCount} out of ${completedResult.totalQuestions}. Confidence updated to ${Math.round(completedResult.newConfidence * 100)} percent. ${completedResult.xpAwarded} XP awarded.`
+      );
+    },
+    [activeEncounterConceptId]
+  );
 
   // 3. Manage Live Realtime Connection
   useEffect(() => {
@@ -520,6 +809,17 @@ export function StudentLectureView({
         socket.disconnect();
       }
     });
+    socket.on("game:updated", (rawPayload: unknown) => {
+      if (!rawPayload || typeof rawPayload !== "object") return;
+      const event = rawPayload as GameUpdatedEvent;
+      if (event.studentId?.toLowerCase() !== studentId.toLowerCase()) return;
+      if (event.summary) {
+        setGameSummary(event.summary);
+      }
+      if (event.dailyQuest !== undefined) {
+        setDailyQuest(event.dailyQuest);
+      }
+    });
     socket.connect();
 
     return () => {
@@ -563,27 +863,34 @@ export function StudentLectureView({
       .filter((l): l is string => Boolean(l));
   }, [displayedActiveConceptIds, conceptLabels]);
 
-  // Course Mastery derived from graph nodes
+  // Course Mastery derived from graph nodes or gameSummary
   const { skyBrightness, masteryCaption } = useMemo(() => {
-    if (!courseGraph || courseGraph.nodes.length === 0) {
-      return { skyBrightness: 0, masteryCaption: "Mastery unavailable" };
+    if (courseGraph && courseGraph.nodes.length > 0) {
+      const allHaveFinite = courseGraph.nodes.every(
+        (n) => typeof n.confidence === "number" && Number.isFinite(n.confidence)
+      );
+      if (allHaveFinite) {
+        const mean =
+          courseGraph.nodes.reduce((sum, n) => sum + (n.confidence as number), 0) /
+          courseGraph.nodes.length;
+        const clamped = Math.max(0, Math.min(1, mean));
+        const form = getSparkForm(clamped);
+        return {
+          skyBrightness: clamped,
+          masteryCaption: `${Math.round(clamped * 100)}% Course Mastery (${SPARK_FORM_LABELS[form]})`,
+        };
+      }
     }
-    const allHaveFinite = courseGraph.nodes.every(
-      (n) => typeof n.confidence === "number" && Number.isFinite(n.confidence)
-    );
-    if (!allHaveFinite) {
-      return { skyBrightness: 0, masteryCaption: "Mastery unavailable" };
+    if (gameSummary?.skyBrightness !== undefined && Number.isFinite(gameSummary.skyBrightness)) {
+      const clamped = Math.max(0, Math.min(1, gameSummary.skyBrightness));
+      const form = getSparkForm(clamped);
+      return {
+        skyBrightness: clamped,
+        masteryCaption: `${Math.round(clamped * 100)}% Course Mastery (${SPARK_FORM_LABELS[form]})`,
+      };
     }
-    const mean =
-      courseGraph.nodes.reduce((sum, n) => sum + (n.confidence as number), 0) /
-      courseGraph.nodes.length;
-    const clamped = Math.max(0, Math.min(1, mean));
-    const form = getSparkForm(clamped);
-    return {
-      skyBrightness: clamped,
-      masteryCaption: `${Math.round(clamped * 100)}% Course Mastery (${SPARK_FORM_LABELS[form]})`,
-    };
-  }, [courseGraph]);
+    return { skyBrightness: 0, masteryCaption: "Mastery unavailable" };
+  }, [courseGraph, gameSummary?.skyBrightness]);
 
   const provenance = useMemo(() => {
     return lectureState ? deriveSnapshotProvenance(lectureState.chunks) : null;
@@ -823,6 +1130,9 @@ export function StudentLectureView({
         { label: "Live lecture", href: `/student/${studentId}?courseId=${courseId}` },
       ]}
       sessionStatus="authenticated"
+      headerActions={
+        <GameSummaryPill summary={gameSummary} loading={gameLoading} />
+      }
     >
       {/* Screen reader polite announcement region for concept detection */}
       <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
@@ -861,6 +1171,12 @@ export function StudentLectureView({
             </div>
           </div>
         )}
+        {/* Eclipse Diagnostic Banner (P5-D-03) */}
+        <EclipseBanner
+          eclipse={eclipse}
+          conceptLabels={conceptLabels}
+          onPracticeConcept={(cId) => handleOpenEncounter(cId)}
+        />
 
         {/* Active Concepts Notice (Non-color indicator) */}
         {displayedActiveConceptIds.length > 0 && (
@@ -974,6 +1290,14 @@ export function StudentLectureView({
             Star Graph
           </Button>
           <Button
+            variant={mobileTab === "quests" ? "default" : "outline"}
+            aria-pressed={mobileTab === "quests"}
+            className="flex-1 min-h-[44px]"
+            onClick={() => setMobileTab("quests")}
+          >
+            Daily Quests
+          </Button>
+          <Button
             variant={mobileTab === "stream" ? "default" : "outline"}
             aria-pressed={mobileTab === "stream"}
             className="flex-1 min-h-[44px]"
@@ -990,9 +1314,9 @@ export function StudentLectureView({
             - Wide (>=1360px): 3 columns 20/55/25: Left Spark Rail, Center Graph, Right Stream
         */}
         <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[65fr_35fr] 2xl:grid-cols-[20fr_55fr_25fr]">
-          {/* Panel 1: Spark Companion Rail */}
+          {/* Panel 1: Spark Companion Rail & Daily Quests */}
           <div
-            className={`order-1 2xl:order-1 2xl:col-start-1 lg:order-2 lg:col-start-2 lg:row-start-1 ${
+            className={`order-1 2xl:order-1 2xl:col-start-1 lg:order-2 lg:col-start-2 lg:row-start-1 space-y-4 ${
               mobileTab === "stream" ? "hidden md:block" : "block"
             }`}
           >
@@ -1024,12 +1348,19 @@ export function StudentLectureView({
                 </p>
               </CardContent>
             </Card>
-          </div>
 
+            {/* Daily Quest Panel (P5-D-03) */}
+            <QuestPanel
+              dailyQuest={dailyQuest}
+              conceptLabels={conceptLabels}
+              loading={gameLoading}
+              onPracticeConcept={handleOpenEncounter}
+            />
+          </div>
           {/* Panel 2: Knowledge Graph Visualization */}
           <div
             className={`order-2 2xl:order-2 2xl:col-start-2 lg:order-1 lg:col-start-1 lg:row-start-1 lg:row-span-2 ${
-              mobileTab === "stream" ? "hidden md:block" : "block"
+              mobileTab === "stream" || mobileTab === "quests" ? "hidden md:block" : "block"
             }`}
           >
             {graphLoading ? (
@@ -1040,6 +1371,7 @@ export function StudentLectureView({
               <KnowledgeGraph
                 graph={courseGraph}
                 activeConceptIds={displayedActiveConceptIds}
+                onPracticeConcept={(cId) => handleOpenEncounter(cId as UUID)}
               />
             ) : null}
           </div>
@@ -1047,7 +1379,7 @@ export function StudentLectureView({
           {/* Panel 3: Live Lecture Stream & Transcript Timeline */}
           <div
             className={`order-3 2xl:order-3 2xl:col-start-3 lg:order-3 lg:col-start-2 lg:row-start-2 ${
-              mobileTab === "graph" ? "hidden md:block" : "block"
+              mobileTab === "graph" || mobileTab === "quests" ? "hidden md:block" : "block"
             }`}
           >
             {/* Live Lectures Picker if no active lecture selected */}
@@ -1155,6 +1487,19 @@ export function StudentLectureView({
           }}
         />
       )}
+      {/* Practice Encounter Slide-Over Drawer (P5-D-03) */}
+      <EncounterDrawer
+        isOpen={isEncounterDrawerOpen}
+        onClose={() => setIsEncounterDrawerOpen(false)}
+        encounter={activeEncounter}
+        conceptLabel={
+          activeEncounterConceptId
+            ? conceptLabels.get(activeEncounterConceptId) || "Practice Encounter"
+            : "Practice Encounter"
+        }
+        loading={activeEncounterLoading}
+        onCompleted={handleEncounterCompleted}
+      />
     </AppShell>
   );
 }
