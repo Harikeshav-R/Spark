@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const port = Number(process.env.PORT) || 3000;
 const baseURL = process.env.APP_ORIGIN || `http://localhost:${port}`;
+const shouldStartServer = process.env.PLAYWRIGHT_START_SERVER !== "0";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -25,14 +26,28 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
     },
+    {
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
+    },
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
+    },
   ],
-  webServer:
-    process.env.CI || process.env.PLAYWRIGHT_START_SERVER
-      ? {
-          command: "npm run start",
-          url: `${baseURL}/api/health`,
-          reuseExistingServer: !process.env.CI,
-          timeout: 60_000,
-        }
-      : undefined,
+  webServer: shouldStartServer
+    ? {
+        command: "npx tsx server/index.ts",
+        url: `${baseURL}/api/health`,
+        reuseExistingServer: false,
+        timeout: 120_000,
+        env: {
+          PORT: String(port),
+          NODE_ENV: "development",
+          INTEGRATION_MODE: "fixture",
+          LECTURE_SOURCE: "simulator",
+          DEMO_MODE: "false",
+        },
+      }
+    : undefined,
 });

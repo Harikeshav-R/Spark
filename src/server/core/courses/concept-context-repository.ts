@@ -108,7 +108,7 @@ export class ConceptContextRepository {
       description: foundRow.description,
       category: foundRow.category,
       difficulty: foundRow.difficulty,
-      createdAt: foundRow.created_at,
+      createdAt: new Date(foundRow.created_at).toISOString(),
     });
 
     // Step 3: Resolve studentId for student actors and revalidate course authorization

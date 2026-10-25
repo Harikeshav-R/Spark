@@ -8,6 +8,7 @@ export default tseslint.config(
     ignores: [
       "dist/**",
       ".next/**",
+      ".next*/**",
       "node_modules/**",
       "coverage/**",
       "recordings/**",

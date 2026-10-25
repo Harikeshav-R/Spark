@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import { getAccessToken, setRuntimeSession } from "../../lib/client/session.js";
+import { getAccessToken, setRuntimeSession } from "@/lib/client/session";
 
 const DEMO_PASSWORD = "DemoPass123!";
 const CS229_COURSE_ID = "11111111-1111-4111-8111-111111111111";
