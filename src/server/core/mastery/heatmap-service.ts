@@ -160,12 +160,9 @@ export class HeatmapService implements Pick<MasteryServicePort, "getClassHeatmap
     }
   }
 
-  private invalidateCache(): void {
-    for (const key of this.cache.keys()) {
-      const currentRev = this.activeRevisions.get(key) ?? 0;
-      this.activeRevisions.set(key, currentRev + 1);
-    }
-    this.cache.clear();
+  private invalidateCache(courseId: UUID): void {
+    this.activeRevisions.set(courseId, (this.activeRevisions.get(courseId) ?? 0) + 1);
+    this.cache.delete(courseId);
   }
 
   private async loadCourseSnapshot(courseId: UUID, bypassCache: boolean): Promise<CourseHeatmapSnapshot> {
@@ -446,10 +443,7 @@ export class HeatmapService implements Pick<MasteryServicePort, "getClassHeatmap
   }
 
   async afterEvidenceApplied(actor: ActorContext, studentId: UUID, conceptId: UUID): Promise<void> {
-    // 1. Immediately invalidate cached state and advance revisions
-    this.invalidateCache();
-
-    // 2. Derive courseId from persisted student enrollment
+    // 1. Derive courseId from persisted student enrollment
     let query = this.dependencies.client
       .from("students")
       .select("id,course_id")
@@ -491,6 +485,9 @@ export class HeatmapService implements Pick<MasteryServicePort, "getClassHeatmap
 
     // 3. Verify course authorization
     await this.dependencies.courses.getCourse(actor, courseId);
+
+    // Invalidate cached state and advance revision for target course
+    this.invalidateCache(courseId);
 
     // 4. Queue and serialize refresh operations per course
     const previousPromise = this.refreshChains.get(courseId) ?? Promise.resolve();
