@@ -36,7 +36,6 @@ import { SparkMascot } from "@/features/mascot/spark-mascot";
 import {
   SPARK_FORM_LABELS,
   getSparkForm,
-  type SparkMood,
 } from "@/features/mascot/spark-moods";
 import { TranscriptFeed } from "@/features/professor/transcript-feed";
 import { requestJson, ClientApiError, getRuntimeAccessToken } from "@/lib/client/http";
@@ -45,6 +44,7 @@ import {
   createStudentLectureState,
   reduceStudentLectureState,
   applyStudentGraphMastery,
+  deriveStudentSparkMood,
   type StudentLectureState,
 } from "./student-lecture-state";
 import { ActivePollModal } from "./active-poll-modal";
@@ -552,18 +552,10 @@ export function StudentLectureView({
     return lectureState.activeConceptIds;
   }, [lectureState, connectionStatus]);
 
-  const sparkMood: SparkMood = useMemo(() => {
-    if (lectureState?.poll.submission.status === "evaluated") {
-      const outcome = lectureState.poll.submission.result.evaluation.outcome;
-      if (outcome === "correct") return "cheer";
-      if (outcome === "wrong") return "oops";
-      return "think";
-    }
-    if (lectureState?.poll.submission.status === "submitting") {
-      return "think";
-    }
-    return displayedActiveConceptIds.length > 0 ? "think" : "calm";
-  }, [lectureState?.poll.submission, displayedActiveConceptIds]);
+  const sparkMood = deriveStudentSparkMood(
+    lectureState?.poll ?? null,
+    displayedActiveConceptIds.length > 0
+  );
 
   const activeConceptLabels = useMemo(() => {
     return displayedActiveConceptIds

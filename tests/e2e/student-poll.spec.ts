@@ -185,6 +185,9 @@ test.describe("P4-D-02: Student Active Poll Modal & Evaluation Card E2E", () => 
     // Verify persistent evaluation card is visible outside modal in the compact section
     await expect(page1.getByText("Correct", { exact: true })).toBeVisible();
 
+    // Verify rail companion returned to lecture mood (calm without active concepts) while evaluation card retains cheer
+    await expect(page1.locator('[data-testid="spark-mascot-container"] svg')).toHaveAttribute("data-mood", "calm");
+    await expect(page1.locator('svg[data-mood="cheer"]')).toBeVisible();
     // 10. Teacher closes poll
     const closeRes = await fetch(`${baseURL}/api/polls/${pollId}/close`, {
       method: "POST",
@@ -195,7 +198,10 @@ test.describe("P4-D-02: Student Active Poll Modal & Evaluation Card E2E", () => 
     // Assert Student 2 modal closes cleanly on poll:closed and persistent evaluation card is visible
     await expect(page2.getByRole("dialog")).not.toBeVisible({ timeout: 5000 });
     await expect(page2.getByText("Incorrect", { exact: true })).toBeVisible();
-    await context1.close();
+
+    // Verify rail companion on Student 2 returned to lecture mood while evaluation card retains oops
+    await expect(page2.locator('[data-testid="spark-mascot-container"] svg')).toHaveAttribute("data-mood", "calm");
+    await expect(page2.locator('svg[data-mood="oops"]')).toBeVisible();
     await context2.close();
   });
   test("Dismiss draft, reopen, focus containment, closure during in-flight evaluation, and reconnect", async ({

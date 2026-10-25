@@ -5,6 +5,7 @@ import type { PollResponseResult } from "@/contracts/classroom";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge, getMasteryLabel } from "@/components/ui/badge";
 import { SparkMascot } from "@/features/mascot/spark-mascot";
+import { getPollOutcomeMood } from "@/features/mascot/spark-moods";
 import { cn } from "@/lib/client/utils";
 
 export interface EvaluationCardProps {
@@ -26,17 +27,14 @@ export function EvaluationCard({
     correct: {
       label: "Correct",
       badgeClass: "bg-[#dff1e5] text-[#2b7f55] border-[#2b7f55]",
-      mood: "cheer" as const,
     },
     partial: {
       label: "Partially correct",
       badgeClass: "bg-[#fbeac2] text-[#cf951f] border-[#cf951f]",
-      mood: "think" as const,
     },
     wrong: {
       label: "Incorrect",
       badgeClass: "bg-[#f8e0e3] text-[#b0384a] border-[#b0384a]",
-      mood: "oops" as const,
     },
   }[outcome];
 
@@ -84,7 +82,7 @@ export function EvaluationCard({
           <div className="shrink-0 flex items-center justify-center">
             <SparkMascot
               skyBrightness={skyBrightness}
-              mood={outcomeConfig.mood}
+              mood={getPollOutcomeMood(outcome)}
               size={84}
             />
           </div>

@@ -17,7 +17,7 @@ import type {
 } from "@/contracts/realtime";
 import type { courseGraphResponseSchema } from "@/contracts/course";
 import { mergeTranscriptChunks } from "@/features/professor/teacher-lecture-state";
-
+import { getPollOutcomeMood, type SparkMood } from "@/features/mascot/spark-moods";
 export type StudentPollQuestion = Pick<
   PublicPollQuestion,
   "id" | "lectureId" | "conceptId" | "question" | "activatedAt"
@@ -555,4 +555,26 @@ export function applyStudentGraphMastery(
     ...graph,
     nodes: nextNodes,
   };
+}
+
+/**
+ * Derives Spark companion mood on the student live lecture rail.
+ * Follows modal reaction lifetime:
+ * - While modal is open, evaluated outcome maps to cheer/think/oops and submitting gives think.
+ * - When modal is closed (or poll is inactive/dismissed/closed), rail immediately resumes
+ *   think when active concepts exist, otherwise calm.
+ */
+export function deriveStudentSparkMood(
+  poll: StudentPollState | null,
+  hasActiveConcepts: boolean
+): SparkMood {
+  if (poll?.isOpen) {
+    if (poll.submission.status === "evaluated") {
+      return getPollOutcomeMood(poll.submission.result.evaluation.outcome);
+    }
+    if (poll.submission.status === "submitting") {
+      return "think";
+    }
+  }
+  return hasActiveConcepts ? "think" : "calm";
 }

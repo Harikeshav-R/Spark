@@ -1,6 +1,22 @@
 import type { SparkForm } from "../../contracts";
+import type { PollResponseOutcome } from "@/contracts/classroom";
 
 export type SparkMood = "calm" | "think" | "cheer" | "oops" | "sleepy";
+
+/**
+ * Maps a formative poll response evaluation outcome to the mascot mood.
+ * correct -> cheer, partial -> think, wrong -> oops
+ */
+export function getPollOutcomeMood(outcome: PollResponseOutcome): SparkMood {
+  switch (outcome) {
+    case "correct":
+      return "cheer";
+    case "partial":
+      return "think";
+    case "wrong":
+      return "oops";
+  }
+}
 
 /**
  * Returns the evolutionary Spark mascot form corresponding to whole-course sky brightness.

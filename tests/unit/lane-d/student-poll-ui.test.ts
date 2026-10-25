@@ -21,6 +21,7 @@ import {
   createStudentLectureState,
   reduceStudentLectureState,
   applyStudentGraphMastery,
+  deriveStudentSparkMood,
 } from "@/features/student/student-lecture-state";
 import { EvaluationCard } from "@/features/student/evaluation-card";
 import { ActivePollModal } from "@/features/student/active-poll-modal";
@@ -743,6 +744,279 @@ describe("P4-D-02: Student Active Poll Modal & Evaluation Card (Lane D)", () => 
       );
 
       expect(html).toBe("");
+    });
+  });
+
+  describe("5. Companion Mood Lifecycle and Modal Visibility Decoupling", () => {
+    const correctResult: PollResponseResult = {
+      responseId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      status: "evaluated",
+      evaluation: {
+        outcome: "correct",
+        feedback: "Excellent understanding.",
+      },
+      newConfidence: 0.85,
+      newBand: "green",
+    };
+
+    const wrongResult: PollResponseResult = {
+      responseId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      status: "evaluated",
+      evaluation: {
+        outcome: "wrong",
+        feedback: "Needs more work.",
+      },
+      newConfidence: 0.25,
+      newBand: "red",
+    };
+
+    const partialResult: PollResponseResult = {
+      responseId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      status: "evaluated",
+      evaluation: {
+        outcome: "partial",
+        feedback: "Almost there.",
+      },
+      newConfidence: 0.55,
+      newBand: "yellow",
+    };
+
+    it("evaluates null/idle poll paths to calm (no active concepts) or think (with active concepts)", () => {
+      // Null poll
+      expect(deriveStudentSparkMood(null, false)).toBe("calm");
+      expect(deriveStudentSparkMood(null, true)).toBe("think");
+
+      // Idle poll
+      const state = createStudentLectureState(baseSnapshot, KNOWN_CONCEPTS);
+      expect(deriveStudentSparkMood(state.poll, false)).toBe("calm");
+      expect(deriveStudentSparkMood(state.poll, true)).toBe("think");
+    });
+
+    it("maps open modal outcomes to cheer/oops/think and releases on dismiss", () => {
+      let state = createStudentLectureState(baseSnapshot, KNOWN_CONCEPTS);
+
+      // 1. Activate poll -> modal opens
+      state = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:new-question",
+          payload: {
+            eventId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee1",
+            occurredAt: "2026-10-24T10:06:00.000Z",
+            pollId: POLL_1_ID,
+            lectureId: LECTURE_ID,
+            conceptId: CONCEPT_A,
+            question: activePublicPoll.question,
+            status: "active",
+            activatedAt: "2026-10-24T10:06:00.000Z",
+          },
+        },
+        KNOWN_CONCEPTS
+      );
+      expect(state.poll.isOpen).toBe(true);
+
+      // Submitting -> think
+      state = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:submit-start",
+          pollId: POLL_1_ID,
+          answer: "My correct answer",
+        },
+        KNOWN_CONCEPTS
+      );
+      expect(deriveStudentSparkMood(state.poll, false)).toBe("think");
+
+      // Correct success -> cheer while open
+      const correctState = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:submit-success",
+          pollId: POLL_1_ID,
+          result: correctResult,
+        },
+        KNOWN_CONCEPTS
+      );
+      expect(correctState.poll.isOpen).toBe(true);
+      expect(deriveStudentSparkMood(correctState.poll, false)).toBe("cheer");
+
+      // Wrong success -> oops while open
+      const wrongState = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:submit-success",
+          pollId: POLL_1_ID,
+          result: wrongResult,
+        },
+        KNOWN_CONCEPTS
+      );
+      expect(wrongState.poll.isOpen).toBe(true);
+      expect(deriveStudentSparkMood(wrongState.poll, false)).toBe("oops");
+
+      // Partial success -> think while open
+      const partialState = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:submit-success",
+          pollId: POLL_1_ID,
+          result: partialResult,
+        },
+        KNOWN_CONCEPTS
+      );
+      expect(partialState.poll.isOpen).toBe(true);
+      expect(deriveStudentSparkMood(partialState.poll, false)).toBe("think");
+
+      // Dismiss ("Continue lecture") -> modal closes, result retained, mood resumes lecture activity
+      const dismissedState = reduceStudentLectureState(
+        correctState,
+        {
+          type: "poll:dismiss",
+          pollId: POLL_1_ID,
+        },
+        KNOWN_CONCEPTS
+      );
+      expect(dismissedState.poll.isOpen).toBe(false);
+      expect(dismissedState.poll.submission.status).toBe("evaluated");
+      expect(deriveStudentSparkMood(dismissedState.poll, true)).toBe("think");
+      expect(deriveStudentSparkMood(dismissedState.poll, false)).toBe("calm");
+    });
+
+    it("handles poll:closed during submission followed by late success without relatching rail mood", () => {
+      let state = createStudentLectureState(baseSnapshot, KNOWN_CONCEPTS);
+
+      // Activate poll
+      state = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:new-question",
+          payload: {
+            eventId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee2",
+            occurredAt: "2026-10-24T10:06:00.000Z",
+            pollId: POLL_1_ID,
+            lectureId: LECTURE_ID,
+            conceptId: CONCEPT_A,
+            question: activePublicPoll.question,
+            status: "active",
+            activatedAt: "2026-10-24T10:06:00.000Z",
+          },
+        },
+        KNOWN_CONCEPTS
+      );
+
+      // Start submitting
+      state = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:submit-start",
+          pollId: POLL_1_ID,
+          answer: "Late answering",
+        },
+        KNOWN_CONCEPTS
+      );
+
+      // Teacher closes poll while submitting
+      state = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:closed",
+          payload: {
+            eventId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee3",
+            occurredAt: "2026-10-24T10:08:00.000Z",
+            lectureId: LECTURE_ID,
+            pollId: POLL_1_ID,
+            status: "closed",
+            closedAt: "2026-10-24T10:08:00.000Z",
+          },
+        },
+        KNOWN_CONCEPTS
+      );
+      expect(state.poll.isOpen).toBe(false);
+      expect(state.poll.isActive).toBe(false);
+
+      // Late success arrives
+      state = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:submit-success",
+          pollId: POLL_1_ID,
+          result: correctResult,
+        },
+        KNOWN_CONCEPTS
+      );
+      // Result is preserved for private evaluation card
+      expect(state.poll.submission.status).toBe("evaluated");
+      // Modal remains closed
+      expect(state.poll.isOpen).toBe(false);
+      // Rail mood remains lecture-driven, not latched to cheer
+      expect(deriveStudentSparkMood(state.poll, true)).toBe("think");
+      expect(deriveStudentSparkMood(state.poll, false)).toBe("calm");
+    });
+
+    it("handles lecture:ended during submission followed by late success without relatching rail mood", () => {
+      let state = createStudentLectureState(baseSnapshot, KNOWN_CONCEPTS);
+
+      // Activate poll
+      state = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:new-question",
+          payload: {
+            eventId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee4",
+            occurredAt: "2026-10-24T10:06:00.000Z",
+            pollId: POLL_1_ID,
+            lectureId: LECTURE_ID,
+            conceptId: CONCEPT_A,
+            question: activePublicPoll.question,
+            status: "active",
+            activatedAt: "2026-10-24T10:06:00.000Z",
+          },
+        },
+        KNOWN_CONCEPTS
+      );
+
+      // Start submitting
+      state = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:submit-start",
+          pollId: POLL_1_ID,
+          answer: "Late answering before lecture ends",
+        },
+        KNOWN_CONCEPTS
+      );
+
+      // Lecture ends
+      state = reduceStudentLectureState(
+        state,
+        {
+          type: "lecture:ended",
+          payload: {
+            eventId: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeee5",
+            occurredAt: "2026-10-24T10:15:00.000Z",
+            lectureId: LECTURE_ID,
+            endedAt: "2026-10-24T10:15:00.000Z",
+          },
+        },
+        KNOWN_CONCEPTS
+      );
+      expect(state.poll.isOpen).toBe(false);
+
+      // Late success arrives
+      state = reduceStudentLectureState(
+        state,
+        {
+          type: "poll:submit-success",
+          pollId: POLL_1_ID,
+          result: wrongResult,
+        },
+        KNOWN_CONCEPTS
+      );
+      // Result is preserved
+      expect(state.poll.submission.status).toBe("evaluated");
+      expect(state.poll.isOpen).toBe(false);
+      // Rail mood is calm (no active concepts) or think (active concepts), never latched to oops
+      expect(deriveStudentSparkMood(state.poll, false)).toBe("calm");
+      expect(deriveStudentSparkMood(state.poll, true)).toBe("think");
     });
   });
 });
