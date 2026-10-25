@@ -296,4 +296,98 @@ export class SchedulerRepository {
 
     return mapRowToSchedulingMatch(result.data);
   }
+
+  async setMeetingResult(
+    previous: SchedulingMatch,
+    result:
+      | { meetingStatus: "created"; zoomMeetingId: string; zoomLink: string }
+      | { meetingStatus: "unavailable" }
+  ): Promise<SchedulingMatch | null> {
+    if (result.meetingStatus === "created") {
+      if (!result.zoomMeetingId?.trim() || !result.zoomLink?.trim()) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Created meeting result must include non-empty zoomMeetingId and zoomLink",
+        });
+      }
+    }
+
+    const updatePayload =
+      result.meetingStatus === "created"
+        ? {
+            meeting_status: "created",
+            zoom_meeting_id: result.zoomMeetingId,
+            zoom_link: result.zoomLink,
+          }
+        : {
+            meeting_status: "unavailable",
+            zoom_meeting_id: null,
+            zoom_link: null,
+          };
+
+    let query = this.client
+      .from("study_group_matches")
+      .update(updatePayload)
+      .eq("id", previous.id)
+      .eq("course_id", previous.courseId)
+      .eq("student1_id", previous.student1Id)
+      .eq("student2_id", previous.student2Id)
+      .eq("status", "active")
+      .eq("scheduling_status", "accepted")
+      .eq("student1_accepted", true)
+      .eq("student2_accepted", true)
+      .eq("meeting_status", previous.meetingStatus);
+
+    if (previous.proposedSlot === null) {
+      query = query.is("proposed_start", null).is("proposed_end", null);
+    } else {
+      query = query
+        .eq("proposed_start", previous.proposedSlot.startsAt)
+        .eq("proposed_end", previous.proposedSlot.endsAt);
+    }
+
+    if (previous.zoomMeetingId === null) {
+      query = query.is("zoom_meeting_id", null);
+    } else {
+      query = query.eq("zoom_meeting_id", previous.zoomMeetingId);
+    }
+
+    if (previous.zoomLink === null) {
+      query = query.is("zoom_link", null);
+    } else {
+      query = query.eq("zoom_link", previous.zoomLink);
+    }
+
+    let res;
+    try {
+      res = await query.select(MATCH_SELECT_COLUMNS).maybeSingle();
+    } catch (err) {
+      throw new AppError({
+        code: "SERVICE_UNAVAILABLE",
+        statusCode: 503,
+        message: "Failed to update study group match meeting status",
+        cause: err,
+      });
+    }
+
+    if (res.error) {
+      throw mapPostgrestError(res.error, "Database error updating study group match meeting status");
+    }
+
+    if (!res.data) {
+      return null;
+    }
+
+    const match = mapRowToSchedulingMatch(res.data);
+    if (result.meetingStatus === "created" && (!match.zoomMeetingId || !match.zoomLink)) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Persisted match is inconsistent with created meeting result",
+      });
+    }
+
+    return match;
+  }
 }

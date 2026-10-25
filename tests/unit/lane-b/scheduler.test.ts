@@ -6,6 +6,8 @@ import type {
   UUID,
 } from "../../../src/contracts/common.js";
 import type { RealtimePublisher, StudyGroupUpdatedEvent } from "../../../src/contracts/realtime.js";
+import { AppError } from "../../../src/contracts/errors.js";
+import type { ZoomMeetingService } from "../../../src/server/zoom/index.js";
 import {
   MessagingRepository,
   SchedulerRepository,
@@ -120,6 +122,7 @@ describe("P6-B-03: Availability Scheduler Unit Tests", () => {
     availability?: Record<string, unknown>[];
     dbError?: boolean;
     clockTime?: string;
+    meetings?: Pick<ZoomMeetingService, "createForCourse">;
   }
 
   function setupTestHarness(options: HarnessOptions = {}) {
@@ -168,10 +171,17 @@ describe("P6-B-03: Availability Scheduler Unit Tests", () => {
     };
     const clock = new TestClock(options.clockTime ?? "2026-10-24T12:00:00.000Z");
     const ids = new TestIdGenerator();
+    const meetings = options.meetings ?? {
+      createForCourse: vi.fn(async () => ({
+        meetingId: "9876543210",
+        joinUrl: "https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123",
+      })),
+    };
 
     const scheduler = new Scheduler({
       membership,
       repository,
+      meetings,
       publisher,
       clock,
       ids,
@@ -181,6 +191,7 @@ describe("P6-B-03: Availability Scheduler Unit Tests", () => {
       fixtureDb,
       membership,
       repository,
+      meetings,
       publisher,
       publishedEvents,
       clock,
@@ -619,6 +630,9 @@ describe("P6-B-03: Availability Scheduler Unit Tests", () => {
           proposed_end: validSlot.endsAt,
           student1_accepted: true,
           student2_accepted: true,
+          meeting_status: "created",
+          zoom_meeting_id: "9876543210",
+          zoom_link: "https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123",
         },
       });
 
@@ -651,23 +665,142 @@ describe("P6-B-03: Availability Scheduler Unit Tests", () => {
       expect(match?.student2Accepted).toBe(false);
     });
 
-    it("returns existing Zoom fields on acceptance when present without fabricating them", async () => {
-      const { scheduler } = setupTestHarness({
+    it("creates meeting on bilateral consent, persists it before broadcast, and reuses on duplicate acceptance", async () => {
+      const { scheduler, repository, meetings, publishedEvents } = setupTestHarness({
         matchOverrides: {
           scheduling_status: "proposed",
           proposed_start: validSlot.startsAt,
           proposed_end: validSlot.endsAt,
           student1_accepted: true,
           student2_accepted: false,
-          zoom_meeting_id: "zoom-123456",
-          zoom_link: "https://zoom.us/j/123456",
+          meeting_status: "pending",
+          zoom_meeting_id: null,
+          zoom_link: null,
         },
       });
 
       const res = await scheduler.acceptSchedule(actorStudent2, matchId1, validSlot);
       expect(res.bothAccepted).toBe(true);
-      expect(res.zoomMeetingId).toBe("zoom-123456");
-      expect(res.zoomLink).toBe("https://zoom.us/j/123456");
+      expect(res.zoomMeetingId).toBe("9876543210");
+      expect(res.zoomLink).toBe("https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123");
+
+      expect(meetings.createForCourse).toHaveBeenCalledTimes(1);
+      expect(meetings.createForCourse).toHaveBeenCalledWith(
+        actorStudent2,
+        courseId1,
+        "Peer Study Session",
+        validSlot.startsAt,
+        30
+      );
+
+      // Verified from repository
+      const updatedMatch = await repository.getMatch(courseId1, matchId1);
+      expect(updatedMatch?.schedulingStatus).toBe("accepted");
+      expect(updatedMatch?.meetingStatus).toBe("created");
+      expect(updatedMatch?.zoomMeetingId).toBe("9876543210");
+      expect(updatedMatch?.zoomLink).toBe("https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123");
+
+      // Verified event published with created meeting status and link
+      expect(publishedEvents.length).toBe(1);
+      const eventPayload = publishedEvents[0]!.payload as StudyGroupUpdatedEvent;
+      expect(eventPayload.schedulingStatus).toBe("accepted");
+      expect(eventPayload.meetingStatus).toBe("created");
+      expect(eventPayload.zoomLink).toBe("https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123");
+
+      // Repeated acceptance from Student 1 reuses existing meeting without calling Zoom
+      const resDup = await scheduler.acceptSchedule(actorStudent1, matchId1, validSlot);
+      expect(resDup.bothAccepted).toBe(true);
+      expect(resDup.zoomMeetingId).toBe("9876543210");
+      expect(resDup.zoomLink).toBe("https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123");
+      expect(meetings.createForCourse).toHaveBeenCalledTimes(1);
+    });
+
+    it("handles provider failure during bilateral consent by persisting unavailable, emitting event, and propagating error", async () => {
+      const failingMeetings = {
+        createForCourse: vi.fn(async () => {
+          throw new AppError({
+            code: "SERVICE_UNAVAILABLE",
+            statusCode: 503,
+            message: "Zoom credentials are not configured",
+          });
+        }),
+      };
+
+      const { scheduler, repository, publishedEvents } = setupTestHarness({
+        meetings: failingMeetings,
+        matchOverrides: {
+          scheduling_status: "proposed",
+          proposed_start: validSlot.startsAt,
+          proposed_end: validSlot.endsAt,
+          student1_accepted: true,
+          student2_accepted: false,
+          meeting_status: "pending",
+          zoom_meeting_id: null,
+          zoom_link: null,
+        },
+      });
+
+      await expect(
+        scheduler.acceptSchedule(actorStudent2, matchId1, validSlot)
+      ).rejects.toThrowError(
+        expect.objectContaining({
+          code: "SERVICE_UNAVAILABLE",
+          statusCode: 503,
+          message: "Zoom credentials are not configured",
+        })
+      );
+
+      // Repository still records accepted consent, but meetingStatus is unavailable
+      const match = await repository.getMatch(courseId1, matchId1);
+      expect(match?.schedulingStatus).toBe("accepted");
+      expect(match?.student1Accepted).toBe(true);
+      expect(match?.student2Accepted).toBe(true);
+      expect(match?.meetingStatus).toBe("unavailable");
+      expect(match?.zoomMeetingId).toBeNull();
+      expect(match?.zoomLink).toBeNull();
+
+      // Event was emitted for unavailable status without a join link
+      expect(publishedEvents.length).toBe(1);
+      const eventPayload = publishedEvents[0]!.payload as StudyGroupUpdatedEvent;
+      expect(eventPayload.schedulingStatus).toBe("accepted");
+      expect(eventPayload.meetingStatus).toBe("unavailable");
+      expect(eventPayload.zoomLink).toBeUndefined();
+
+      // Subsequent accept calls throw 503 unavailable
+      await expect(
+        scheduler.acceptSchedule(actorStudent1, matchId1, validSlot)
+      ).rejects.toThrowError(
+        expect.objectContaining({
+          code: "SERVICE_UNAVAILABLE",
+          statusCode: 503,
+          message: "Zoom meeting is unavailable for this session",
+        })
+      );
+    });
+
+    it("throws 503 if attempting to accept an already accepted match whose meeting is still pending", async () => {
+      const { scheduler } = setupTestHarness({
+        matchOverrides: {
+          scheduling_status: "accepted",
+          proposed_start: validSlot.startsAt,
+          proposed_end: validSlot.endsAt,
+          student1_accepted: true,
+          student2_accepted: true,
+          meeting_status: "pending",
+          zoom_meeting_id: null,
+          zoom_link: null,
+        },
+      });
+
+      await expect(
+        scheduler.acceptSchedule(actorStudent1, matchId1, validSlot)
+      ).rejects.toThrowError(
+        expect.objectContaining({
+          code: "SERVICE_UNAVAILABLE",
+          statusCode: 503,
+          message: "Zoom meeting creation is incomplete",
+        })
+      );
     });
   });
 
@@ -991,7 +1124,7 @@ describe("P6-B-03: Availability Scheduler Unit Tests", () => {
     };
 
     it("rejects concurrent stale CAS update with 409 conflict, preserves winner's consent, and fresh retry succeeds", async () => {
-      const { scheduler, repository, membership, publisher, clock, ids } = setupTestHarness({
+      const { scheduler, repository, membership, meetings, publisher, clock, ids } = setupTestHarness({
         matchOverrides: {
           scheduling_status: "proposed",
           proposed_start: validSlot.startsAt,
@@ -1030,6 +1163,7 @@ describe("P6-B-03: Availability Scheduler Unit Tests", () => {
       const freshScheduler = new Scheduler({
         membership,
         repository,
+        meetings,
         publisher,
         clock,
         ids,
@@ -1157,6 +1291,12 @@ describe("P6-B-03: Availability Scheduler Unit Tests", () => {
       const scheduler = new Scheduler({
         membership,
         repository,
+        meetings: {
+          createForCourse: vi.fn(async () => ({
+            meetingId: "9876543210",
+            joinUrl: "https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123",
+          })),
+        },
         publisher,
         clock: new TestClock(),
         ids: new TestIdGenerator(),
