@@ -414,4 +414,10 @@ export class TranscriptRepository {
 
     return allChunks;
   }
+
+  async getTranscriptChunks(
+    lectureId: UUID
+  ): Promise<{ text: string; timestampSec: number }[]> {
+    return this.getLectureTranscript(lectureId);
+  }
 }

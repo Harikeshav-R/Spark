@@ -716,5 +716,15 @@ describe("TranscriptRepository Unit Tests", () => {
         statusCode: 500,
       });
     });
+
+    it("provides getTranscriptChunks alias delegating to getLectureTranscript", async () => {
+      const mockClient = { from: vi.fn() } as unknown as TranscriptDatabaseClientPort;
+      const repo = new TranscriptRepository(mockClient);
+      const spy = vi.spyOn(repo, "getLectureTranscript").mockResolvedValue([{ text: "test", timestampSec: 0 }]);
+
+      const result = await repo.getTranscriptChunks(lectureId);
+      expect(spy).toHaveBeenCalledWith(lectureId);
+      expect(result).toEqual([{ text: "test", timestampSec: 0 }]);
+    });
   });
 });
