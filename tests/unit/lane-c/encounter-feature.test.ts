@@ -11,9 +11,7 @@ import {
   FIXTURE_ENCOUNTER_RESULT,
 } from "../../fixtures/game.fixture";
 
-interface SparkWindow {
-  __spark_token?: string;
-}
+import { setRuntimeSession } from "@/lib/client/session";
 
 const mockFetch = vi.fn();
 
@@ -45,7 +43,10 @@ describe("P5-C-07 EncounterFeature Component", () => {
     root = createRoot(container);
     global.fetch = mockFetch;
     mockFetch.mockReset();
-    (window as unknown as SparkWindow).__spark_token = "mock-token-p5c07";
+    setRuntimeSession({
+      accessToken: "mock-token-p5c07",
+      expiresAt: Math.floor(Date.now() / 1000) + 3600,
+    });
   });
 
   afterEach(async () => {
@@ -53,7 +54,7 @@ describe("P5-C-07 EncounterFeature Component", () => {
       root.unmount();
     });
     container.remove();
-    delete (window as unknown as SparkWindow).__spark_token;
+    setRuntimeSession(null);
     vi.restoreAllMocks();
   });
 

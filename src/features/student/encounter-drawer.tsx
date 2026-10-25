@@ -12,6 +12,8 @@ export interface EncounterDrawerProps {
   encounter: EncounterDTO | null;
   conceptLabel?: string;
   loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
   onCompleted?: (result: EncounterResultDTO) => void;
 }
 
@@ -29,6 +31,8 @@ export function EncounterDrawer({
   encounter,
   conceptLabel,
   loading = false,
+  error = null,
+  onRetry,
   onCompleted,
 }: EncounterDrawerProps): React.JSX.Element | null {
   const handleKeyDown = useCallback(
@@ -100,6 +104,17 @@ export function EncounterDrawer({
             <p className="text-sm font-medium text-[var(--color-fg-muted,#5f5b54)]">
               Preparing practice encounter questions…
             </p>
+          </div>
+        ) : error ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-3" data-testid="encounter-drawer-error">
+            <p className="text-sm font-medium text-[var(--color-error,#c53b27)]">
+              {error}
+            </p>
+            {onRetry && (
+              <Button variant="outline" size="sm" onClick={onRetry}>
+                Retry Encounter
+              </Button>
+            )}
           </div>
         ) : encounter ? (
           <div className="flex-1">

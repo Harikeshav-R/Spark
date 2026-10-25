@@ -1,6 +1,7 @@
 import React from "react";
 import { AppShell } from "@/components/ui/app-shell";
 import { TeacherLectureDashboard } from "@/features/professor/teacher-lecture-dashboard";
+import { CourseEntry } from "@/features/courses/course-entry";
 import { uuidSchema } from "@/contracts/common";
 
 export default async function ProfessorDashboardPage({
@@ -26,15 +27,16 @@ export default async function ProfessorDashboardPage({
       >
         <div
           role="status"
-          className="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-panel)] p-6 text-[var(--color-fg-default)]"
+          className="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-panel)] p-6 text-[var(--color-fg-default)] mb-6"
         >
           <p className="font-medium text-[var(--color-fg-default)] mb-2">
             Select a course to start or resume a lecture.
           </p>
           <p className="text-sm text-[var(--color-fg-muted)]">
-            Pass a valid course identifier in the URL query parameters (e.g. <code>?courseId=&lt;id&gt;</code>) to access lecture controls.
+            Choose an existing course below or create a new one to access lecture controls.
           </p>
         </div>
+        <CourseEntry role="teacher" />
       </AppShell>
     );
   }

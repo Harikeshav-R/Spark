@@ -441,4 +441,169 @@ export class CourseRepository {
       message: "Unrecognized actor role",
     });
   }
+
+  async listCourses(actor: ActorContext): Promise<Course[]> {
+    if (actor.role === "student") {
+      if (!actor.enrolledCourses || actor.enrolledCourses.length === 0) {
+        return [];
+      }
+
+      const verifiedCourses: Course[] = [];
+      for (const enrollment of actor.enrolledCourses) {
+        let studentCheck;
+        try {
+          studentCheck = await this.client
+            .from("students")
+            .select("id")
+            .eq("id", enrollment.studentId)
+            .eq("auth_id", actor.authId)
+            .eq("course_id", enrollment.courseId)
+            .maybeSingle();
+        } catch (err) {
+          throw new AppError({
+            code: "INTERNAL_SERVER_ERROR",
+            statusCode: 500,
+            message: "Failed to verify student enrollment",
+            cause: err,
+          });
+        }
+
+        if (studentCheck.error) {
+          throw new AppError({
+            code: "INTERNAL_SERVER_ERROR",
+            statusCode: 500,
+            message: "Database error verifying student enrollment",
+            cause: studentCheck.error,
+          });
+        }
+
+        if (!studentCheck.data) {
+          continue;
+        }
+
+        let courseResult;
+        try {
+          courseResult = await this.client
+            .from("courses")
+            .select(
+              "id,teacher_id,name,description,join_code,pdf_cache_hash,created_at",
+            )
+            .eq("id", enrollment.courseId)
+            .maybeSingle();
+        } catch (err) {
+          throw new AppError({
+            code: "INTERNAL_SERVER_ERROR",
+            statusCode: 500,
+            message: "Failed to retrieve course",
+            cause: err,
+          });
+        }
+
+        if (courseResult.error) {
+          throw new AppError({
+            code: "INTERNAL_SERVER_ERROR",
+            statusCode: 500,
+            message: "Database error retrieving course",
+            cause: courseResult.error,
+          });
+        }
+
+        if (!courseResult.data) {
+          continue;
+        }
+
+        const parsed = courseRowSchema.parse(courseResult.data);
+        verifiedCourses.push(mapCourseRow(parsed));
+      }
+
+      return verifiedCourses;
+    }
+
+    if (actor.role === "teacher") {
+      if (!actor.teacherId) {
+        throw new AppError({
+          code: "FORBIDDEN",
+          statusCode: 403,
+          message: "Teacher context missing teacher ID",
+        });
+      }
+
+      let teacherAuthCheck;
+      try {
+        teacherAuthCheck = await this.client
+          .from("teachers")
+          .select("id")
+          .eq("id", actor.teacherId)
+          .eq("auth_id", actor.authId)
+          .maybeSingle();
+      } catch (err) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Failed to verify teacher authorization",
+          cause: err,
+        });
+      }
+
+      if (teacherAuthCheck.error) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database error verifying teacher authorization",
+          cause: teacherAuthCheck.error,
+        });
+      }
+
+      if (!teacherAuthCheck.data) {
+        throw new AppError({
+          code: "FORBIDDEN",
+          statusCode: 403,
+          message: "Teacher authorization record not found",
+        });
+      }
+
+      let coursesResult;
+      try {
+        coursesResult = await (this.client
+          .from("courses")
+          .select(
+            "id,teacher_id,name,description,join_code,pdf_cache_hash,created_at",
+          ) as unknown as { eq(col: string, val: string): Promise<{ data: unknown; error: unknown }> })
+          .eq("teacher_id", actor.teacherId);
+      } catch (err) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Failed to retrieve courses for teacher",
+          cause: err,
+        });
+      }
+
+      if (coursesResult.error) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database error retrieving courses for teacher",
+          cause: coursesResult.error,
+        });
+      }
+
+      if (!Array.isArray(coursesResult.data)) {
+        return [];
+      }
+
+      const rows: Course[] = [];
+      for (const raw of coursesResult.data) {
+        const parsed = courseRowSchema.parse(raw);
+        rows.push(mapCourseRow(parsed));
+      }
+      return rows;
+    }
+
+    throw new AppError({
+      code: "FORBIDDEN",
+      statusCode: 403,
+      message: "Unrecognized actor role",
+    });
+  }
 }

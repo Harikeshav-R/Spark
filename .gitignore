@@ -26,3 +26,4 @@ blob-report/
 .superpowers/
 __pycache__/
 *.pyc
+.codebase-memory/

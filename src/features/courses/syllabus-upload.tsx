@@ -22,7 +22,8 @@ import { GraphPreview, type GraphPreviewConcept } from "./graph-preview";
 import type { UUID } from "@/contracts/common";
 import { syllabusUploadPreviewResponseSchema } from "@/contracts/course";
 import { apiErrorSchema } from "@/contracts/errors";
-
+import { getAccessToken } from "@/lib/client/session";
+import { requestJson, ClientApiError } from "@/lib/client/http";
 export type UploadState =
   | "idle"
   | "uploading"
@@ -159,6 +160,13 @@ export function SyllabusUpload({ courseId }: SyllabusUploadProps): React.JSX.Ele
 
     setState("uploading");
     try {
+      const token = await getAccessToken();
+      if (!token) {
+        setErrorMessage("Authentication required to upload syllabus.");
+        setState("error");
+        return;
+      }
+
       const formData = new FormData();
       formData.append("syllabus", file);
 
@@ -166,6 +174,9 @@ export function SyllabusUpload({ courseId }: SyllabusUploadProps): React.JSX.Ele
         `/api/courses/${encodeURIComponent(courseId)}/upload`,
         {
           method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           body: formData,
         }
       );
@@ -244,45 +255,46 @@ export function SyllabusUpload({ courseId }: SyllabusUploadProps): React.JSX.Ele
     if (!previewData) return;
     setState("committing");
     try {
-      const res = await fetch(
+      const token = await getAccessToken();
+      if (!token) {
+        setErrorMessage("Authentication required to commit knowledge graph.");
+        setState("error");
+        return;
+      }
+
+      const result = await requestJson(
         `/api/courses/${encodeURIComponent(courseId)}/graph`,
+        graphCommitResponseSchema,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+          body: {
             concepts: previewData.concepts,
             edges: previewData.edges,
-          }),
+          },
+          getAccessToken: async () => token,
         }
       );
 
-      if (!res.ok) {
-        const errorMsg = await readApiErrorMessage(res, "commit");
-        setErrorMessage(errorMsg);
-        setState("error");
-        return;
-      }
-
-      const data: unknown = await res.json();
-      const parsed = graphCommitResponseSchema.safeParse(data);
-      if (!parsed.success) {
-        setErrorMessage("Invalid server response");
-        setState("error");
-        return;
-      }
-
       setCommittedResult({
-        nodeCount: parsed.data.nodeCount,
-        edgeCount: parsed.data.edgeCount,
+        nodeCount: result.nodeCount,
+        edgeCount: result.edgeCount,
       });
       setState("committed");
     } catch (err: unknown) {
       console.error("[SyllabusUpload] Commit failed", err);
-      setErrorMessage(
-        err instanceof Error
-          ? err.message
-          : "An unexpected error occurred. Please try again."
-      );
+      let errorMsg = "An unexpected error occurred. Please try again.";
+      if (err instanceof ClientApiError) {
+        if (err.status === 409 || err.status === 422 || err.status === 413) {
+          errorMsg = getErrorMessage(err.status, {
+            error: { code: err.code, message: err.message },
+          });
+        } else {
+          errorMsg = "Invalid server response";
+        }
+      } else if (err instanceof Error) {
+        errorMsg = err.message;
+      }
+      setErrorMessage(errorMsg);
       setState("error");
     }
   };

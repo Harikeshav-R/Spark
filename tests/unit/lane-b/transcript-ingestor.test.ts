@@ -152,6 +152,9 @@ describe("TranscriptIngestor Unit Tests", () => {
       },
       ids: mockIds,
       clock: mockClock,
+      operations: {
+        runExclusive: async (_id, fn) => fn(),
+      },
     };
 
     const ingestor = new TranscriptIngestor(deps);

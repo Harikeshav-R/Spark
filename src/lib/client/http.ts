@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { apiErrorSchema, DomainErrorCode } from "@/contracts/errors";
-
+import { getAccessToken } from "./session";
 export class ClientApiError extends Error {
   readonly status: number;
   readonly code: string;
@@ -21,17 +21,11 @@ export interface RequestJsonOptions {
 }
 
 /**
- * Reads the runtime client access token from window.__spark_token.
- * Returns null in non-browser environments or when the token is missing/empty.
+ * Reads the runtime client access token from the session manager.
+ * Delegates to getAccessToken() in session.ts.
  */
 export async function getRuntimeAccessToken(): Promise<string | null> {
-  if (typeof window !== "undefined") {
-    const candidate = (window as unknown as Record<string, unknown>)["__spark_token"];
-    if (typeof candidate === "string" && candidate.length > 0) {
-      return candidate;
-    }
-  }
-  return null;
+  return getAccessToken();
 }
 
 /**

@@ -2,11 +2,15 @@ import React from "react";
 import { notFound } from "next/navigation";
 import { uuidSchema } from "@/contracts/common";
 import { AppShell } from "@/components/ui/app-shell";
-import { LectureSummariesView } from "@/features/student/lecture-summaries-view";
+import {
+  LectureSummariesView,
+  type LectureSummaryItem,
+} from "@/features/student/lecture-summaries-view";
 
 export interface StudentSummariesPageProps {
   params: Promise<{ studentId: string }>;
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
+  initialSummaries?: LectureSummaryItem[] | null;
 }
 
 export default async function StudentSummariesPage(
@@ -52,6 +56,7 @@ export default async function StudentSummariesPage(
       <LectureSummariesView
         studentId={parsedStudentId.data}
         courseId={courseId}
+        initialSummaries={props.initialSummaries}
       />
     </AppShell>
   );

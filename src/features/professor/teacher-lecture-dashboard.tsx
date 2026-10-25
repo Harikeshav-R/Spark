@@ -22,7 +22,7 @@ import {
   type ConceptDetectedEvent,
 } from "@/contracts/realtime";
 import { AppShell } from "@/components/ui/app-shell";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SignInPrompt } from "@/features/auth/sign-in-prompt";
 import { requestJson, ClientApiError, getRuntimeAccessToken } from "@/lib/client/http";
@@ -32,6 +32,7 @@ import { TranscriptFeed } from "./transcript-feed";
 import { mergeTranscriptChunks } from "./teacher-lecture-state";
 import { useTeacherPolls } from "./use-teacher-polls";
 import { PollPanel } from "./poll-panel";
+import { InterventionsPanel } from "./interventions-panel";
 import { ClassHeatmap } from "./class-heatmap";
 import { ClassSky } from "./class-sky";
 import { cn } from "@/lib/client/utils";
@@ -73,6 +74,16 @@ export function TeacherLectureDashboard({
   const [activeTab, setActiveTab] = useState<"live" | "class-sky">("live");
   const liveTabRef = useRef<HTMLButtonElement>(null);
   const classSkyTabRef = useRef<HTMLButtonElement>(null);
+
+  // Speech source state
+  const [speechPending, setSpeechPending] = useState(false);
+  const [speechError, setSpeechError] = useState<string | null>(null);
+
+  // Summary recovery state for completed lecture
+  const [summaryState, setSummaryState] = useState<"loading" | "available" | "not_found" | "error">("loading");
+  const [summaryData, setSummaryData] = useState<{ summary: string } | null>(null);
+  const [summaryPending, setSummaryPending] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const handleClassSkyAuthError = useCallback((status: 401 | 403) => {
     if (status === 401) {
@@ -534,6 +545,100 @@ export function TeacherLectureDashboard({
     }
   };
 
+  const handleStartSpeech = useCallback(async () => {
+    if (!lecture || lecture.status !== "live") return;
+    setSpeechPending(true);
+    setSpeechError(null);
+    try {
+      await requestJson(
+        `/api/lectures/${encodeURIComponent(lecture.id)}/speech`,
+        z.object({ started: z.literal(true), source: z.string() }),
+        {
+          method: "POST",
+          body: {},
+          getAccessToken: getEffectiveToken,
+        }
+      );
+    } catch (err: unknown) {
+      setSpeechError(
+        err instanceof ClientApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to start speech stream."
+      );
+    } finally {
+      setSpeechPending(false);
+    }
+  }, [getEffectiveToken, lecture]);
+
+  const loadSummary = useCallback(
+    async (lectureId: UUID) => {
+      setSummaryState("loading");
+      setSummaryError(null);
+      try {
+        const res = await requestJson(
+          `/api/lectures/${encodeURIComponent(lectureId)}/summary`,
+          z.object({ summary: z.string() }).passthrough(),
+          { getAccessToken: getEffectiveToken }
+        );
+        setSummaryData({ summary: res.summary });
+        setSummaryState("available");
+      } catch (err: unknown) {
+        if (err instanceof ClientApiError && err.status === 404) {
+          setSummaryState("not_found");
+        } else {
+          setSummaryState("error");
+          setSummaryError(
+            err instanceof ClientApiError
+              ? err.message
+              : err instanceof Error
+                ? err.message
+                : "Failed to load summary."
+          );
+        }
+      }
+    },
+    [getEffectiveToken]
+  );
+
+  useEffect(() => {
+    if (lecture && lecture.status === "completed") {
+      void loadSummary(lecture.id);
+    } else {
+      setSummaryState("loading");
+      setSummaryData(null);
+      setSummaryError(null);
+    }
+  }, [lecture?.id, lecture?.status, loadSummary]);
+
+  const handleRetrySummary = useCallback(async () => {
+    if (!lecture) return;
+    setSummaryPending(true);
+    setSummaryError(null);
+    try {
+      await requestJson(
+        `/api/lectures/${encodeURIComponent(lecture.id)}/end`,
+        lectureSessionSchema,
+        {
+          method: "POST",
+          getAccessToken: getEffectiveToken,
+        }
+      );
+      await loadSummary(lecture.id);
+    } catch (err: unknown) {
+      setSummaryError(
+        err instanceof ClientApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to recover lecture summary."
+      );
+    } finally {
+      setSummaryPending(false);
+    }
+  }, [getEffectiveToken, lecture, loadSummary]);
+
   // Render branches
   if (authChecking) {
     return (
@@ -756,7 +861,64 @@ export function TeacherLectureDashboard({
           error={dashboardError}
           onStart={handleStartLecture}
           onEnd={handleEndLecture}
+          onStartSpeech={lecture?.status === "live" ? handleStartSpeech : undefined}
+          speechPending={speechPending}
+          speechError={speechError}
         />
+
+        {/* Completed Lecture Summary Recovery */}
+        {lecture && lecture.status === "completed" && (
+          <Card data-testid="completed-summary-recovery" className="w-full">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3">
+              <div>
+                <CardTitle as="h3">Lecture Summary</CardTitle>
+                <CardDescription>
+                  Chronological summary and concept takeaways generated for this completed lecture session.
+                </CardDescription>
+              </div>
+              {summaryState === "not_found" && (
+                <Button
+                  size="sm"
+                  onClick={() => void handleRetrySummary()}
+                  disabled={summaryPending}
+                  isLoading={summaryPending}
+                >
+                  {summaryPending ? "Retrying summary…" : "Retry lecture summary"}
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {summaryState === "loading" && (
+                <p className="text-sm text-[var(--color-fg-muted)]">Checking lecture summary…</p>
+              )}
+              {summaryState === "not_found" && (
+                <div className="space-y-2">
+                  <p className="text-sm text-[var(--color-border-danger,#b0384a)] font-medium">
+                    Summary unavailable
+                  </p>
+                  <p className="text-xs text-[var(--color-fg-muted)]">
+                    The initial summary generation may have encountered a transient provider error. Click &ldquo;Retry lecture summary&rdquo; to re-trigger generation.
+                  </p>
+                </div>
+              )}
+              {summaryError && (
+                <div
+                  role="alert"
+                  className="p-3 text-sm rounded bg-[var(--color-bg-danger-soft,#f8e0e3)] text-[var(--color-border-danger,#b0384a)] border border-[var(--color-border-danger,#b0384a)]"
+                >
+                  {summaryError}
+                </div>
+              )}
+              {summaryState === "available" && summaryData && (
+                <div className="space-y-2 text-sm">
+                  <p className="text-[var(--color-fg-default)] whitespace-pre-line leading-relaxed">
+                    {summaryData.summary}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Transcript Timeline Feed & Formative Polls Side-by-Side on Desktop */}
         {lecture && (
@@ -767,11 +929,19 @@ export function TeacherLectureDashboard({
               isSimulated={isSimulated}
               lectureStatus={lecture.status}
             />
-            <PollPanel
-              isLive={lecture.status === "live"}
-              concepts={courseConcepts}
-              hook={teacherPolls}
-            />
+            <div className="space-y-6">
+              <PollPanel
+                isLive={lecture.status === "live"}
+                concepts={courseConcepts}
+                hook={teacherPolls}
+              />
+              {lecture.status === "live" && (
+                <InterventionsPanel
+                  lectureId={lecture.id}
+                  getAccessToken={getEffectiveToken}
+                />
+              )}
+            </div>
           </div>
         )}
 

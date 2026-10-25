@@ -60,3 +60,18 @@ export {
   EncounterService,
   type EncounterServiceDependencies,
 } from "./encounter-service.js";
+
+export {
+  createLearningRouter,
+  type LearningRouterDependencies,
+} from "./learning-router.js";
+
+export {
+  createTutoringRouter,
+  type TutoringRouterDependencies,
+} from "./tutoring-router.js";
+
+export {
+  createEncounterRouter,
+  type EncounterRouterDependencies,
+} from "./encounter-router.js";

@@ -603,7 +603,7 @@ export class EncounterService {
       level > 3
     ) {
       throw new AppError({
-        code: DomainErrorCode.VALIDATION_ERROR,
+        code: "INVALID_HINT_LEVEL",
         statusCode: 400,
         message: "Invalid hint level; must be 1, 2, or 3",
       });
@@ -638,7 +638,7 @@ export class EncounterService {
 
       if (encounter.status !== "active") {
         throw new AppError({
-          code: DomainErrorCode.CONFLICT,
+          code: "ENCOUNTER_ALREADY_SUBMITTED",
           statusCode: 409,
           message: "Encounter already submitted or inactive",
         });
@@ -650,7 +650,7 @@ export class EncounterService {
       );
       if (existingAttempt !== null) {
         throw new AppError({
-          code: DomainErrorCode.CONFLICT,
+          code: "ENCOUNTER_ALREADY_SUBMITTED",
           statusCode: 409,
           message: "Encounter already submitted",
         });
@@ -670,7 +670,7 @@ export class EncounterService {
 
       if (requestedLevel > currentHints + 1) {
         throw new AppError({
-          code: DomainErrorCode.CONFLICT,
+          code: "HINT_OUT_OF_SEQUENCE",
           statusCode: 409,
           message: `Hint level out of sequence: cannot request level ${requestedLevel} when current is ${currentHints}`,
         });
@@ -845,7 +845,7 @@ export class EncounterService {
 
       if (!answersMatch) {
         throw new AppError({
-          code: DomainErrorCode.CONFLICT,
+          code: "ENCOUNTER_ALREADY_SUBMITTED",
           statusCode: 409,
           message: "Encounter has already been submitted with different answers",
         });

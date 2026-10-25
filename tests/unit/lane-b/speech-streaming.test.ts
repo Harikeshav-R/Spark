@@ -150,6 +150,9 @@ describe("P3-B-04: Lecture Simulator & Zoom RTMS Streaming Adapter", () => {
         now: () => new Date(),
         nowISO: () => "2026-10-22T14:05:00.000Z",
       },
+      operations: {
+        runExclusive: async <T>(_id: UUID, fn: () => Promise<T>): Promise<T> => fn(),
+      },
     };
 
     const ingestor = new TranscriptIngestor(deps);

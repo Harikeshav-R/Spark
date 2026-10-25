@@ -42,14 +42,29 @@ export function GameSummaryPill({
       </div>
     );
   }
+  if (!summary) {
+    return (
+      <div
+        role="region"
+        aria-label="Student progression unavailable"
+        className={cn(
+          "inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium",
+          "border border-[var(--color-border-default,#e6d8bd)] bg-[var(--color-panel,#fffdf8)] text-[var(--color-fg-muted,#5f5b54)]",
+          className
+        )}
+        data-testid="game-summary-pill"
+      >
+        Progression unavailable
+      </div>
+    );
+  }
 
-  const xp = summary?.xp ?? 0;
-  const streakDays = summary?.streakDays ?? 0;
-  const skyBrightness = summary?.skyBrightness ?? 0;
-  const form = summary?.form ?? "spark";
+  const xp = summary.xp;
+  const streakDays = summary.streakDays;
+  const skyBrightness = summary.skyBrightness;
+  const form = summary.form;
   const formLabel = SPARK_FORM_LABELS[form] ?? "Spark";
   const skyPercentage = Math.round(skyBrightness * 100);
-
   return (
     <div
       role="region"

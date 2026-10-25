@@ -52,6 +52,9 @@ export interface LectureControlsProps {
   error: string | null;
   onStart: (title: string) => void;
   onEnd: () => void;
+  onStartSpeech?: () => void;
+  speechPending?: boolean;
+  speechError?: string | null;
 }
 
 export function LectureControls({
@@ -60,6 +63,9 @@ export function LectureControls({
   error,
   onStart,
   onEnd,
+  onStartSpeech,
+  speechPending = false,
+  speechError = null,
 }: LectureControlsProps): React.JSX.Element {
   const [titleInput, setTitleInput] = useState("");
   const [confirmingEnd, setConfirmingEnd] = useState(false);
@@ -158,7 +164,17 @@ export function LectureControls({
         </div>
 
         {isLive && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {onStartSpeech && (
+              <Button
+                variant="outline"
+                onClick={onStartSpeech}
+                disabled={speechPending}
+                isLoading={speechPending}
+              >
+                {speechPending ? "Starting transcript…" : "Start transcript source"}
+              </Button>
+            )}
             {!confirmingEnd ? (
               <Button
                 variant="destructive"
@@ -195,14 +211,24 @@ export function LectureControls({
         )}
       </CardHeader>
 
-      {error && (
-        <CardContent className="pt-0">
-          <div
-            role="alert"
-            className="rounded-md border border-[var(--color-border-danger,#b0384a)] bg-[var(--color-bg-danger-soft,#f8e0e3)] p-3 text-sm text-[var(--color-fg-default)]"
-          >
-            {error}
-          </div>
+      {(error || speechError) && (
+        <CardContent className="pt-0 space-y-2">
+          {error && (
+            <div
+              role="alert"
+              className="rounded-md border border-[var(--color-border-danger,#b0384a)] bg-[var(--color-bg-danger-soft,#f8e0e3)] p-3 text-sm text-[var(--color-fg-default)]"
+            >
+              {error}
+            </div>
+          )}
+          {speechError && (
+            <div
+              role="alert"
+              className="rounded-md border border-[var(--color-border-danger,#b0384a)] bg-[var(--color-bg-danger-soft,#f8e0e3)] p-3 text-sm text-[var(--color-fg-default)]"
+            >
+              {speechError}
+            </div>
+          )}
         </CardContent>
       )}
     </Card>

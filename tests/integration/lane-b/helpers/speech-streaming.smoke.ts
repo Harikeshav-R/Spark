@@ -6,6 +6,7 @@ import { createAuthGateway } from "../../../../src/server/platform/index.js";
 import { createRoomAuthorizer } from "../../../../src/server/realtime/room-authorizer.js";
 import { createSocketServer } from "../../../../src/server/realtime/index.js";
 import {
+  LectureOperationCoordinator,
   LectureRepository,
   TranscriptRepository,
   TranscriptIngestor,
@@ -93,6 +94,7 @@ async function runSmoke(): Promise<void> {
         now: () => new Date(),
         nowISO: () => new Date().toISOString(),
       },
+      operations: new LectureOperationCoordinator(),
     });
 
     // 1. Connect student socket to receive broadcasts

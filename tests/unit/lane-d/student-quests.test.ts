@@ -78,7 +78,7 @@ describe("P5-D-03: Student Quests, Eclipse, Mascot Shell Mounting & Encounter In
       expect(html).toContain("Loading stats…");
     });
 
-    it("renders fallback default values cleanly when summary is null and loading is false", () => {
+    it("renders progression unavailable state when summary is null and loading is false", () => {
       const html = renderToString(
         React.createElement(GameSummaryPill, {
           summary: null,
@@ -86,10 +86,8 @@ describe("P5-D-03: Student Quests, Eclipse, Mascot Shell Mounting & Encounter In
         })
       );
 
-      expect(html).toContain("0 XP");
-      expect(html).toContain("0 days");
-      expect(html).toContain("0% sky");
-      expect(html).toContain("Spark");
+      expect(html).toContain("Progression unavailable");
+      expect(html).not.toContain("0 XP");
     });
 
     it("displays live updated XP and form when updated summary prop is provided", () => {

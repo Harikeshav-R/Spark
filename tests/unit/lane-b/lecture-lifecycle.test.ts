@@ -76,6 +76,12 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
       summarize: vi.fn(async () => {
         callOrder.push("summarize");
       }),
+      operations: {
+        runExclusive: async (_id, fn) => fn(),
+      },
+      stopSpeech: vi.fn(async () => {
+        callOrder.push("stopSpeech");
+      }),
     };
   }
 
@@ -193,11 +199,12 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
       expect(completion.summarize).toHaveBeenCalledWith(teacherActor, lectureId);
       expect(completion.callOrder).toEqual([
         "authorizeRoom",
+        "stopSpeech",
         "emitToLecture",
         "summarize",
       ]);
     });
-    it("Ending already-completed lecture returns 409 CONFLICT", async () => {
+    it("Ending already-completed lecture recovers summary and returns completed session without duplicate end event", async () => {
       const completedLecture: LectureSession = {
         id: lectureId,
         courseId,
@@ -213,17 +220,15 @@ describe("P1-B-01: Lecture Session Lifecycle & State Machine", () => {
         updateLectureStatus: vi.fn(),
       };
 
-      const service = new LectureService(mockRepo, mockIds, mockClock, createCompletionFixture());
+      const completion = createCompletionFixture();
+      const service = new LectureService(mockRepo, mockIds, mockClock, completion);
 
-      await expect(
-        service.endLecture(teacherActor, lectureId),
-      ).rejects.toMatchObject({
-        code: "CONFLICT",
-        statusCode: 409,
-        message: "Lecture session is already completed",
-      });
+      const result = await service.endLecture(teacherActor, lectureId);
 
+      expect(result).toEqual(completedLecture);
       expect(mockRepo.updateLectureStatus).not.toHaveBeenCalled();
+      expect(completion.publisher.emitToLecture).not.toHaveBeenCalled();
+      expect(completion.summarize).toHaveBeenCalledWith(teacherActor, lectureId);
     });
 
     it("Student cannot start lecture (403 FORBIDDEN)", async () => {

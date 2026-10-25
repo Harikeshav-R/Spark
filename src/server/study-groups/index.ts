@@ -35,3 +35,13 @@ export {
   Scheduler,
   type SchedulerDependencies,
 } from "./scheduler.js";
+
+export {
+  AvailabilityService,
+  type AvailabilityServiceDependencies,
+} from "./availability-service.js";
+
+export {
+  createStudyGroupRouter,
+  type StudyGroupRouterDependencies,
+} from "./study-group-router.js";

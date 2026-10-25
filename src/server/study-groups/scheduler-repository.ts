@@ -140,11 +140,18 @@ function mapRowToSchedulingMatch(rawRow: unknown): SchedulingMatch {
   };
 }
 
-export class SchedulerRepository {
-  private readonly client: Pick<SupabaseClient, "from">;
+export type SchedulerDatabaseClientPort = Pick<SupabaseClient, "from"> & {
+  rpc?: (
+    fn: string,
+    args?: Record<string, unknown>
+  ) => Promise<{ data: unknown; error: unknown }>;
+};
 
-  constructor(client: Pick<SupabaseClient, "from">) {
-    this.client = client;
+export class SchedulerRepository {
+  private readonly client: SchedulerDatabaseClientPort;
+
+  constructor(client: SchedulerDatabaseClientPort | SupabaseClient) {
+    this.client = client as SchedulerDatabaseClientPort;
   }
 
   async getMatch(courseId: UUID, matchId: UUID): Promise<SchedulingMatch | null> {
@@ -237,6 +244,44 @@ export class SchedulerRepository {
     }
 
     return intervals;
+  }
+
+  async replaceAvailability(
+    actorAuthId: UUID,
+    studentId: UUID,
+    courseId: UUID,
+    intervals: Array<{ start: string; end: string }>
+  ): Promise<void> {
+    if (!this.client.rpc) {
+      throw new AppError({
+        code: "SERVICE_UNAVAILABLE",
+        statusCode: 503,
+        message: "Database client does not support RPC",
+      });
+    }
+    try {
+      const result = await this.client.rpc("replace_student_availability", {
+        p_actor_auth_id: actorAuthId,
+        p_student_id: studentId,
+        p_course_id: courseId,
+        p_intervals: intervals,
+      });
+
+      if (result.error) {
+        throw mapPostgrestError(
+          result.error,
+          "Database error updating student availability"
+        );
+      }
+    } catch (err: unknown) {
+      if (err instanceof AppError) throw err;
+      throw new AppError({
+        code: "SERVICE_UNAVAILABLE",
+        statusCode: 503,
+        message: "Failed to update student availability",
+        cause: err,
+      });
+    }
   }
 
   async compareAndSet(

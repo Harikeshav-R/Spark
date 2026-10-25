@@ -3,18 +3,29 @@ import http from "node:http";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import express from "express";
 import type { Express, Request, Response } from "express";
-import type { Clock, IdGenerator } from "../src/contracts/common.js";
+import type { Clock, IdGenerator, UUID } from "../src/contracts/common.js";
 import next from "next";
 import {
+  CheckUnderstandingAi,
   DetectConceptsAi,
   EvaluatePollAi,
+  ExtractGraphAi,
+  GenerateLearningPageAi,
   GeneratePollAi,
+  GenerateQuizAi,
+  GenerateQuizHintsAi,
   OpenRouterClient,
+  ResourceQaAi,
+  SearchResourcesAi,
+  SocraticTutorAi,
+  SuggestInterventionsAi,
   SummarizeLectureAi,
 } from "../src/server/ai/index.js";
 import {
+  LectureOperationCoordinator,
   LectureRepository,
   LectureService,
+  LectureSpeechService,
   PollRepository,
   PollService,
   TeacherPollService,
@@ -24,39 +35,76 @@ import {
   createLectureSummaryRouter,
   createPollRouter,
   createTranscriptRouter,
+  readSpeechSourceConfig,
 } from "../src/server/classroom/index.js";
 import {
   AttendanceEvidenceService,
+  ConceptContextRepository,
   CourseRepository,
   CourseService,
   CryptoIdGenerator,
+  EnrollmentRepository,
+  EnrollmentService,
   GraphRepository,
   HeatmapService,
+  LearningEvidenceService,
   MasteryRepository,
   MasteryService,
   PollEvidenceService,
   createCourseEffortRouter,
+  createCourseRouter,
   createGraphRouter,
   createHeatmapRouter,
+  createSyllabusRouter,
   CourseEffortService,
   GameRepository,
   ConcreteGameService,
   createGameRouter,
+  SyllabusIngestionService,
 } from "../src/server/core/index.js";
 import {
+  EncounterRepository,
+  EncounterService,
+  LearningPageRepository,
+  LearningPageService,
   LectureSummaryRepository,
   LectureSummaryService,
+  QuizRepository,
+  QuizService,
+  TutoringRepository,
+  TutoringService,
+  createEncounterRouter,
+  createLearningRouter,
+  createTutoringRouter,
 } from "../src/server/learning/index.js";
 import {
   type AuthGateway,
   createAuthGateway,
+  createAuthRouter,
   createSupabaseClients,
+  apiErrorHandler,
 } from "../src/server/platform/index.js";
 import {
   type RealtimeSocketServer,
   createRoomAuthorizer,
   createSocketServer,
 } from "../src/server/realtime/index.js";
+import {
+  AvailabilityService,
+  MatchRepository,
+  MessagingRepository,
+  MessagingService,
+  PoolRepository,
+  Scheduler,
+  SchedulerRepository,
+  StudyGroupService,
+  createStudyGroupRouter,
+} from "../src/server/study-groups/index.js";
+import {
+  ZoomMeetingService,
+  ZoomOAuth,
+  createZoomRouter,
+} from "../src/server/zoom/index.js";
 
 export interface ServerDependencies {
   auth: Pick<AuthGateway, "verifyToken">;
@@ -65,12 +113,15 @@ export interface ServerDependencies {
   clock: Clock;
   ids: Pick<IdGenerator, "generateId">;
   origin?: string;
+  env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
+  sessionClientFactory?: () => Pick<SupabaseClient, "auth">;
 }
 
 export interface ServerInstance {
   app: Express;
   httpServer: http.Server;
   io: RealtimeSocketServer;
+  dispose: () => Promise<void>;
 }
 
 export function createServer(dependencies: ServerDependencies): ServerInstance {
@@ -105,6 +156,39 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
   const courses = new CourseService(
     courseRepository,
     new CryptoIdGenerator()
+  );
+  const enrollment = new EnrollmentService(
+    new EnrollmentRepository(dependencies.databaseClient)
+  );
+
+  app.use(
+    createAuthRouter({
+      auth: dependencies.auth,
+      courses,
+      env: dependencies.env,
+      sessionClientFactory: dependencies.sessionClientFactory,
+    })
+  );
+
+  app.use(
+    createCourseRouter({
+      auth: dependencies.auth,
+      courses,
+      enrollment,
+    })
+  );
+
+  const syllabusIngestion = new SyllabusIngestionService(
+    dependencies.databaseClient,
+    courses,
+    new ExtractGraphAi(dependencies.aiClient)
+  );
+  app.use(
+    createSyllabusRouter({
+      auth: dependencies.auth,
+      courses,
+      syllabusIngestion,
+    })
   );
   const heatmap = new HeatmapService({
     client: dependencies.databaseClient,
@@ -167,6 +251,99 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       game: gameService,
     })
   );
+
+  const learningEvidence = new LearningEvidenceService(
+    dependencies.databaseClient,
+    courses,
+    mastery
+  );
+  const learningPageRepository = new LearningPageRepository(dependencies.databaseClient);
+  const quizRepository = new QuizRepository(dependencies.databaseClient);
+  const tutoringRepository = new TutoringRepository(dependencies.databaseClient);
+  const encounterRepository = new EncounterRepository(dependencies.databaseClient);
+  const conceptContext = new ConceptContextRepository(dependencies.databaseClient, courses);
+
+  const generateQuizAi = new GenerateQuizAi(dependencies.aiClient);
+  const generateQuizHintsAi = new GenerateQuizHintsAi(dependencies.aiClient);
+  const generateLearningPageAi = new GenerateLearningPageAi(dependencies.aiClient);
+  const searchResourcesAi = new SearchResourcesAi(dependencies.aiClient);
+  const resourceQaAi = new ResourceQaAi(dependencies.aiClient);
+
+  const createQuizService = (courseId: UUID) => {
+    return new QuizService({
+      courseId,
+      topology: graphRepository,
+      repository: quizRepository,
+      ai: generateQuizAi,
+      evidence: learningEvidence,
+    });
+  };
+
+  const createLearningPageService = (courseId: UUID) => {
+    return new LearningPageService({
+      courseId,
+      topology: graphRepository,
+      repository: learningPageRepository,
+      ai: generateLearningPageAi,
+    });
+  };
+
+  const tutoringService = new TutoringService({
+    repository: tutoringRepository,
+    ai: new SocraticTutorAi(dependencies.aiClient),
+    understandingChecker: new CheckUnderstandingAi(dependencies.aiClient),
+    mastery,
+    ids: new CryptoIdGenerator(),
+    clock: dependencies.clock,
+  });
+
+  const createEncounterService = (courseId: UUID) => {
+    return new EncounterService({
+      courseId,
+      topology: graphRepository,
+      quizzes: createQuizService(courseId),
+      questions: quizRepository,
+      hints: generateQuizHintsAi,
+      repository: encounterRepository,
+      evidence: learningEvidence,
+      game: gameService,
+      gameRepository,
+      mastery,
+      clock: dependencies.clock,
+      ids: new CryptoIdGenerator(),
+    });
+  };
+
+  app.use(
+    createLearningRouter({
+      auth: dependencies.auth,
+      conceptContext,
+      createLearningPageService,
+      createQuizService,
+      searchResourcesAi,
+      resourceQaAi,
+    })
+  );
+
+  app.use(
+    createTutoringRouter({
+      auth: dependencies.auth,
+      conceptContext,
+      tutoringService,
+      tutoringRepository,
+    })
+  );
+
+  app.use(
+    createEncounterRouter({
+      auth: dependencies.auth,
+      conceptContext,
+      encounterRepository,
+      createEncounterService,
+    })
+  );
+  const coordinator = new LectureOperationCoordinator();
+
   const attendance = new AttendanceEvidenceService(
     dependencies.databaseClient,
     courses,
@@ -182,12 +359,22 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     publisher,
     ids: dependencies.ids,
     clock: dependencies.clock,
+    operations: coordinator,
   });
   app.use(
     createTranscriptRouter({
       auth: dependencies.auth,
       classroom: transcriptIngestor,
     })
+  );
+  const speechConfig = readSpeechSourceConfig(dependencies.env ?? process.env);
+  const speech = new LectureSpeechService(
+    {
+      classroom: transcriptIngestor,
+      lectures: lectureRepository,
+      rooms,
+    },
+    speechConfig
   );
 
   const summaryRepository = new LectureSummaryRepository(
@@ -220,6 +407,10 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       publisher,
       summarize: async (actor, lectureId) => {
         await summaryService.generateForLecture(actor, lectureId);
+      },
+      operations: coordinator,
+      stopSpeech: async (lectureId) => {
+        await speech.stop(lectureId);
       },
     }
   );
@@ -259,6 +450,8 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     ids: dependencies.ids,
   });
 
+  const interventionsAi = new SuggestInterventionsAi(dependencies.aiClient);
+
   app.use(
     createLectureRouter({
       auth: dependencies.auth,
@@ -268,6 +461,9 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       polls: pollRepository,
       transcripts: transcriptRepository,
       rooms,
+      speech,
+      interventionsAi,
+      pollRepository,
     })
   );
 
@@ -279,8 +475,86 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       pollRepo: pollRepository,
     })
   );
+  const env = dependencies.env ?? process.env;
 
-  return { app, httpServer, io };
+  const zoomOAuth = new ZoomOAuth({
+    client: dependencies.databaseClient,
+    env,
+    clock: dependencies.clock,
+  });
+
+  const zoomMeetingService = new ZoomMeetingService({
+    oauth: zoomOAuth,
+    courses,
+    env,
+    clock: dependencies.clock,
+    webhookSecret: env.ZOOM_SECRET_TOKEN,
+  });
+
+  app.use(
+    createZoomRouter({
+      auth: dependencies.auth,
+      oauth: zoomOAuth,
+      env,
+    })
+  );
+
+  const poolRepository = new PoolRepository(dependencies.databaseClient);
+  const matchRepository = new MatchRepository(dependencies.databaseClient);
+  const studyGroupService = new StudyGroupService({
+    courses,
+    pool: poolRepository,
+    matches: matchRepository,
+    publisher,
+    clock: dependencies.clock,
+    ids: new CryptoIdGenerator(),
+  });
+
+  const messagingRepository = new MessagingRepository(dependencies.databaseClient);
+  const messagingService = new MessagingService({
+    repository: messagingRepository,
+    publisher,
+    clock: dependencies.clock,
+    ids: new CryptoIdGenerator(),
+  });
+
+  const schedulerRepository = new SchedulerRepository(dependencies.databaseClient);
+  const scheduler = new Scheduler({
+    membership: messagingRepository,
+    repository: schedulerRepository,
+    meetings: zoomMeetingService,
+    publisher,
+    clock: dependencies.clock,
+    ids: new CryptoIdGenerator(),
+  });
+
+  const availabilityService = new AvailabilityService({
+    courses,
+    repository: schedulerRepository,
+  });
+
+  app.use(
+    createStudyGroupRouter({
+      auth: dependencies.auth,
+      studyGroups: studyGroupService,
+      messaging: messagingService,
+      membership: messagingRepository,
+      scheduler,
+      schedulerRepository,
+      availability: availabilityService,
+    })
+  );
+
+  app.use(apiErrorHandler);
+  const dispose = async (): Promise<void> => {
+    await speech.dispose();
+    io.close();
+    const { promise, resolve } = Promise.withResolvers<void>();
+    httpServer.close(() => resolve());
+    await promise;
+  };
+
+  return { app, httpServer, io, dispose };
 }
 
 export async function startServer(
@@ -304,6 +578,8 @@ export async function startServer(
     aiClient,
     clock,
     ids,
+    env: process.env,
+    sessionClientFactory: () => supabase.authClient,
   });
 
   // Attach Next.js custom server after Express API routers
@@ -333,13 +609,11 @@ export async function startServer(
     );
     resolve(instance);
   });
-  const shutdown = () => {
+  const shutdown = async () => {
     console.log("[server] Shutting down gracefully...");
-    instance.io.close();
-    instance.httpServer.close(() => {
-      console.log("[server] HTTP and WebSocket server closed.");
-      process.exit(0);
-    });
+    await instance.dispose();
+    console.log("[server] HTTP and WebSocket server closed.");
+    process.exit(0);
   };
 
   process.on("SIGTERM", shutdown);

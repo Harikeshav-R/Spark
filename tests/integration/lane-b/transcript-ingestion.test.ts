@@ -18,6 +18,7 @@ import {
 } from "../../../src/contracts/index.js";
 import { AppError, apiErrorSchema } from "../../../src/contracts/errors.js";
 import {
+  LectureOperationCoordinator,
   LectureRepository,
   TranscriptIngestor,
   TranscriptRepository,
@@ -202,6 +203,7 @@ describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)
       publisher,
       ids: new CryptoIdGenerator(),
       clock: testClock,
+      operations: new LectureOperationCoordinator(),
     });
 
     app.use(createTranscriptRouter({ auth: authGateway, classroom: ingestor }));
@@ -1242,6 +1244,7 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
         publisher,
         ids: new CryptoIdGenerator(),
         clock: testClock,
+        operations: new LectureOperationCoordinator(),
       });
 
       app.use(createTranscriptRouter({ auth: authGateway, classroom: ingestor }));

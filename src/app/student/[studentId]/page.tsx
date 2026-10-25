@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { uuidSchema } from "@/contracts/common";
 import { AppShell } from "@/components/ui/app-shell";
 import { StudentLectureView } from "@/features/student/student-lecture-view";
+import { CourseEntry } from "@/features/courses/course-entry";
 
 export interface StudentPageProps {
   params: Promise<{ studentId: string }>;
@@ -35,17 +36,7 @@ export default async function StudentPage(
           { label: "Student workspace", href: `/student/${parsedStudentId.data}` },
         ]}
       >
-        <div
-          role="status"
-          className="rounded-xl border border-[var(--color-border-default)] bg-[var(--color-bg-panel)] p-6 text-[var(--color-fg-default)]"
-        >
-          <p className="font-medium text-[var(--color-fg-default)] mb-2">
-            Select a course to view lectures and explore the knowledge graph.
-          </p>
-          <p className="text-sm text-[var(--color-fg-muted)]">
-            Pass a valid course identifier in the URL query parameters (e.g. <code>?courseId=&lt;id&gt;</code>) to access the lecture feed.
-          </p>
-        </div>
+        <CourseEntry role="student" studentId={parsedStudentId.data} />
       </AppShell>
     );
   }

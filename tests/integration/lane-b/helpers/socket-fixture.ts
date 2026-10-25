@@ -250,21 +250,27 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
             }
           }
         }
+        const insertedList: Record<string, unknown>[] = [];
         for (const item of itemsToInsert) {
           if (item && typeof item === "object") {
-            records.push(item as Record<string, unknown>);
+            const rec = { ...(item as Record<string, unknown>) };
+            if (tableName !== "transcript_concepts") {
+              if (!rec.id) rec.id = crypto.randomUUID();
+              if (!rec.created_at) rec.created_at = new Date().toISOString();
+            }
+            records.push(rec);
+            insertedList.push(rec);
           }
         }
 
         if (acceptHeader.includes("application/vnd.pgrst.object+json")) {
-          const singleItem = Array.isArray(bodyParsed) ? bodyParsed[0] : bodyParsed;
-          return new Response(JSON.stringify(singleItem ?? {}), {
+          return new Response(JSON.stringify(insertedList[0] ?? {}), {
             status: 201,
             headers: { "Content-Type": "application/json" },
           });
         }
 
-        return new Response(JSON.stringify(itemsToInsert), {
+        return new Response(JSON.stringify(insertedList), {
           status: 201,
           headers: { "Content-Type": "application/json" },
         });
