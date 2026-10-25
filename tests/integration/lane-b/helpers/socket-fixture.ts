@@ -289,7 +289,29 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
             if (key === "select" || key === "order" || key === "offset" || key === "limit") continue;
             if (val.startsWith("eq.")) {
               const target = val.slice(3);
-              if (String(r[key]) !== target) {
+              if (key === "proposed_start" || key === "proposed_end") {
+                const rVal = r[key];
+                if (rVal === null || rVal === undefined) {
+                  matches = false;
+                  break;
+                }
+                const rTime = new Date(String(rVal)).getTime();
+                const targetTime = new Date(target).getTime();
+                if (Number.isFinite(rTime) && Number.isFinite(targetTime)) {
+                  if (rTime !== targetTime) {
+                    matches = false;
+                    break;
+                  }
+                } else if (String(rVal) !== target) {
+                  matches = false;
+                  break;
+                }
+              } else if (String(r[key]) !== target) {
+                matches = false;
+                break;
+              }
+            } else if (val === "is.null") {
+              if (r[key] !== null && r[key] !== undefined) {
                 matches = false;
                 break;
               }
@@ -343,6 +365,8 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
         } else if (val.startsWith("in.(") && val.endsWith(")")) {
           const targets = val.slice(4, -1).split(",").map(decodeURIComponent);
           filtered = filtered.filter((r) => targets.includes(String(r[key])));
+        } else if (val === "is.null") {
+          filtered = filtered.filter((r) => r[key] === null || r[key] === undefined);
         }
       }
 
