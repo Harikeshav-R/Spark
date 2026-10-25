@@ -159,6 +159,102 @@ describe("TranscriptRepository Unit Tests", () => {
       expect(stored).toEqual(validChunk);
     });
 
+    it("persists and parses is_simulated: true correctly", async () => {
+      let insertedPayload: unknown;
+      const mockClient: TranscriptDatabaseClientPort = {
+        from: vi.fn().mockReturnValue({
+          insert: vi.fn().mockImplementation((payload: unknown) => {
+            insertedPayload = payload;
+            return {
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: chunkId,
+                    lecture_id: lectureId,
+                    text: "Today we discuss neural network optimization.",
+                    timestamp_sec: 12.5,
+                    speaker_name: "Dr. Smith",
+                    is_simulated: true,
+                    created_at: timestamp,
+                  },
+                  error: null,
+                }),
+              }),
+            };
+          }),
+        }),
+      };
+      const repo = new TranscriptRepository(mockClient);
+      const stored = await repo.insertChunk({ ...validChunk, isSimulated: true });
+
+      expect(insertedPayload).toMatchObject({ is_simulated: true });
+      expect(stored.isSimulated).toBe(true);
+    });
+
+    it("persists and parses is_simulated: false correctly", async () => {
+      let insertedPayload: unknown;
+      const mockClient: TranscriptDatabaseClientPort = {
+        from: vi.fn().mockReturnValue({
+          insert: vi.fn().mockImplementation((payload: unknown) => {
+            insertedPayload = payload;
+            return {
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: chunkId,
+                    lecture_id: lectureId,
+                    text: "Today we discuss neural network optimization.",
+                    timestamp_sec: 12.5,
+                    speaker_name: "Dr. Smith",
+                    is_simulated: false,
+                    created_at: timestamp,
+                  },
+                  error: null,
+                }),
+              }),
+            };
+          }),
+        }),
+      };
+      const repo = new TranscriptRepository(mockClient);
+      const stored = await repo.insertChunk({ ...validChunk, isSimulated: false });
+
+      expect(insertedPayload).toMatchObject({ is_simulated: false });
+      expect(stored.isSimulated).toBe(false);
+    });
+
+    it("persists null is_simulated and leaves isSimulated undefined for legacy rows", async () => {
+      let insertedPayload: unknown;
+      const mockClient: TranscriptDatabaseClientPort = {
+        from: vi.fn().mockReturnValue({
+          insert: vi.fn().mockImplementation((payload: unknown) => {
+            insertedPayload = payload;
+            return {
+              select: vi.fn().mockReturnValue({
+                single: vi.fn().mockResolvedValue({
+                  data: {
+                    id: chunkId,
+                    lecture_id: lectureId,
+                    text: "Today we discuss neural network optimization.",
+                    timestamp_sec: 12.5,
+                    speaker_name: "Dr. Smith",
+                    is_simulated: null,
+                    created_at: timestamp,
+                  },
+                  error: null,
+                }),
+              }),
+            };
+          }),
+        }),
+      };
+      const repo = new TranscriptRepository(mockClient);
+      const stored = await repo.insertChunk(validChunk);
+
+      expect(insertedPayload).toMatchObject({ is_simulated: null });
+      expect(stored.isSimulated).toBeUndefined();
+    });
+
     it("rejects invalid chunk payload with 400 VALIDATION_ERROR", async () => {
       const mockClient: TranscriptDatabaseClientPort = {
         from: vi.fn(),

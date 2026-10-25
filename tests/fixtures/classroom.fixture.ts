@@ -350,7 +350,8 @@ export class FakeClassroomService implements ClassroomService {
     lectureId: UUID,
     text: string,
     timestampSec: number,
-    speakerName?: string
+    speakerName?: string,
+    provenance?: { isSimulated: boolean }
   ): Promise<TranscriptChunk> {
     const lecture = this.lectures.get(lectureId);
     if (!lecture) {
@@ -385,6 +386,9 @@ export class FakeClassroomService implements ClassroomService {
       detectedConceptIds,
       createdAt,
     };
+    if (provenance?.isSimulated !== undefined) {
+      chunk.isSimulated = provenance.isSimulated;
+    }
 
     const existing = this.chunks.get(lectureId) ?? [];
     existing.push(chunk);
@@ -400,6 +404,9 @@ export class FakeClassroomService implements ClassroomService {
         timestampSec,
         speakerName,
       };
+      if (chunk.isSimulated !== undefined) {
+        chunkPayload.isSimulated = chunk.isSimulated;
+      }
       await this.publisher.emitToLecture(lectureId, "transcript:chunk", chunkPayload);
 
       const conceptPayload: ConceptDetectedEvent = {

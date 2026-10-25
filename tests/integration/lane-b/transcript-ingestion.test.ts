@@ -220,6 +220,11 @@ describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)
       conceptNodesTable,
       fixtureMastery,
       presence,
+      ingestor,
+      authGateway,
+      roomAuthorizer,
+      lectureRepository,
+      transcriptRepository,
     };
   }
   it("Teacher POSTs chunk to live lecture: returns 201, persists chunk & link, broadcasts events to enrolled student", async () => {
@@ -918,6 +923,73 @@ describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)
       expect(receivedAnyEvent).toBe(false);
     });
   });
+  describe("P3-B-04: Speech Provenance Ingestion & Broadcasting", () => {
+    it("ingestor attaches isSimulated true/false to persisted rows and broadcast events, and HTTP rejects forged provenance", async () => {
+      const { port, ingestor, authGateway, transcriptChunksTable } = await setupFixtureEnvironment();
+      const studentSocket = connectClient(port, FIXTURE_IDS.studentCourse1Only.token);
+      activeSockets.push(studentSocket);
+      await waitForConnect(studentSocket);
+
+      const joinAck = await emitWithAck(studentSocket, "lecture:join", {
+        lectureId: FIXTURE_IDS.teacher1.lectureId,
+      });
+      expect(joinAck).toEqual({ success: true });
+
+      const teacherActor = await authGateway.verifyToken(FIXTURE_IDS.teacher1.token);
+
+      // 1. Simulated chunk
+      const simChunkPromise = waitForEvent<TranscriptChunkEvent>(studentSocket, "transcript:chunk");
+      const simChunk = await ingestor.ingestTranscriptChunk(
+        teacherActor,
+        FIXTURE_IDS.teacher1.lectureId,
+        "Simulated gradient descent intro.",
+        1.0,
+        "CS229 simulator",
+        { isSimulated: true },
+      );
+      const simEvent = await simChunkPromise;
+
+      expect(simChunk.isSimulated).toBe(true);
+      expect(simEvent.isSimulated).toBe(true);
+      const persistedSim = transcriptChunksTable.find((c) => c.id === simChunk.id);
+      expect(persistedSim?.is_simulated).toBe(true);
+
+      // 2. Authentic Zoom chunk
+      const liveChunkPromise = waitForEvent<TranscriptChunkEvent>(studentSocket, "transcript:chunk");
+      const liveChunk = await ingestor.ingestTranscriptChunk(
+        teacherActor,
+        FIXTURE_IDS.teacher1.lectureId,
+        "Authentic Zoom spoken transcript.",
+        5.0,
+        "Prof. Chen",
+        { isSimulated: false },
+      );
+      const liveEvent = await liveChunkPromise;
+
+      expect(liveChunk.isSimulated).toBe(false);
+      expect(liveEvent.isSimulated).toBe(false);
+      const persistedLive = transcriptChunksTable.find((c) => c.id === liveChunk.id);
+      expect(persistedLive?.is_simulated).toBe(false);
+
+      // 3. HTTP reject client attempts to forge isSimulated
+      const forgedRes = await fetch(
+        `http://127.0.0.1:${port}/api/lectures/${FIXTURE_IDS.teacher1.lectureId}/transcript`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${FIXTURE_IDS.teacher1.token}`,
+          },
+          body: JSON.stringify({
+            text: "Forged HTTP chunk",
+            timestampSec: 10.0,
+            isSimulated: true,
+          }),
+        },
+      );
+      expect(forgedRes.status).toBe(400);
+    });
+  });
 });
 
 describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
@@ -1089,7 +1161,48 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
         .eq("id", body.chunkId);
       expect(chunkRows).toHaveLength(1);
       expect(chunkRows![0].text).toBe("Today we discuss gradient descent in real postgres.");
+      expect(chunkRows![0].is_simulated).toBeNull();
 
+      // Verify explicit is_simulated true/false roundtrip in real PostgreSQL
+      const simChunkId = randomUUID();
+      const simChunk = await transcriptRepo.insertChunk({
+        id: simChunkId,
+        lectureId,
+        text: "Simulated chunk in real PostgreSQL",
+        timestampSec: 20.0,
+        speakerName: "CS229 simulator",
+        detectedConceptIds: [],
+        isSimulated: true,
+        createdAt: new Date().toISOString(),
+      });
+      expect(simChunk.isSimulated).toBe(true);
+
+      const { data: realSimRows } = await harness.serviceClient
+        .from("transcript_chunks")
+        .select("is_simulated")
+        .eq("id", simChunkId);
+      expect(realSimRows![0].is_simulated).toBe(true);
+
+      const zoomChunkId = randomUUID();
+      const zoomChunk = await transcriptRepo.insertChunk({
+        id: zoomChunkId,
+        lectureId,
+        text: "Authentic Zoom chunk in real PostgreSQL",
+        timestampSec: 24.0,
+        speakerName: "Prof. Real",
+        detectedConceptIds: [],
+        isSimulated: false,
+        createdAt: new Date().toISOString(),
+      });
+      expect(zoomChunk.isSimulated).toBe(false);
+
+      const { data: realZoomRows } = await harness.serviceClient
+        .from("transcript_chunks")
+        .select("is_simulated")
+        .eq("id", zoomChunkId);
+      expect(realZoomRows![0].is_simulated).toBe(false);
+
+      await harness.serviceClient.from("transcript_chunks").delete().in("id", [simChunkId, zoomChunkId]);
       const { data: linkRows } = await harness.serviceClient
         .from("transcript_concepts")
         .select("*")

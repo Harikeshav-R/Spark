@@ -134,6 +134,21 @@ describe("P3-D-01: Teacher Live Lecture Controls & Streaming Transcript Feed", (
       const result = mergeTranscriptChunks([], [c1, c2, c3]);
       expect(result.map((c) => c.id)).toEqual([c2.id, c3.id, c1.id]);
     });
+
+    it("preserves isSimulated provenance when merging chunks", () => {
+      const simulatedChunk: TranscriptChunk = {
+        id: "chunk-simulated-1",
+        lectureId,
+        text: "Simulated gradient descent chunk",
+        timestampSec: 4,
+        detectedConceptIds: [],
+        isSimulated: true,
+        createdAt: "2026-10-22T10:00:04.000Z",
+      };
+
+      const result = mergeTranscriptChunks([], [simulatedChunk]);
+      expect(result[0]?.isSimulated).toBe(true);
+    });
   });
 
   describe("teacher-lecture-state: getElapsedSeconds & formatElapsedTimer", () => {

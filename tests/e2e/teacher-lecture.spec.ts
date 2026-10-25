@@ -123,11 +123,11 @@ test.describe("Lane D: Teacher Live Lecture Dashboard E2E (P3-D-01)", () => {
               timestampSec: 12,
               speakerName: "Prof. Chen",
               detectedConceptIds: [CONCEPT_ID_1, CONCEPT_ID_2],
+              isSimulated: true,
               createdAt: new Date().toISOString(),
             },
           ],
           activeConceptIds: [CONCEPT_ID_1, CONCEPT_ID_2],
-          isSimulated: true,
         }),
       });
     });

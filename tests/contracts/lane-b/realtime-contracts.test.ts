@@ -207,6 +207,26 @@ describe("Lane B: Classroom & Collaboration Contracts & Realtime Fixtures (P0-B-
       expect(transcriptChunkEventSchema.safeParse(invalidEmptyText).success).toBe(false);
     });
 
+    it("validates transcript:chunk events with explicit isSimulated provenance", () => {
+      const validBase = {
+        eventId: "66666666-6666-4666-8666-666666666610",
+        occurredAt: "2026-10-20T14:10:00.000Z",
+        chunkId: FIXTURE_CHUNK_ID,
+        lectureId: FIXTURE_LECTURE_ID,
+        text: "Gradient descent moves against the gradient vector.",
+        timestampSec: 124,
+      };
+
+      expect(transcriptChunkEventSchema.safeParse({ ...validBase, isSimulated: true }).success).toBe(true);
+      expect(transcriptChunkEventSchema.safeParse({ ...validBase, isSimulated: false }).success).toBe(true);
+      expect(transcriptChunkEventSchema.safeParse({ ...validBase, isSimulated: undefined }).success).toBe(true);
+      expect(transcriptChunkEventSchema.safeParse(validBase).success).toBe(true);
+
+      // Invalid types for isSimulated
+      expect(transcriptChunkEventSchema.safeParse({ ...validBase, isSimulated: "true" }).success).toBe(false);
+      expect(transcriptChunkEventSchema.safeParse({ ...validBase, isSimulated: 1 }).success).toBe(false);
+    });
+
     it("validates lecture:concept-detected events", () => {
       const valid = {
         eventId: "66666666-6666-4666-8666-666666666611",
