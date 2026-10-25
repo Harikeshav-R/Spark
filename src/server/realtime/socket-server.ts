@@ -9,11 +9,14 @@ import {
   lectureLeavePayloadSchema,
 } from "../../contracts/realtime.js";
 import type { AuthGateway } from "../platform/index.js";
+import type { LectureRepository } from "../classroom/index.js";
+import { PresenceTracker } from "./presence-tracker.js";
 import type { RoomAuthorizer } from "./room-authorizer.js";
 
 export interface SocketServerDependencies {
   auth: Pick<AuthGateway, "verifyToken">;
   rooms: RoomAuthorizer;
+  lectures: Pick<LectureRepository, "getLecture">;
   origin?: string;
 }
 
@@ -27,7 +30,11 @@ export type RealtimeSocketServer = SocketIOServer<
 export function createSocketServer(
   httpServer: HttpServer,
   dependencies: SocketServerDependencies
-): { io: RealtimeSocketServer; publisher: RealtimePublisher } {
+): {
+  io: RealtimeSocketServer;
+  publisher: RealtimePublisher;
+  presence: PresenceTracker;
+} {
   const allowedOrigin =
     dependencies.origin ?? process.env.APP_ORIGIN ?? "http://localhost:3000";
 
@@ -52,6 +59,13 @@ export function createSocketServer(
       io.to(`study-group:${matchId}`).emit(event, payload);
     },
   };
+  const presence = new PresenceTracker();
+  if (httpServer && typeof httpServer.on === "function") {
+    httpServer.on("close", () => {
+      presence.dispose();
+    });
+  }
+
 
   io.use(async (socket, next) => {
     const authInput: unknown = socket.handshake.auth;
@@ -102,6 +116,14 @@ export function createSocketServer(
 
   io.on("connection", async (socket) => {
     const actor = socket.data.actor;
+    const joinedLectures = new Map<UUID, UUID>();
+
+    socket.on("disconnect", () => {
+      for (const [lectureId, studentId] of joinedLectures.entries()) {
+        presence.disconnect(lectureId, studentId, socket.id);
+      }
+      joinedLectures.clear();
+    });
 
     if (actor.role === "student") {
       try {
@@ -165,7 +187,31 @@ export function createSocketServer(
             if (!socket.connected) {
               return;
             }
+            const lecture = await dependencies.lectures.getLecture(lectureId);
+            const enrollment = actor.enrolledCourses.find(
+              (e) => e.courseId === lecture.courseId
+            );
+            if (!enrollment) {
+              throw new AppError({
+                code: "FORBIDDEN",
+                statusCode: 403,
+                message: "Student is not enrolled in course for this lecture",
+              });
+            }
+            if (!socket.connected) {
+              return;
+            }
             await socket.join(`lecture:${lectureId}`);
+            if (!socket.connected) {
+              try {
+                await socket.leave(`lecture:${lectureId}`);
+              } catch {
+                // Ignore cleanup error if already disconnected
+              }
+              return;
+            }
+            presence.join(lectureId, enrollment.studentId, socket.id);
+            joinedLectures.set(lectureId, enrollment.studentId);
           }
           ack({ success: true });
         } catch (err) {
@@ -192,12 +238,28 @@ export function createSocketServer(
 
         const { lectureId } = parseResult.data;
 
-        await socket.leave(`lecture:${lectureId}`);
-        await socket.leave(`professor:${lectureId}`);
-        ack({ success: true });
+        const studentId = joinedLectures.get(lectureId);
+        if (studentId) {
+          joinedLectures.delete(lectureId);
+          presence.leave(lectureId, studentId, socket.id);
+        }
+
+        try {
+          await socket.leave(`lecture:${lectureId}`);
+          await socket.leave(`professor:${lectureId}`);
+          ack({ success: true });
+        } catch (err) {
+          console.error(`Failed to leave rooms for lecture ${lectureId}:`, err);
+          if (err instanceof AppError) {
+            ack({ success: false, error: err.code });
+          } else {
+            ack({ success: false, error: "INTERNAL_SERVER_ERROR" });
+          }
+          socket.disconnect(true);
+        }
       });
     });
   });
 
-  return { io, publisher };
+  return { io, publisher, presence };
 }

@@ -10,6 +10,7 @@ import { createSocketServer } from "../../../src/server/realtime/socket-server.j
 import { createRoomAuthorizer } from "../../../src/server/realtime/room-authorizer.js";
 import { createAuthGateway } from "../../../src/server/platform/index.js";
 import { createFixtureSupabaseClient } from "./helpers/socket-fixture.js";
+import { LectureRepository } from "../../../src/server/classroom/index.js";
 import http from "node:http";
 import { type AddressInfo } from "node:net";
 import { io as ioc } from "socket.io-client";
@@ -435,9 +436,11 @@ describe("P3-B-01: Authenticated Socket.IO Server & Room Authorization", () => {
       };
 
       const httpServer = http.createServer();
+      const lectures = new LectureRepository(supabase);
       const { io } = createSocketServer(httpServer, {
         auth,
         rooms: gatedAuthorizer,
+        lectures,
         origin: "*",
       });
 
@@ -550,6 +553,150 @@ describe("P3-B-01: Authenticated Socket.IO Server & Room Authorization", () => {
       await barrierPromise;
 
       expect(client2ReceivedMessage1).toBe(false);
+    });
+  });
+
+  describe("9. Presence and Multi-Tab Attendance Tracking", () => {
+    it("tracks presence across multiple tabs and retains presence when one tab disconnects", async () => {
+      harness = await createTestRealtimeHarness();
+
+      const tab1 = await harness.connectClient({
+        token: FIXTURE_IDS.studentCourse1Only.token,
+      });
+      await waitForConnect(tab1);
+
+      const tab2 = await harness.connectClient({
+        token: FIXTURE_IDS.studentCourse1Only.token,
+      });
+      await waitForConnect(tab2);
+
+      const lectureId = FIXTURE_IDS.teacher1.lectureId;
+      const studentId = FIXTURE_IDS.studentCourse1Only.studentIdCourse1;
+
+      const { promise: ack1Promise, resolve: resolveAck1 } = Promise.withResolvers<SocketAckResponse>();
+      tab1.emit("lecture:join", { lectureId }, (res: SocketAckResponse) => resolveAck1(res));
+      const ack1 = await ack1Promise;
+
+      const { promise: ack2Promise, resolve: resolveAck2 } = Promise.withResolvers<SocketAckResponse>();
+      tab2.emit("lecture:join", { lectureId }, (res: SocketAckResponse) => resolveAck2(res));
+      const ack2 = await ack2Promise;
+
+      expect(ack1.success).toBe(true);
+      expect(ack2.success).toBe(true);
+
+      expect(harness.presence.getAttendingStudentIds(lectureId)).toEqual([studentId]);
+
+      // Await server-side socket disconnect event directly
+      const serverTab1 = tab1.id ? harness.io.sockets.sockets.get(tab1.id) : undefined;
+      const { promise: serverDisconnectPromise, resolve: resolveDisconnect } = Promise.withResolvers<void>();
+      serverTab1?.on("disconnect", () => resolveDisconnect());
+
+      tab1.disconnect();
+      await serverDisconnectPromise;
+
+      // Attendance should still be retained because tab 2 is connected
+      expect(harness.presence.getAttendingStudentIds(lectureId)).toEqual([studentId]);
+    });
+
+    it("explicit leave on one tab retains presence; explicit leave on last tab removes presence immediately", async () => {
+      harness = await createTestRealtimeHarness();
+
+      const tab1 = await harness.connectClient({
+        token: FIXTURE_IDS.studentCourse1Only.token,
+      });
+      await waitForConnect(tab1);
+
+      const tab2 = await harness.connectClient({
+        token: FIXTURE_IDS.studentCourse1Only.token,
+      });
+      await waitForConnect(tab2);
+
+      const lectureId = FIXTURE_IDS.teacher1.lectureId;
+      const studentId = FIXTURE_IDS.studentCourse1Only.studentIdCourse1;
+
+      const { promise: join1, resolve: resolveJoin1 } = Promise.withResolvers<SocketAckResponse>();
+      tab1.emit("lecture:join", { lectureId }, (res: SocketAckResponse) => resolveJoin1(res));
+      await join1;
+
+      const { promise: join2, resolve: resolveJoin2 } = Promise.withResolvers<SocketAckResponse>();
+      tab2.emit("lecture:join", { lectureId }, (res: SocketAckResponse) => resolveJoin2(res));
+      await join2;
+
+      expect(harness.presence.getAttendingStudentIds(lectureId)).toEqual([studentId]);
+
+      // Explicit leave tab1
+      const { promise: leave1, resolve: resolveLeave1 } = Promise.withResolvers<SocketAckResponse>();
+      tab1.emit("lecture:leave", { lectureId }, (res: SocketAckResponse) => resolveLeave1(res));
+      const leaveAck1 = await leave1;
+      expect(leaveAck1.success).toBe(true);
+      expect(harness.presence.getAttendingStudentIds(lectureId)).toEqual([studentId]);
+
+      // Explicit leave tab2
+      const { promise: leave2, resolve: resolveLeave2 } = Promise.withResolvers<SocketAckResponse>();
+      tab2.emit("lecture:leave", { lectureId }, (res: SocketAckResponse) => resolveLeave2(res));
+      const leaveAck2 = await leave2;
+      expect(leaveAck2.success).toBe(true);
+
+      // Immediately removed without grace timer
+      expect(harness.presence.getAttendingStudentIds(lectureId)).toEqual([]);
+    });
+
+    it("teachers and unauthorized student joins never create student presence", async () => {
+      harness = await createTestRealtimeHarness();
+
+      const teacherClient = await harness.connectClient({
+        token: FIXTURE_IDS.teacher1.token,
+      });
+      await waitForConnect(teacherClient);
+
+      const lectureId = FIXTURE_IDS.teacher1.lectureId;
+
+      const { promise: teacherJoin, resolve: resolveTeacherJoin } = Promise.withResolvers<SocketAckResponse>();
+      teacherClient.emit("lecture:join", { lectureId }, (res: SocketAckResponse) => resolveTeacherJoin(res));
+      const teacherAck = await teacherJoin;
+      expect(teacherAck.success).toBe(true);
+      // Teacher should not be in student presence
+      expect(harness.presence.getAttendingStudentIds(lectureId)).toEqual([]);
+
+      // Student joins lecture they are not enrolled in
+      const unauthStudent = await harness.connectClient({
+        token: FIXTURE_IDS.studentCourse1Only.token,
+      });
+      await waitForConnect(unauthStudent);
+
+      const { promise: unauthJoin, resolve: resolveUnauthJoin } = Promise.withResolvers<SocketAckResponse>();
+      unauthStudent.emit("lecture:join", { lectureId: FIXTURE_IDS.teacher2.lectureId }, (res: SocketAckResponse) => resolveUnauthJoin(res));
+      const unauthAck = await unauthJoin;
+      expect(unauthAck.success).toBe(false);
+      expect(unauthAck.error).toBe("FORBIDDEN");
+      expect(harness.presence.getAttendingStudentIds(FIXTURE_IDS.teacher2.lectureId)).toEqual([]);
+    });
+
+    it("isolates dual-course student memberships to their respective course-specific student IDs", async () => {
+      harness = await createTestRealtimeHarness();
+
+      const client = await harness.connectClient({
+        token: FIXTURE_IDS.studentDual.token,
+      });
+      await waitForConnect(client);
+
+      const { promise: join1, resolve: resolveJoin1 } = Promise.withResolvers<SocketAckResponse>();
+      client.emit("lecture:join", { lectureId: FIXTURE_IDS.teacher1.lectureId }, (res: SocketAckResponse) => resolveJoin1(res));
+      const ack1 = await join1;
+
+      const { promise: join2, resolve: resolveJoin2 } = Promise.withResolvers<SocketAckResponse>();
+      client.emit("lecture:join", { lectureId: FIXTURE_IDS.teacher2.lectureId }, (res: SocketAckResponse) => resolveJoin2(res));
+      const ack2 = await join2;
+
+      expect(ack1.success).toBe(true);
+      expect(ack2.success).toBe(true);
+
+      expect(harness.presence.getAttendingStudentIds(FIXTURE_IDS.teacher1.lectureId)).toEqual([
+        FIXTURE_IDS.studentDual.studentIdCourse1,
+      ]);
+      expect(harness.presence.getAttendingStudentIds(FIXTURE_IDS.teacher2.lectureId)).toEqual([
+        FIXTURE_IDS.studentDual.studentIdCourse2,
+      ]);
     });
   });
 });

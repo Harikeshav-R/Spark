@@ -16,6 +16,7 @@ import {
   transcriptChunkEventSchema,
   transcriptIngestResponseSchema,
 } from "../../../src/contracts/index.js";
+import { AppError, apiErrorSchema } from "../../../src/contracts/errors.js";
 import {
   LectureRepository,
   TranscriptIngestor,
@@ -27,7 +28,16 @@ import { createAuthGateway } from "../../../src/server/platform/index.js";
 import {
   createRoomAuthorizer,
   createSocketServer,
+  type RealtimeSocketServer,
 } from "../../../src/server/realtime/index.js";
+import {
+  AttendanceEvidenceService,
+  CourseRepository,
+  CourseService,
+  MasteryRepository,
+  MasteryService,
+} from "../../../src/server/core/index.js";
+import { createFixtureAttendanceService } from "./helpers/attendance-fixture.js";
 import { FakeAiService } from "../../fixtures/ai.fixture.js";
 import {
   SupabaseTestHarness,
@@ -88,7 +98,7 @@ function waitForEvent<T = unknown>(
 describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)", () => {
   const activeSockets: ClientSocket[] = [];
   let httpServer: http.Server | null = null;
-  let ioServer: { close: () => void } | null = null;
+  let ioServer: RealtimeSocketServer | null = null;
 
   const conceptId1 = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
   const conceptId2 = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
@@ -119,8 +129,8 @@ describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)
     detectorOverride?: (chunkText: string, candidates: { id: string; label: string }[]) => Promise<string[]>;
     lectureSessions?: Record<string, unknown>[];
     onEmitHook?: (lectureId: string, event: string, payload: unknown) => Promise<void>;
+    attendanceOverride?: Pick<AttendanceEvidenceService, "recordChunkAttendance">;
   }
-
   async function setupFixtureEnvironment(options: SetupOptions = {}) {
     const transcriptChunksTable: Record<string, unknown>[] = [];
     const transcriptConceptsTable: Record<string, unknown>[] = [];
@@ -163,11 +173,15 @@ describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)
     const app = express();
     httpServer = http.createServer(app);
 
-    const { io, publisher: basePublisher } = createSocketServer(httpServer, {
+    const { io, publisher: basePublisher, presence } = createSocketServer(httpServer, {
       auth: authGateway,
       rooms: roomAuthorizer,
+      lectures: lectureRepository,
     });
     ioServer = io;
+
+    const { attendance: fixtureAttendance, mastery: fixtureMastery } =
+      createFixtureAttendanceService(fixtureSupabase);
 
     const publisher: RealtimePublisher = {
       ...basePublisher,
@@ -184,6 +198,8 @@ describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)
       transcripts: transcriptRepository,
       rooms: roomAuthorizer,
       ai: detector,
+      presence,
+      attendance: options.attendanceOverride ?? fixtureAttendance,
       publisher,
       ids: new CryptoIdGenerator(),
       clock: testClock,
@@ -202,9 +218,10 @@ describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)
       transcriptChunksTable,
       transcriptConceptsTable,
       conceptNodesTable,
+      fixtureMastery,
+      presence,
     };
   }
-
   it("Teacher POSTs chunk to live lecture: returns 201, persists chunk & link, broadcasts events to enrolled student", async () => {
     const { port, transcriptChunksTable, transcriptConceptsTable } = await setupFixtureEnvironment();
 
@@ -690,6 +707,217 @@ describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)
       expect(eventsReceived[0]!.lectureId).toBe(FIXTURE_IDS.teacher2.lectureId);
     });
   });
+
+  describe("Attendance Evidence & Multi-Tab Presence Integration", () => {
+    it("multi-tab presence: closing 1 tab keeps presence active, awards attendance evidence to remaining tab", async () => {
+      const { port, fixtureMastery } = await setupFixtureEnvironment();
+
+      const tab1 = connectClient(port, FIXTURE_IDS.studentCourse1Only.token);
+      const tab2 = connectClient(port, FIXTURE_IDS.studentCourse1Only.token);
+      activeSockets.push(tab1, tab2);
+      await waitForConnect(tab1);
+      await waitForConnect(tab2);
+
+      const lectureId = FIXTURE_IDS.teacher1.lectureId;
+      const studentId = FIXTURE_IDS.studentCourse1Only.studentIdCourse1;
+
+      const join1 = await emitWithAck(tab1, "lecture:join", { lectureId });
+      const join2 = await emitWithAck(tab2, "lecture:join", { lectureId });
+      expect(join1).toEqual({ success: true });
+      expect(join2).toEqual({ success: true });
+
+      // Seed initial mastery: confidence 0.20, attempts 2, version 1
+      fixtureMastery.set(`${studentId}:${conceptId1}`, {
+        confidence: 0.2,
+        attempts: 2,
+        version: 1,
+      });
+
+      // Disconnect tab 1 and await server-side disconnect
+      const serverTab1 = tab1.id ? ioServer?.sockets.sockets.get(tab1.id) : undefined;
+      const { promise: disconnectPromise, resolve: resolveDisconnect } = Promise.withResolvers<void>();
+      if (serverTab1) {
+        serverTab1.on("disconnect", () => resolveDisconnect());
+      } else {
+        tab1.on("disconnect", () => resolveDisconnect());
+      }
+      tab1.disconnect();
+      await disconnectPromise;
+
+      const chunkPromise = waitForEvent<TranscriptChunkEvent>(tab2, "transcript:chunk");
+      const conceptPromise = waitForEvent<ConceptDetectedEvent>(
+        tab2,
+        "lecture:concept-detected",
+      );
+
+      const res = await fetch(`http://127.0.0.1:${port}/api/lectures/${lectureId}/transcript`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIXTURE_IDS.teacher1.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Today we explore Gradient Descent optimization",
+          timestampSec: 15,
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      const chunkEvent = await chunkPromise;
+      const conceptEvent = await conceptPromise;
+      expect(chunkEvent.text).toContain("Gradient Descent");
+      expect(conceptEvent.conceptIds).toContain(conceptId1);
+
+      // Attendance applied once: 0.20 + 0.05 = 0.25, attempts unchanged (2), version incremented (2)
+      const updatedMastery = fixtureMastery.get(`${studentId}:${conceptId1}`);
+      expect(updatedMastery).toEqual({
+        confidence: 0.25,
+        attempts: 2,
+        version: 2,
+      });
+    });
+
+    it("explicit final leave before chunk ingestion leaves seeded mastery unchanged", async () => {
+      const { port, fixtureMastery } = await setupFixtureEnvironment();
+
+      const studentSocket = connectClient(port, FIXTURE_IDS.studentCourse1Only.token);
+      activeSockets.push(studentSocket);
+      await waitForConnect(studentSocket);
+
+      const lectureId = FIXTURE_IDS.teacher1.lectureId;
+      const studentId = FIXTURE_IDS.studentCourse1Only.studentIdCourse1;
+
+      const joinRes = await emitWithAck(studentSocket, "lecture:join", { lectureId });
+      expect(joinRes).toEqual({ success: true });
+
+      fixtureMastery.set(`${studentId}:${conceptId1}`, {
+        confidence: 0.2,
+        attempts: 2,
+        version: 1,
+      });
+
+      // Explicit leave
+      const leaveRes = await emitWithAck(studentSocket, "lecture:leave", { lectureId });
+      expect(leaveRes).toEqual({ success: true });
+
+      const res = await fetch(`http://127.0.0.1:${port}/api/lectures/${lectureId}/transcript`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIXTURE_IDS.teacher1.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Gradient Descent optimization while student is absent",
+          timestampSec: 20,
+        }),
+      });
+
+      expect(res.status).toBe(201);
+      // Mastery state unchanged because student explicitly left
+      expect(fixtureMastery.get(`${studentId}:${conceptId1}`)).toEqual({
+        confidence: 0.2,
+        attempts: 2,
+        version: 1,
+      });
+    });
+
+    it("attendee snapshot at chunk arrival excludes student who joins during AI detection", async () => {
+      const { promise: gatePromise, resolve: openGate } = Promise.withResolvers<void>();
+
+      const { port, fixtureMastery } = await setupFixtureEnvironment({
+        detectorOverride: async (_text, cands) => {
+          await gatePromise;
+          return [cands[0]!.id];
+        },
+      });
+
+      const lectureId = FIXTURE_IDS.teacher1.lectureId;
+      const student1Id = FIXTURE_IDS.studentDual.studentIdCourse1;
+      const student2Id = FIXTURE_IDS.studentCourse1Only.studentIdCourse1;
+
+      const socket1 = connectClient(port, FIXTURE_IDS.studentDual.token);
+      activeSockets.push(socket1);
+      await waitForConnect(socket1);
+      await emitWithAck(socket1, "lecture:join", { lectureId });
+
+      // Trigger POST: enters detector and pauses at gate
+      const postPromise = fetch(`http://127.0.0.1:${port}/api/lectures/${lectureId}/transcript`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIXTURE_IDS.teacher1.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Gated detection with Gradient Descent",
+          timestampSec: 30,
+        }),
+      });
+
+      // Student 2 joins while detection is in-flight
+      const socket2 = connectClient(port, FIXTURE_IDS.studentCourse1Only.token);
+      activeSockets.push(socket2);
+      await waitForConnect(socket2);
+      await emitWithAck(socket2, "lecture:join", { lectureId });
+
+      // Release gate
+      openGate();
+
+      const res = await postPromise;
+      expect(res.status).toBe(201);
+
+      // Only student 1 was snapshotted at chunk arrival
+      expect(fixtureMastery.has(`${student1Id}:${conceptId1}`)).toBe(true);
+      expect(fixtureMastery.has(`${student2Id}:${conceptId1}`)).toBe(false);
+    });
+
+    it("attendance failure aborts broadcast and returns 503 SERVICE_UNAVAILABLE", async () => {
+      const { port, transcriptChunksTable } = await setupFixtureEnvironment({
+        attendanceOverride: {
+          recordChunkAttendance: async () => {
+            throw new AppError({
+              code: "SERVICE_UNAVAILABLE",
+              statusCode: 503,
+              message: "Mastery store unavailable",
+            });
+          },
+        },
+      });
+
+      const lectureId = FIXTURE_IDS.teacher1.lectureId;
+      const studentSocket = connectClient(port, FIXTURE_IDS.studentCourse1Only.token);
+      activeSockets.push(studentSocket);
+      await waitForConnect(studentSocket);
+      await emitWithAck(studentSocket, "lecture:join", { lectureId });
+
+      let receivedAnyEvent = false;
+      studentSocket.on("transcript:chunk", () => {
+        receivedAnyEvent = true;
+      });
+      studentSocket.on("lecture:concept-detected", () => {
+        receivedAnyEvent = true;
+      });
+
+      const res = await fetch(`http://127.0.0.1:${port}/api/lectures/${lectureId}/transcript`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIXTURE_IDS.teacher1.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Gradient Descent with failing attendance",
+          timestampSec: 40,
+        }),
+      });
+
+      expect(res.status).toBe(503);
+      const body = apiErrorSchema.parse(await res.json());
+      expect(body.error.code).toBe("SERVICE_UNAVAILABLE");
+      expect(transcriptChunksTable).toHaveLength(1);
+
+      // Socket never received events due to persist-before-broadcast gate
+      expect(receivedAnyEvent).toBe(false);
+    });
+  });
 });
 
 describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
@@ -783,11 +1011,24 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
 
       const app = express();
       httpServer = http.createServer(app);
-      const { io, publisher } = createSocketServer(httpServer, {
+      const { io, publisher, presence } = createSocketServer(httpServer, {
         auth: authGateway,
         rooms: roomAuthorizer,
+        lectures: lectureRepo,
       });
       ioServer = io;
+
+      const courseRepo = new CourseRepository(harness.serviceClient);
+      const idGen = new CryptoIdGenerator();
+      const courseService = new CourseService(courseRepo, idGen);
+      const masteryRepo = new MasteryRepository(harness.serviceClient);
+      const masteryService = new MasteryService(masteryRepo);
+      await masteryService.initializeStudentMastery(studentId, courseCtx.courseId);
+      const attendanceService = new AttendanceEvidenceService(
+        harness.serviceClient,
+        courseService,
+        masteryService,
+      );
 
       const ingestor = new TranscriptIngestor({
         lectures: lectureRepo,
@@ -796,6 +1037,8 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
         ai: {
           detectConcepts: (t, c) => fakeAi.detectConcepts(t, c),
         },
+        presence,
+        attendance: attendanceService,
         publisher,
         ids: new CryptoIdGenerator(),
         clock: testClock,
@@ -860,7 +1103,17 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       const receivedConcept = await conceptPromise;
       expect(receivedConcept.conceptIds).toEqual([conceptId]);
 
+      // Query genuine PostgreSQL student_mastery update from attendance evidence
+      const { data: masteryRows } = await harness.serviceClient
+        .from("student_mastery")
+        .select("confidence,attempts,version")
+        .eq("student_id", studentId)
+        .eq("concept_id", conceptId);
+      expect(masteryRows).toHaveLength(1);
+      expect(Number(masteryRows![0].confidence)).toBe(0.05);
+
       // Cleanup
+      await harness.serviceClient.from("student_mastery").delete().eq("student_id", studentId);
       await harness.serviceClient.from("transcript_concepts").delete().eq("transcript_chunk_id", body.chunkId);
       await harness.serviceClient.from("transcript_chunks").delete().eq("id", body.chunkId);
       await harness.serviceClient.from("concept_nodes").delete().eq("id", conceptId);

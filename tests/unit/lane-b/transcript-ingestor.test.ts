@@ -82,6 +82,9 @@ describe("TranscriptIngestor Unit Tests", () => {
     candidates?: { id: UUID; label: string }[];
     detected?: UUID[];
     detectorError?: Error;
+    attendingStudentIds?: UUID[];
+    attendanceError?: Error;
+    onDetectConcepts?: () => void;
   }) {
     idCounter = 0;
     const lectureToUse = overrides?.lecture ?? liveLecture;
@@ -114,7 +117,20 @@ describe("TranscriptIngestor Unit Tests", () => {
       ai: {
         detectConcepts: overrides?.detectorError
           ? vi.fn().mockRejectedValue(overrides.detectorError)
-          : vi.fn().mockResolvedValue(overrides?.detected ?? [conceptId1]),
+          : vi.fn().mockImplementation(async (_text: string, _cands: { id: UUID; label: string }[]) => {
+              if (overrides?.onDetectConcepts) {
+                overrides.onDetectConcepts();
+              }
+              return overrides?.detected ?? [conceptId1];
+            }),
+      },
+      presence: {
+        getAttendingStudentIds: vi.fn().mockReturnValue(overrides?.attendingStudentIds ?? [studentId]),
+      },
+      attendance: {
+        recordChunkAttendance: overrides?.attendanceError
+          ? vi.fn().mockRejectedValue(overrides.attendanceError)
+          : vi.fn().mockResolvedValue([]),
       },
       publisher: {
         emitToLecture: vi
@@ -458,6 +474,114 @@ describe("TranscriptIngestor Unit Tests", () => {
       expect(insertedChunks).toHaveLength(1);
       expect(deps.transcripts.insertConceptLinks).not.toHaveBeenCalled();
       expect(emittedEvents).toHaveLength(0);
+    });
+  });
+
+  describe("Attendance Evidence Integration", () => {
+    it("calls recordChunkAttendance after persisting concept links and before broadcast", async () => {
+      const callOrder: string[] = [];
+      const { ingestor, deps } = createTestHarness();
+
+      vi.mocked(deps.transcripts.insertConceptLinks).mockImplementation(async () => {
+        callOrder.push("insertConceptLinks");
+      });
+      vi.mocked(deps.attendance.recordChunkAttendance).mockImplementation(async () => {
+        callOrder.push("recordChunkAttendance");
+        return [];
+      });
+      vi.mocked(deps.publisher.emitToLecture).mockImplementation(async () => {
+        callOrder.push("emitToLecture");
+      });
+
+      await ingestor.ingestTranscriptChunk(teacherActor, lectureId, "Hello gradient descent", 10);
+
+      expect(deps.attendance.recordChunkAttendance).toHaveBeenCalledWith(
+        teacherActor,
+        courseId,
+        lectureId,
+        chunkId,
+        [studentId],
+      );
+      expect(callOrder).toEqual([
+        "insertConceptLinks",
+        "recordChunkAttendance",
+        "emitToLecture",
+        "emitToLecture",
+      ]);
+    });
+
+    it("propagates error if recordChunkAttendance throws and aborts broadcast", async () => {
+      const attendanceError = new AppError({
+        code: "SERVICE_UNAVAILABLE",
+        statusCode: 503,
+        message: "Failed to record attendance",
+      });
+      const { ingestor, deps } = createTestHarness({ attendanceError });
+
+      await expect(
+        ingestor.ingestTranscriptChunk(teacherActor, lectureId, "Hello gradient descent", 10),
+      ).rejects.toThrow("Failed to record attendance");
+
+      expect(deps.publisher.emitToLecture).not.toHaveBeenCalled();
+    });
+
+    it("skips recordChunkAttendance when attending student list is empty", async () => {
+      const { ingestor, deps } = createTestHarness({ attendingStudentIds: [] });
+
+      const result = await ingestor.ingestTranscriptChunk(
+        teacherActor,
+        lectureId,
+        "Hello gradient descent",
+        10,
+      );
+
+      expect(deps.attendance.recordChunkAttendance).not.toHaveBeenCalled();
+      expect(deps.publisher.emitToLecture).toHaveBeenCalledTimes(2);
+      expect(result.detectedConceptIds).toEqual([conceptId1]);
+    });
+
+    it("skips recordChunkAttendance when no concepts are accepted", async () => {
+      const { ingestor, deps } = createTestHarness({ detected: [] });
+
+      const result = await ingestor.ingestTranscriptChunk(
+        teacherActor,
+        lectureId,
+        "Just some chat without concepts",
+        10,
+      );
+
+      expect(deps.attendance.recordChunkAttendance).not.toHaveBeenCalled();
+      // Still broadcasts chunk event
+      expect(deps.publisher.emitToLecture).toHaveBeenCalledWith(
+        lectureId,
+        "transcript:chunk",
+        expect.any(Object),
+      );
+      expect(result.detectedConceptIds).toEqual([]);
+    });
+
+    it("snapshots attendees before detection so late joining students are not awarded earlier chunk", async () => {
+      let attendees = [studentId];
+      const lateStudentId = "bbbbbbbb-4444-4444-8444-bbbbbbbbbbbb" as UUID;
+
+      const { ingestor, deps } = createTestHarness({
+        onDetectConcepts: () => {
+          // Simulate student joining during AI detection
+          attendees = [studentId, lateStudentId];
+        },
+      });
+      vi.mocked(deps.presence.getAttendingStudentIds).mockImplementation(() => [...attendees]);
+
+      await ingestor.ingestTranscriptChunk(teacherActor, lectureId, "Hello gradient descent", 10);
+
+      // Only studentId should be present, not lateStudentId
+      expect(deps.attendance.recordChunkAttendance).toHaveBeenCalledWith(
+        teacherActor,
+        courseId,
+        lectureId,
+        chunkId,
+        [studentId],
+      );
     });
   });
 });

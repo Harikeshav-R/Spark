@@ -22,10 +22,10 @@ import {
   conceptDetectedEventSchema,
   transcriptChunkEventSchema,
 } from "../../contracts/realtime.js";
-import type { RoomAuthorizer } from "../realtime/index.js";
+import type { RoomAuthorizer, PresenceTracker } from "../realtime/index.js";
+import type { AttendanceEvidenceService } from "../core/index.js";
 import type { LectureRepository } from "./lecture-repository.js";
 import type { TranscriptRepository } from "./transcript-repository.js";
-
 export interface TranscriptIngestorDependencies {
   lectures: Pick<LectureRepository, "getLecture">;
   transcripts: Pick<
@@ -34,6 +34,8 @@ export interface TranscriptIngestorDependencies {
   >;
   rooms: RoomAuthorizer;
   ai: Pick<AiService, "detectConcepts">;
+  presence: Pick<PresenceTracker, "getAttendingStudentIds">;
+  attendance: Pick<AttendanceEvidenceService, "recordChunkAttendance">;
   publisher: Pick<RealtimePublisher, "emitToLecture">;
   ids: Pick<IdGenerator, "generateId">;
   clock: Clock;
@@ -105,7 +107,10 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
       });
     }
 
-    // 4. Persistence of raw chunk
+    // 4. Snapshot attendees at start of chunk processing
+    const attendingStudentIds = this.deps.presence.getAttendingStudentIds(lectureId);
+
+    // 5. Persistence of raw chunk
     const candidates = await this.deps.transcripts.getCandidateConcepts(lecture.courseId);
     const chunkId = this.deps.ids.generateId();
     const createdAt = this.deps.clock.nowISO();
@@ -124,7 +129,7 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
 
     const storedChunk = await this.deps.transcripts.insertChunk(chunkToInsert);
 
-    // 5. Concept detection
+    // 6. Concept detection
     const acceptedConceptIds: UUID[] = [];
     if (candidates.length > 0) {
       const candidateIdSet = new Set(candidates.map((c) => c.id));
@@ -153,7 +158,18 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
       }
     }
 
-    // 6. Broadcast events (persisted before publish)
+    // 7. Record attendance evidence before broadcasting
+    if (acceptedConceptIds.length > 0 && attendingStudentIds.length > 0) {
+      await this.deps.attendance.recordChunkAttendance(
+        actor,
+        lecture.courseId,
+        lectureId,
+        storedChunk.id,
+        attendingStudentIds,
+      );
+    }
+
+    // 8. Broadcast events (persisted before publish)
     const chunkEvent: TranscriptChunkEvent = {
       eventId: this.deps.ids.generateId(),
       occurredAt: this.deps.clock.nowISO(),
@@ -181,8 +197,7 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
       "lecture:concept-detected",
       validatedConceptEvent,
     );
-
-    // 7. Return stored chunk with detected concept IDs
+    // 9. Return stored chunk with detected concept IDs
     const finalChunk: TranscriptChunk = {
       ...storedChunk,
       detectedConceptIds: acceptedConceptIds,
