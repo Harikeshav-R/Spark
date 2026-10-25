@@ -216,7 +216,7 @@ export class PollRepository {
       });
     }
 
-    let query = this.client
+    const query = this.client
       .from("poll_questions")
       .select(`
         id,

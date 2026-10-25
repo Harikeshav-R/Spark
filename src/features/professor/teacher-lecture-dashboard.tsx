@@ -14,6 +14,10 @@ import {
   transcriptChunkEventSchema,
   conceptDetectedEventSchema,
   lectureEndedEventSchema,
+  pollNewQuestionEventSchema,
+  pollClosedEventSchema,
+  pollResponseCountEventSchema,
+  heatmapUpdatedEventSchema,
   type TranscriptChunkEvent,
   type ConceptDetectedEvent,
 } from "@/contracts/realtime";
@@ -26,7 +30,9 @@ import { createLectureSocket, type LectureSocket } from "@/lib/client/socket";
 import { LectureControls } from "./lecture-controls";
 import { TranscriptFeed } from "./transcript-feed";
 import { mergeTranscriptChunks } from "./teacher-lecture-state";
-
+import { useTeacherPolls } from "./use-teacher-polls";
+import { PollPanel } from "./poll-panel";
+import { ClassHeatmap } from "./class-heatmap";
 export interface TeacherLectureDashboardProps {
   courseId: UUID;
   lectureId?: UUID;
@@ -58,6 +64,22 @@ export function TeacherLectureDashboard({
   const [chunks, setChunks] = useState<TranscriptChunk[]>([]);
   const [conceptLabels, setConceptLabels] = useState<Map<UUID, string>>(new Map());
   const [isSimulated, setIsSimulated] = useState<boolean | null>(null);
+  const [courseConcepts, setCourseConcepts] = useState<Array<{ id: UUID; label: string; category?: string }>>([]);
+
+  const getEffectiveToken = useCallback(async () => {
+    if (token) return token;
+    if (getAccessToken) return getAccessToken();
+    return getRuntimeAccessToken();
+  }, [token, getAccessToken]);
+
+  const currentLectureId = lecture?.id ?? activeLectureId ?? null;
+  const teacherPolls = useTeacherPolls({
+    courseId,
+    lectureId: currentLectureId,
+    getAccessToken: getEffectiveToken,
+  });
+  const teacherPollsRef = useRef(teacherPolls);
+  teacherPollsRef.current = teacherPolls;
 
   const [isLoadingCourseData, setIsLoadingCourseData] = useState<boolean>(false);
   const [lifecyclePending, setLifecyclePending] = useState<"start" | "end" | null>(null);
@@ -172,6 +194,7 @@ export function TeacherLectureDashboard({
             map.set(node.id, node.label);
           }
           setConceptLabels(map);
+          setCourseConcepts(graphResult.value.nodes.map((n) => ({ id: n.id, label: n.label, category: n.category })));
         } else {
           console.warn("[Dashboard] Course graph unavailable, concept labels fallback active");
         }
@@ -270,6 +293,7 @@ export function TeacherLectureDashboard({
           setConnectionStatus("connected");
           // Re-fetch snapshot to reconcile any chunks missed during connection/reconnection
           void refreshSnapshot(currentLectureId, token, generation);
+          void teacherPollsRef.current.refresh();
         } else {
           setConnectionStatus("error");
           setDashboardError(ack?.error || "Failed to join live classroom session.");
@@ -325,6 +349,34 @@ export function TeacherLectureDashboard({
       void refreshSnapshot(currentLectureId, token, generation);
     });
 
+    socket.on("poll:new-question", (rawPayload: unknown) => {
+      const parsed = pollNewQuestionEventSchema.safeParse(rawPayload);
+      if (!parsed.success) return;
+      if (parsed.data.lectureId !== currentLectureId) return;
+      teacherPollsRef.current.handleEvent({ type: "poll:new-question", payload: parsed.data });
+    });
+
+    socket.on("poll:closed", (rawPayload: unknown) => {
+      const parsed = pollClosedEventSchema.safeParse(rawPayload);
+      if (!parsed.success) return;
+      if (parsed.data.lectureId !== currentLectureId) return;
+      teacherPollsRef.current.handleEvent({ type: "poll:closed", payload: parsed.data });
+    });
+
+    socket.on("poll:response-count", (rawPayload: unknown) => {
+      const parsed = pollResponseCountEventSchema.safeParse(rawPayload);
+      if (!parsed.success) return;
+      if (parsed.data.lectureId !== currentLectureId) return;
+      teacherPollsRef.current.handleEvent({ type: "poll:response-count", payload: parsed.data });
+    });
+
+    socket.on("heatmap:updated", (rawPayload: unknown) => {
+      const parsed = heatmapUpdatedEventSchema.safeParse(rawPayload);
+      if (!parsed.success) return;
+      if (parsed.data.courseId !== courseId) return;
+      teacherPollsRef.current.handleEvent({ type: "heatmap:updated", payload: parsed.data });
+    });
+
     socket.on("lecture:ended", (rawPayload: unknown) => {
       const parsed = lectureEndedEventSchema.safeParse(rawPayload);
       if (!parsed.success) return;
@@ -334,6 +386,7 @@ export function TeacherLectureDashboard({
         setConnectionStatus("idle");
         socket.disconnect();
       }
+        teacherPollsRef.current.handleEvent({ type: "lecture:ended", payload: event });
     });
 
     socket.connect();
@@ -598,15 +651,29 @@ export function TeacherLectureDashboard({
           onEnd={handleEndLecture}
         />
 
-        {/* Transcript Timeline Feed */}
+        {/* Transcript Timeline Feed & Formative Polls Side-by-Side on Desktop */}
         {lecture && (
-          <TranscriptFeed
-            chunks={chunks}
-            conceptLabels={conceptLabels}
-            isSimulated={isSimulated}
-            lectureStatus={lecture.status}
-          />
+          <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] gap-6 items-start">
+            <TranscriptFeed
+              chunks={chunks}
+              conceptLabels={conceptLabels}
+              isSimulated={isSimulated}
+              lectureStatus={lecture.status}
+            />
+            <PollPanel
+              isLive={lecture.status === "live"}
+              concepts={courseConcepts}
+              hook={teacherPolls}
+            />
+          </div>
         )}
+
+        {/* Course Mastery Heatmap Full Width Below */}
+        <ClassHeatmap
+          heatmap={teacherPolls.state.heatmap}
+          loading={teacherPolls.heatmapLoading}
+          error={teacherPolls.heatmapError}
+        />
       </div>
     </AppShell>
   );

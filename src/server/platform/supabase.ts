@@ -7,7 +7,7 @@ export interface SupabaseClients {
 }
 
 export function createSupabaseClients(
-  env: NodeJS.ProcessEnv = process.env,
+  env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
 ): SupabaseClients {
   const missing: string[] = [];
   if (!env.SUPABASE_URL) missing.push("SUPABASE_URL");

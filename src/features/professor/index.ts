@@ -20,3 +20,28 @@ export {
   getElapsedSeconds,
   formatElapsedTimer,
 } from "./teacher-lecture-state";
+
+export {
+  PollPanel,
+  type PollPanelProps,
+} from "./poll-panel";
+
+export {
+  ClassHeatmap,
+  type ClassHeatmapProps,
+} from "./class-heatmap";
+
+export {
+  useTeacherPolls,
+  type UseTeacherPollsOptions,
+  type UseTeacherPollsResult,
+  type DraftEditState,
+} from "./use-teacher-polls";
+
+export {
+  createTeacherPollState,
+  reduceTeacherPollState,
+  getEffectiveResponseCount,
+  type TeacherPollState,
+  type TeacherPollAction,
+} from "./teacher-poll-state";
