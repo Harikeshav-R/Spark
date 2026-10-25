@@ -15,6 +15,8 @@ import {
   fixturePrerequisiteGraph,
   fixtureSummarizeLecture,
   fixturePollEvaluation,
+  OpenRouterClient,
+  SuggestInterventionsAi,
 } from "../../src/server/ai/index.js";
 import { fixtureDetectConcepts } from "../../src/server/ai/fixtures/detected-concepts.js";
 
@@ -120,6 +122,10 @@ export const FIXTURE_STUDENT_QUIZ_QUESTIONS: StudentQuizQuestion[] =
 // ============================================================================
 
 export class FakeAiService implements AiService {
+  private readonly interventionAi = new SuggestInterventionsAi(
+    new OpenRouterClient({ env: { INTEGRATION_MODE: "fixture" } })
+  );
+
   async extractPrerequisiteGraph(_pdfBytes: Buffer): Promise<{
     totalPages: number;
     processedPages: number;
@@ -225,23 +231,13 @@ export class FakeAiService implements AiService {
   }
 
   async suggestInterventions(
-    _lectureId: UUID,
-    _pollResponses: { answer: string; outcome: string }[]
+    lectureId: UUID,
+    pollResponses: { answer: string; outcome: string }[]
   ): Promise<{
     misconceptions: string[];
     recommendations: { title: string; description: string; actionablePrompt: string }[];
   }> {
-    return {
-      misconceptions: ["Conflating gradient magnitude with learning rate"],
-      recommendations: [
-        {
-          title: "Interactive Momentum Demo",
-          description: "Demonstrate how momentum dampens cross-axis oscillations in narrow valleys.",
-          actionablePrompt:
-            "Compare standard SGD against SGD with momentum on the Rosenbrock benchmark valley.",
-        },
-      ],
-    };
+    return this.interventionAi.suggestInterventions(lectureId, pollResponses);
   }
 
   async generateLearningPage(concept: ConceptNode): Promise<string> {

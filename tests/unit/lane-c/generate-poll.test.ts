@@ -7,26 +7,8 @@ import {
   GeneratePollAi,
   fixturePollQuestion,
 } from "../../../src/server/ai/index.js";
+import { createMockResponse } from "./helpers/openrouter-response.js";
 
-function createMockResponse(content: string): Response {
-  return new Response(
-    JSON.stringify({
-      choices: [
-        {
-          message: {
-            role: "assistant",
-            content,
-          },
-          finish_reason: "stop",
-        },
-      ],
-    }),
-    {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }
-  );
-}
 
 describe("P4-C-01: GeneratePollAi Pipeline", () => {
   const gradientDescentConcept: ConceptNode = {

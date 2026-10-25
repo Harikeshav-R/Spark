@@ -667,7 +667,7 @@ This build plan provides step-by-step engineering instructions, target paths, de
 - **Dependencies**: `P1-C-01`, `P4-B-01`
 - **Consumed / Produced Contracts**: Implements `AiService.suggestInterventions`.
 - **Implementation Instructions**: Cluster incorrect student answers; identify root conceptual confusion; produce 2–3 actionable instructional recommendations.
-- **Invariant / Error Cases**: 30-second timeout; zero incorrect answers returns positive mastery confirmation.
+- **Invariant / Error Cases**: 30-second timeout; a nonempty set of exclusively correct evaluations returns positive mastery confirmation. Empty or wholly unrated input reports insufficient evidence without claiming mastery; wrong or partial evaluations produce 2–3 actionable interventions.
 - **Fixture Path**: Fixture of 4 student poll responses (1 correct, 3 flawed).
 - **Prerequisites & State**: Poll response repository ready.
 
