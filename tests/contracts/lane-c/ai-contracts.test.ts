@@ -621,7 +621,8 @@ describe("Lane C: AI & Learning Service Ports & Deterministic Fixtures (P0-C-01)
       const markdown = await fakeAi.generateLearningPage(FIXTURE_33_CONCEPTS[16]!);
       expect(markdown.length).toBeGreaterThanOrEqual(500);
       expect(markdown).toContain("# Gradient Descent");
-      expect(markdown).toContain("$$\\theta_{t+1} = \\theta_t - \\eta \\nabla J(\\theta_t)$$");
+      expect(markdown).toContain("$$");
+      expect(markdown).toContain("\\theta_{t+1} = \\theta_t - \\eta \\nabla J(\\theta_t)");
       expect(generatedLearningPageSchema.safeParse({ content: markdown }).success).toBe(true);
     });
   });

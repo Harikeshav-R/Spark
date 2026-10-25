@@ -17,6 +17,7 @@ import {
   fixturePollEvaluation,
   OpenRouterClient,
   SuggestInterventionsAi,
+  GenerateLearningPageAi,
 } from "../../src/server/ai/index.js";
 import { fixtureDetectConcepts } from "../../src/server/ai/fixtures/detected-concepts.js";
 
@@ -125,6 +126,10 @@ export class FakeAiService implements AiService {
   private readonly interventionAi = new SuggestInterventionsAi(
     new OpenRouterClient({ env: { INTEGRATION_MODE: "fixture" } })
   );
+  private readonly learningPageAi = new GenerateLearningPageAi(
+    new OpenRouterClient({ env: { INTEGRATION_MODE: "fixture" } })
+  );
+
 
   async extractPrerequisiteGraph(_pdfBytes: Buffer): Promise<{
     totalPages: number;
@@ -241,26 +246,7 @@ export class FakeAiService implements AiService {
   }
 
   async generateLearningPage(concept: ConceptNode): Promise<string> {
-    return `# ${concept.label}
-
-## Overview & Intuition
-${concept.description}. In modern machine learning and computational optimization, mastering this concept provides the foundation for designing, training, and diagnosing neural architectures.
-
-## Mathematical Formulation
-Let $J(\\theta)$ denote the objective loss function parameterized by weights $\\theta \\in \\mathbb{R}^d$. The standard update rule is given by:
-
-$$\\theta_{t+1} = \\theta_t - \\eta \\nabla J(\\theta_t)$$
-
-where $\\eta > 0$ denotes the learning rate, and $\\nabla J(\\theta_t)$ represents the vector of first-order partial derivatives evaluated at the current parameter estimate $\\theta_t$.
-
-## Key Invariants & Properties
-1. **Convergence**: Under Lipschitz continuous gradients and appropriate learning rates $\\eta < \\frac{2}{L}$, the sequence of function values monotonically decreases toward a stationary point.
-2. **Step Size Sensitivity**: If $\\eta$ is chosen excessively large, the iterate sequence diverges. If $\\eta$ is overly conservative, convergence becomes prohibitively slow.
-3. **Stochastic Approximation**: When computed over mini-batches, the gradient estimator exhibits variance that aids in escaping shallow saddle points.
-
-## Common Misconceptions
-- Gradient descent does not guarantee finding a global minimum in non-convex landscapes.
-- The gradient vector points in the direction of maximum rate of increase; subtracting it moves toward steepest descent.`;
+    return this.learningPageAi.generateLearningPage(concept);
   }
 
   async generateQuizQuestions(_concept: ConceptNode): Promise<{
