@@ -56,6 +56,13 @@ describe("P1-B-02: Ephemeral Study Group Pool Repository", () => {
                 });
                 return builder;
               },
+              gte(column: string, value: string) {
+                filters.push((row) => {
+                  const val = row[column];
+                  return typeof val === "string" && val >= value;
+                });
+                return builder;
+              },
               lt(column: string, value: string) {
                 filters.push((row) => {
                   const val = row[column];
@@ -111,8 +118,7 @@ describe("P1-B-02: Ephemeral Study Group Pool Repository", () => {
             const exists = Array.from(rows.values()).some(
               (r) =>
                 r.student_id === studentId &&
-                r.course_id === courseIdVal &&
-                (r.status === "waiting" || r.status === "matched"),
+                r.course_id === courseIdVal,
             );
 
             if (exists) {
@@ -666,6 +672,155 @@ describe("P1-B-02: Ephemeral Study Group Pool Repository", () => {
         code: "VALIDATION_ERROR",
         statusCode: 400,
       });
+    });
+  });
+
+  describe("9. cleanupExpiredForCourse cleans up only target course", () => {
+    it("expires only entries belonging to the specified course", async () => {
+      const { client, rows } = createInMemoryClient();
+      const repo = new PoolRepository(client);
+
+      const e1Id = "10000000-0000-4000-8000-000000000001";
+      rows.set(e1Id, {
+        id: e1Id,
+        student_id: student1Id,
+        course_id: courseId,
+        concept_ids: [concept1Id],
+        status: "waiting",
+        created_at: t0,
+        expires_at: t0Plus5Min,
+      });
+
+      const e2Id = "10000000-0000-4000-8000-000000000002";
+      rows.set(e2Id, {
+        id: e2Id,
+        student_id: student2Id,
+        course_id: otherCourseId,
+        concept_ids: [concept1Id],
+        status: "waiting",
+        created_at: t0,
+        expires_at: t0Plus5Min,
+      });
+
+      const cleaned = await repo.cleanupExpiredForCourse(courseId, t0Plus6Min);
+      expect(cleaned).toBe(1);
+      expect(rows.get(e1Id)?.status).toBe("expired");
+      expect(rows.get(e2Id)?.status).toBe("waiting");
+    });
+  });
+
+  describe("10. reactivateInactiveEntry", () => {
+    it("reactivates expired entry to waiting with updated concepts and timestamps", async () => {
+      const { client, rows } = createInMemoryClient();
+      const repo = new PoolRepository(client);
+
+      const e1Id = "10000000-0000-4000-8000-000000000001";
+      rows.set(e1Id, {
+        id: e1Id,
+        student_id: student1Id,
+        course_id: courseId,
+        concept_ids: [concept1Id],
+        status: "expired",
+        created_at: t0,
+        expires_at: t0Plus5Min,
+      });
+
+      const reactivated = await repo.reactivateInactiveEntry(
+        student1Id,
+        courseId,
+        [concept2Id],
+        t0Plus6Min,
+        "2026-10-20T14:11:00.000Z",
+      );
+
+      expect(reactivated).not.toBeNull();
+      expect(reactivated?.id).toBe(e1Id);
+      expect(reactivated?.status).toBe("waiting");
+      expect(reactivated?.conceptIds).toEqual([concept2Id]);
+      expect(reactivated?.createdAt).toBe(t0Plus6Min);
+      expect(reactivated?.expiresAt).toBe("2026-10-20T14:11:00.000Z");
+      expect(rows.get(e1Id)?.status).toBe("waiting");
+    });
+
+    it("reactivates cancelled entry to waiting", async () => {
+      const { client, rows } = createInMemoryClient();
+      const repo = new PoolRepository(client);
+
+      const e1Id = "10000000-0000-4000-8000-000000000001";
+      rows.set(e1Id, {
+        id: e1Id,
+        student_id: student1Id,
+        course_id: courseId,
+        concept_ids: [concept1Id],
+        status: "cancelled",
+        created_at: t0,
+        expires_at: t0Plus5Min,
+      });
+
+      const reactivated = await repo.reactivateInactiveEntry(
+        student1Id,
+        courseId,
+        [concept1Id],
+        t0Plus6Min,
+        "2026-10-20T14:11:00.000Z",
+      );
+
+      expect(reactivated).not.toBeNull();
+      expect(reactivated?.id).toBe(e1Id);
+      expect(reactivated?.status).toBe("waiting");
+      expect(rows.get(e1Id)?.status).toBe("waiting");
+    });
+
+    it("returns null if row is currently waiting or matched or non-existent", async () => {
+      const { client, rows } = createInMemoryClient();
+      const repo = new PoolRepository(client);
+
+      const e1Id = "10000000-0000-4000-8000-000000000001";
+      rows.set(e1Id, {
+        id: e1Id,
+        student_id: student1Id,
+        course_id: courseId,
+        concept_ids: [concept1Id],
+        status: "matched",
+        created_at: t0,
+        expires_at: t0Plus5Min,
+      });
+
+      const reactivated = await repo.reactivateInactiveEntry(
+        student1Id,
+        courseId,
+        [concept1Id],
+        t0Plus6Min,
+        "2026-10-20T14:11:00.000Z",
+      );
+
+      expect(reactivated).toBeNull();
+      expect(rows.get(e1Id)?.status).toBe("matched");
+    });
+  });
+
+  describe("11. getActiveEntries inclusive expiry boundary", () => {
+    it("includes entry when expires_at equals now (inclusive INV-C01)", async () => {
+      const { client, rows } = createInMemoryClient();
+      const repo = new PoolRepository(client);
+
+      const e1Id = "10000000-0000-4000-8000-000000000001";
+      rows.set(e1Id, {
+        id: e1Id,
+        student_id: student1Id,
+        course_id: courseId,
+        concept_ids: [concept1Id],
+        status: "waiting",
+        created_at: t0,
+        expires_at: t0Plus5Min,
+      });
+
+      const entriesAtExpiry = await repo.getActiveEntries(courseId, t0Plus5Min);
+      expect(entriesAtExpiry).toHaveLength(1);
+      expect(entriesAtExpiry[0].id).toBe(e1Id);
+
+      const entriesAfterExpiry = await repo.getActiveEntries(courseId, t0Plus6Min);
+      expect(entriesAfterExpiry).toHaveLength(0);
     });
   });
 });
