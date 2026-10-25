@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { z } from "zod";
 import type { UUID } from "@/contracts/common";
@@ -1074,6 +1075,12 @@ export function StudentLectureView({
       sessionStatus="authenticated"
       headerActions={
         <div className="flex items-center gap-2">
+          <Link
+            href={`/student/${studentId}/study-group?courseId=${courseId}`}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--color-border-default)] bg-[var(--color-bg-panel)] text-xs font-medium text-[var(--color-fg-default)] hover:bg-[var(--color-bg-subtle)] focus:outline-hidden focus:ring-2 focus:ring-[#ed793c] transition-colors"
+          >
+            Study group
+          </Link>
           {summaryError && !gameSummary && (
             <span
               role="status"
