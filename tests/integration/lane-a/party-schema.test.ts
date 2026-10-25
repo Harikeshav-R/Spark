@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { execFileSync } from "node:child_process";
+import {
+  runPsql,
+  runPsqlExpectError,
+} from "./postgres-test-helpers";
 import { randomUUID } from "node:crypto";
 import {
   SupabaseTestHarness,
@@ -10,74 +13,6 @@ import { EnrollmentRepository } from "../../../src/server/core/enrollment/enroll
 
 const isFixtureMode = process.env.INTEGRATION_MODE === "fixture";
 
-const DB_CONTAINER = process.env.SUPABASE_DB_CONTAINER ?? (
-  (() => {
-    try {
-      execFileSync("docker", ["inspect", "supabase_db_spark"], { stdio: "ignore" });
-      return "supabase_db_spark";
-    } catch {
-      return "supabase_db_HackOHIO-2026";
-    }
-  })()
-);
-
-function runPsql(sql: string): string {
-  return execFileSync(
-    "docker",
-    [
-      "exec",
-      "-i",
-      DB_CONTAINER,
-      "psql",
-      "-U",
-      "postgres",
-      "-d",
-      "postgres",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-t",
-      "-A",
-      "-c",
-      sql,
-    ],
-    { encoding: "utf8" }
-  );
-}
-
-function runPsqlExpectError(sql: string): { code: string; message: string; stderr: string } {
-  try {
-    execFileSync(
-      "docker",
-      [
-        "exec",
-        "-i",
-        DB_CONTAINER,
-        "psql",
-        "-U",
-        "postgres",
-        "-d",
-        "postgres",
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-v",
-        "VERBOSITY=verbose",
-        "-c",
-        sql,
-      ],
-      { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
-    );
-    throw new Error("Expected psql command to fail but it succeeded");
-  } catch (err: unknown) {
-    const stderr =
-      err && typeof err === "object" && "stderr" in err && err.stderr
-        ? String(err.stderr)
-        : String(err);
-
-    const codeMatch = stderr.match(/ERROR:\s+([0-9A-Z]{5}):/i) ?? stderr.match(/SQLSTATE:\s+([0-9A-Z]{5})/i);
-    const code = codeMatch ? codeMatch[1] : "";
-    return { code, message: stderr, stderr };
-  }
-}
 
 function makeQuizAttempt(id: string, studentId: string, conceptId: string) {
   return {
@@ -106,16 +41,51 @@ describe.skipIf(isFixtureMode)(
     });
 
     afterEach(async () => {
-      if (currentContext) {
-        try {
-          runPsql(
-            "DELETE FROM public.party_quest_progress; DELETE FROM public.party_quests; DELETE FROM public.study_group_invitations; DELETE FROM public.study_group_matches;"
-          );
-        } catch {
-          // Ignore cleanup errors before harness cleanup
-        }
-        await harness.cleanup(currentContext);
+      if (!currentContext || currentContext.courseIds.length === 0) {
         currentContext = null;
+        return;
+      }
+
+      let progressError: unknown;
+      let harnessError: unknown;
+
+      try {
+        const formattedCourseIds = currentContext.courseIds
+          .map((id) => `'${id}'::uuid`)
+          .join(", ");
+
+        runPsql(`
+          DELETE FROM public.party_quest_progress
+          WHERE party_quest_id IN (
+            SELECT pq.id
+            FROM public.party_quests pq
+            INNER JOIN public.study_group_matches sgm ON sgm.id = pq.match_id
+            WHERE sgm.course_id IN (${formattedCourseIds})
+          );
+        `);
+      } catch (err: unknown) {
+        progressError = err;
+      }
+
+      try {
+        await harness.cleanup(currentContext);
+      } catch (err: unknown) {
+        harnessError = err;
+      } finally {
+        currentContext = null;
+      }
+
+      if (progressError && harnessError) {
+        throw new AggregateError(
+          [progressError, harnessError],
+          "Scoped progress cleanup and test harness cleanup both failed"
+        );
+      }
+      if (progressError) {
+        throw progressError;
+      }
+      if (harnessError) {
+        throw harnessError;
       }
     });
 
@@ -791,140 +761,184 @@ describe.skipIf(isFixtureMode)(
       expect(countRemaining.trim()).toBe("0");
     });
 
-    it("8. verifies cascades: course/student deletion cascades invitations; student/concept deletion cascades progress", async () => {
-      // 8a. Invitation cascades from course
-      const { course: c1, peerA: p1A, peerB: p1B } = await setupCourseAndPeers();
+    it("8a. verifies invitation cascades from course deletion", async () => {
+      const { course, peerA, peerB } = await setupCourseAndPeers();
       const invCourseId = randomUUID();
-      await harness.serviceClient.from("study_group_invitations").insert({
+      const { error: insErr } = await harness.serviceClient.from("study_group_invitations").insert({
         id: invCourseId,
-        course_id: c1.courseId,
-        inviter_student_id: p1A.id,
-        invitee_student_id: p1B.id,
-        concept_ids: [c1.conceptIds[0]],
+        course_id: course.courseId,
+        inviter_student_id: peerA.id,
+        invitee_student_id: peerB.id,
+        concept_ids: [course.conceptIds[0]],
         expires_at: new Date(Date.now() + 60_000).toISOString(),
       });
+      expect(insErr).toBeNull();
 
-      runPsql(`DELETE FROM public.courses WHERE id = '${c1.courseId}';`);
+      const { data: invBefore } = await harness.serviceClient
+        .from("study_group_invitations")
+        .select("id")
+        .eq("id", invCourseId);
+      expect(invBefore).toHaveLength(1);
+
+      runPsql(`DELETE FROM public.courses WHERE id = '${course.courseId}';`);
       const { data: invAfterCourseDel } = await harness.serviceClient
         .from("study_group_invitations")
         .select("id")
         .eq("id", invCourseId);
       expect(invAfterCourseDel).toHaveLength(0);
+    });
 
-      // 8b. Invitation cascades from inviter student
-      const { course: c2, peerA: p2A, peerB: p2B } = await setupCourseAndPeers();
+    it("8b. verifies invitation cascades from inviter student deletion", async () => {
+      const { course, peerA, peerB } = await setupCourseAndPeers();
       const invInviterId = randomUUID();
-      await harness.serviceClient.from("study_group_invitations").insert({
+      const { error: insErr } = await harness.serviceClient.from("study_group_invitations").insert({
         id: invInviterId,
-        course_id: c2.courseId,
-        inviter_student_id: p2A.id,
-        invitee_student_id: p2B.id,
-        concept_ids: [c2.conceptIds[0]],
+        course_id: course.courseId,
+        inviter_student_id: peerA.id,
+        invitee_student_id: peerB.id,
+        concept_ids: [course.conceptIds[0]],
         expires_at: new Date(Date.now() + 60_000).toISOString(),
       });
+      expect(insErr).toBeNull();
 
-      runPsql(`DELETE FROM public.students WHERE id = '${p2A.id}';`);
+      const { data: invBefore } = await harness.serviceClient
+        .from("study_group_invitations")
+        .select("id")
+        .eq("id", invInviterId);
+      expect(invBefore).toHaveLength(1);
+
+      runPsql(`DELETE FROM public.students WHERE id = '${peerA.id}';`);
       const { data: invAfterInviterDel } = await harness.serviceClient
         .from("study_group_invitations")
         .select("id")
         .eq("id", invInviterId);
       expect(invAfterInviterDel).toHaveLength(0);
+    });
 
-      // 8c. Invitation cascades from invitee student
-      const { course: c3, peerA: p3A, peerB: p3B } = await setupCourseAndPeers();
+    it("8c. verifies invitation cascades from invitee student deletion", async () => {
+      const { course, peerA, peerB } = await setupCourseAndPeers();
       const invInviteeId = randomUUID();
-      await harness.serviceClient.from("study_group_invitations").insert({
+      const { error: insErr } = await harness.serviceClient.from("study_group_invitations").insert({
         id: invInviteeId,
-        course_id: c3.courseId,
-        inviter_student_id: p3A.id,
-        invitee_student_id: p3B.id,
-        concept_ids: [c3.conceptIds[0]],
+        course_id: course.courseId,
+        inviter_student_id: peerA.id,
+        invitee_student_id: peerB.id,
+        concept_ids: [course.conceptIds[0]],
         expires_at: new Date(Date.now() + 60_000).toISOString(),
       });
+      expect(insErr).toBeNull();
 
-      runPsql(`DELETE FROM public.students WHERE id = '${p3B.id}';`);
+      const { data: invBefore } = await harness.serviceClient
+        .from("study_group_invitations")
+        .select("id")
+        .eq("id", invInviteeId);
+      expect(invBefore).toHaveLength(1);
+
+      runPsql(`DELETE FROM public.students WHERE id = '${peerB.id}';`);
       const { data: invAfterInviteeDel } = await harness.serviceClient
         .from("study_group_invitations")
         .select("id")
         .eq("id", invInviteeId);
       expect(invAfterInviteeDel).toHaveLength(0);
+    });
 
-      // 8d. Progress cascades from concept deletion
-      const { course: c4, peerA: p4A, peerB: p4B } = await setupCourseAndPeers();
-      const match4Id = randomUUID();
-      await harness.serviceClient.from("study_group_matches").insert({
-        id: match4Id,
-        course_id: c4.courseId,
-        student1_id: p4A.id,
-        student2_id: p4B.id,
-        concept_ids: [c4.conceptIds[0]],
+    it("8d. verifies progress cascades from concept deletion", async () => {
+      const { course, peerA, peerB } = await setupCourseAndPeers();
+      const matchId = randomUUID();
+      const { error: matchErr } = await harness.serviceClient.from("study_group_matches").insert({
+        id: matchId,
+        course_id: course.courseId,
+        student1_id: peerA.id,
+        student2_id: peerB.id,
+        concept_ids: [course.conceptIds[0]],
         status: "active",
       });
+      expect(matchErr).toBeNull();
 
-      const quest4Id = randomUUID();
-      await harness.serviceClient.from("party_quests").insert({
-        id: quest4Id,
-        match_id: match4Id,
-        concept_ids: [c4.conceptIds[0]],
+      const questId = randomUUID();
+      const { error: questErr } = await harness.serviceClient.from("party_quests").insert({
+        id: questId,
+        match_id: matchId,
+        concept_ids: [course.conceptIds[0]],
         status: "active",
       });
+      expect(questErr).toBeNull();
 
-      const attempt4Id = randomUUID();
-      await harness.serviceClient
+      const attemptId = randomUUID();
+      const { error: attemptErr } = await harness.serviceClient
         .from("quiz_attempts")
-        .insert(makeQuizAttempt(attempt4Id, p4A.id, c4.conceptIds[0]));
+        .insert(makeQuizAttempt(attemptId, peerA.id, course.conceptIds[0]));
+      expect(attemptErr).toBeNull();
 
-      await harness.serviceClient.from("party_quest_progress").insert({
-        party_quest_id: quest4Id,
-        student_id: p4A.id,
-        concept_id: c4.conceptIds[0],
-        quiz_attempt_id: attempt4Id,
+      const { error: progErr } = await harness.serviceClient.from("party_quest_progress").insert({
+        party_quest_id: questId,
+        student_id: peerA.id,
+        concept_id: course.conceptIds[0],
+        quiz_attempt_id: attemptId,
       });
+      expect(progErr).toBeNull();
 
-      runPsql(`DELETE FROM public.concept_nodes WHERE id = '${c4.conceptIds[0]}';`);
+      const { data: progBefore } = await harness.serviceClient
+        .from("party_quest_progress")
+        .select("*")
+        .eq("party_quest_id", questId);
+      expect(progBefore).toHaveLength(1);
+
+      runPsql(`DELETE FROM public.concept_nodes WHERE id = '${course.conceptIds[0]}';`);
       const { data: progAfterConceptDel } = await harness.serviceClient
         .from("party_quest_progress")
         .select("*")
-        .eq("party_quest_id", quest4Id);
+        .eq("party_quest_id", questId);
       expect(progAfterConceptDel).toHaveLength(0);
+    });
 
-      // 8e. Progress cascades from student deletion
-      const { course: c5, peerA: p5A, peerB: p5B } = await setupCourseAndPeers();
-      const match5Id = randomUUID();
-      await harness.serviceClient.from("study_group_matches").insert({
-        id: match5Id,
-        course_id: c5.courseId,
-        student1_id: p5A.id,
-        student2_id: p5B.id,
-        concept_ids: [c5.conceptIds[0]],
+    it("8e. verifies progress cascades from student deletion", async () => {
+      const { course, peerA, peerB } = await setupCourseAndPeers();
+      const matchId = randomUUID();
+      const { error: matchErr } = await harness.serviceClient.from("study_group_matches").insert({
+        id: matchId,
+        course_id: course.courseId,
+        student1_id: peerA.id,
+        student2_id: peerB.id,
+        concept_ids: [course.conceptIds[0]],
         status: "active",
       });
+      expect(matchErr).toBeNull();
 
-      const quest5Id = randomUUID();
-      await harness.serviceClient.from("party_quests").insert({
-        id: quest5Id,
-        match_id: match5Id,
-        concept_ids: [c5.conceptIds[0]],
+      const questId = randomUUID();
+      const { error: questErr } = await harness.serviceClient.from("party_quests").insert({
+        id: questId,
+        match_id: matchId,
+        concept_ids: [course.conceptIds[0]],
         status: "active",
       });
+      expect(questErr).toBeNull();
 
-      const attempt5Id = randomUUID();
-      await harness.serviceClient
+      const attemptId = randomUUID();
+      const { error: attemptErr } = await harness.serviceClient
         .from("quiz_attempts")
-        .insert(makeQuizAttempt(attempt5Id, p5A.id, c5.conceptIds[0]));
+        .insert(makeQuizAttempt(attemptId, peerA.id, course.conceptIds[0]));
+      expect(attemptErr).toBeNull();
 
-      await harness.serviceClient.from("party_quest_progress").insert({
-        party_quest_id: quest5Id,
-        student_id: p5A.id,
-        concept_id: c5.conceptIds[0],
-        quiz_attempt_id: attempt5Id,
+      const { error: progErr } = await harness.serviceClient.from("party_quest_progress").insert({
+        party_quest_id: questId,
+        student_id: peerA.id,
+        concept_id: course.conceptIds[0],
+        quiz_attempt_id: attemptId,
       });
+      expect(progErr).toBeNull();
 
-      runPsql(`DELETE FROM public.students WHERE id = '${p5A.id}';`);
+      const { data: progBefore } = await harness.serviceClient
+        .from("party_quest_progress")
+        .select("*")
+        .eq("party_quest_id", questId);
+      expect(progBefore).toHaveLength(1);
+
+      runPsql(`DELETE FROM public.students WHERE id = '${peerA.id}';`);
       const { data: progAfterStudentDel } = await harness.serviceClient
         .from("party_quest_progress")
         .select("*")
-        .eq("party_quest_id", quest5Id);
+        .eq("party_quest_id", questId);
       expect(progAfterStudentDel).toHaveLength(0);
     });
 
