@@ -36,3 +36,9 @@ export { GenerateLearningPageAi } from "./pipelines/generate-learning-page.js";
 export { fixtureGenerateLearningPage } from "./fixtures/learning-page.js";
 export { GenerateQuizAi } from "./pipelines/generate-quiz.js";
 export { fixtureGenerateQuizQuestions } from "./fixtures/quiz-questions.js";
+export { SearchResourcesAi } from "./pipelines/search-resources.js";
+export {
+  fixtureSearchAcademicResources,
+  fixtureAnswerResourceQuestion,
+} from "./fixtures/academic-resources.js";
+export { ResourceQaAi } from "./pipelines/resource-qa.js";
