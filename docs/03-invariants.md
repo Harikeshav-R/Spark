@@ -160,7 +160,7 @@ stateDiagram-v2
 | **Invalid JWT in Request** | Fall back to unverified payload decode or trust client header. | Return `401 UNAUTHORIZED`; terminate request immediately. |
 | **Student Requests Teacher Room** | Allow socket join if client provides `role: "teacher"`. | Server validates authenticated token role; rejects socket room join with `403 FORBIDDEN`. |
 | **Duplicate Poll Response** | Overwrite existing response and increment attempts counter again. | Return existing evaluation or `409 RESPONSE_ALREADY_SUBMITTED`; attempts incremented exactly once. |
-| **AI Evaluation Timeout** | Fabricate a default "partial" score ($c=0.50$) to avoid UI errors. | Leave response in `pending_evaluation` status; confidence unchanged; notify student/teacher of error. |
+| **AI Evaluation Timeout** | Fabricate a default "partial" score ($c=0.50$) to avoid UI errors. | Mark the stored response as failed when failure persistence succeeds; confidence and attempts remain unchanged; return the typed upstream error. If the failure marker itself cannot be persisted, the response can remain pending; never fabricate a grade. |
 | **Client Submits Quiz Score** | Accept client-supplied `correctCount: 5` and apply $+0.15$ delta. | Reject request. Server grades answers against stored `concept_quiz_questions` keys. |
 | **Single Peer Opts In** | Match with a random student from the course roster. | Keep student in pool with status `waiting`. Match only if another student opts in with gap $\ge 0.30$. |
 | **Missing Zoom Credentials** | Generate a fake link like `https://zoom.us/j/fake123`. | Keep match active for messaging; set `meetingStatus = "unavailable"`; surface honest configuration notice. |

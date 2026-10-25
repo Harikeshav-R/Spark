@@ -511,9 +511,97 @@ describe("Lane C: AI & Learning Service Ports & Deterministic Fixtures (P0-C-01)
       expect(suggestedInterventionsSchema.safeParse(payload).success).toBe(true);
     });
 
-    it("FakeAiService.suggestInterventions returns valid interventions", async () => {
-      const interventions = await fakeAi.suggestInterventions(FIXTURE_COURSE_ID, []);
-      expect(suggestedInterventionsSchema.safeParse(interventions).success).toBe(true);
+    it("suggests activation-caching interventions for mixed backprop responses", async () => {
+      const responses = [
+        { outcome: "correct", answer: "Backprop uses cached activations from the forward pass." },
+        { outcome: "wrong", answer: "Backprop never needs forward activations." },
+        { outcome: "wrong", answer: "Discard all intermediate activations before backward pass." },
+        { outcome: "partial", answer: "I know the chain rule but not why activations are stored." },
+      ];
+      const result = await fakeAi.suggestInterventions(FIXTURE_COURSE_ID, responses);
+      expect(suggestedInterventionsSchema.safeParse(result).success).toBe(true);
+      expect(result.misconceptions.length).toBeGreaterThanOrEqual(1);
+      expect(result.misconceptions.join(" ")).toMatch(/activation cach|forward.pass/i);
+      expect(result.recommendations.length).toBeGreaterThanOrEqual(2);
+      expect(result.recommendations.length).toBeLessThanOrEqual(3);
+      expect(
+        result.recommendations.some((r) =>
+          /computational graph/i.test(r.actionablePrompt)
+        )
+      ).toBe(true);
+    });
+
+    it("returns positive mastery confirmation for nonempty all-correct answers", async () => {
+      const responses = [
+        { outcome: "correct", answer: "The chain rule uses cached activations." },
+        { outcome: "correct", answer: "Intermediate values must be stored for backward pass." },
+      ];
+      const result = await fakeAi.suggestInterventions(FIXTURE_COURSE_ID, responses);
+      expect(suggestedInterventionsSchema.safeParse(result).success).toBe(true);
+      expect(result.misconceptions).toEqual([]);
+      expect(result.recommendations).toHaveLength(1);
+      expect(result.recommendations[0]!.description).toMatch(/all evaluated.*correct/i);
+    });
+
+    it("requests evaluated evidence without claiming mastery for empty or unrated answers", async () => {
+      const emptyResult = await fakeAi.suggestInterventions(FIXTURE_COURSE_ID, []);
+      expect(suggestedInterventionsSchema.safeParse(emptyResult).success).toBe(true);
+      expect(emptyResult.misconceptions).toEqual([]);
+      expect(emptyResult.recommendations).toHaveLength(1);
+      expect(emptyResult.recommendations[0]!.description).toMatch(
+        /no incorrect or partial|insufficient evidence/i
+      );
+      expect(emptyResult.recommendations[0]!.description).not.toMatch(
+        /all evaluated.*correct/i
+      );
+
+      const unratedResult = await fakeAi.suggestInterventions(FIXTURE_COURSE_ID, [
+        { outcome: "unrated", answer: "Response pending review" },
+        { outcome: "skipped", answer: "" },
+      ]);
+      expect(suggestedInterventionsSchema.safeParse(unratedResult).success).toBe(true);
+      expect(unratedResult.misconceptions).toEqual([]);
+      expect(unratedResult.recommendations).toHaveLength(1);
+      expect(unratedResult.recommendations[0]!.description).toMatch(
+        /no incorrect or partial|insufficient evidence/i
+      );
+      expect(unratedResult.recommendations[0]!.description).not.toMatch(
+        /all evaluated.*correct/i
+      );
+    });
+
+    it("produces actionable interventions rather than mastery confirmation for partial-only answers", async () => {
+      const responses = [
+        {
+          outcome: "partial",
+          answer: "I remember backprop involves the chain rule but not intermediate activations.",
+        },
+      ];
+      const result = await fakeAi.suggestInterventions(FIXTURE_COURSE_ID, responses);
+      expect(suggestedInterventionsSchema.safeParse(result).success).toBe(true);
+      expect(result.misconceptions.length).toBeGreaterThanOrEqual(1);
+      expect(result.misconceptions.join(" ")).toMatch(/activation cach|forward.pass/i);
+      expect(result.recommendations.length).toBeGreaterThanOrEqual(2);
+      expect(result.recommendations.length).toBeLessThanOrEqual(3);
+    });
+
+    it("determines topic exclusively from flawed responses, ignoring correct backprop text", async () => {
+      const responses = [
+        {
+          outcome: "correct",
+          answer: "Backprop requires caching activations from the forward pass.",
+        },
+        {
+          outcome: "wrong",
+          answer: "Learning rate should always be set to zero for numerical stability.",
+        },
+      ];
+      const result = await fakeAi.suggestInterventions(FIXTURE_COURSE_ID, responses);
+      expect(suggestedInterventionsSchema.safeParse(result).success).toBe(true);
+      expect(result.misconceptions.length).toBeGreaterThanOrEqual(1);
+      expect(result.misconceptions.join(" ")).not.toMatch(/activation|forward pass|backward pass/i);
+      expect(result.recommendations.length).toBeGreaterThanOrEqual(2);
+      expect(result.recommendations.length).toBeLessThanOrEqual(3);
     });
   });
 
