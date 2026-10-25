@@ -43,3 +43,20 @@ export {
   QuizService,
   type QuizServiceDependencies,
 } from "./quiz-service.js";
+
+export {
+  EncounterRepository,
+  type EncounterRepositoryPort,
+  type EncounterDatabaseClientPort,
+  type EncounterRecord,
+  type NewEncounterRecord,
+  type EncounterAttemptRecord,
+  type NewEncounterAttemptRecord,
+  type OptionPermutation,
+  optionPermutationSchema,
+} from "./encounter-repository.js";
+
+export {
+  EncounterService,
+  type EncounterServiceDependencies,
+} from "./encounter-service.js";
