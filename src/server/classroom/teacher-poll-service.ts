@@ -178,9 +178,7 @@ export class TeacherPollService implements TeacherPollServicePort {
       });
     }
 
-    const now = this.deps.clock.nowISO
-      ? this.deps.clock.nowISO()
-      : this.deps.clock.now().toISOString();
+    const now = this.deps.clock.nowISO();
 
     const draftPoll: PollQuestion = {
       id: this.deps.ids.generateId(),

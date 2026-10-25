@@ -380,6 +380,18 @@ describe("PollService Unit Tests (Lane B)", () => {
         studentId,
         { outcome: "correct", feedback: "Correct scalar relationship." },
       );
+      expect(mockPolls.getResponseCount).toHaveBeenCalledWith(studentActor, pollId);
+      expect(mockPublisher.emitToTeacher).toHaveBeenCalledWith(
+        lectureId,
+        "poll:response-count",
+        {
+          eventId,
+          occurredAt: mockTime,
+          lectureId,
+          pollId,
+          responseCount: 1,
+        },
+      );
       expect(mockEvidence.applyResponse).toHaveBeenCalledWith(
         studentActor,
         courseId,
@@ -475,6 +487,8 @@ describe("PollService Unit Tests (Lane B)", () => {
       expect(mockAi.evaluatePollResponse).not.toHaveBeenCalled();
       expect(mockEvidence.applyResponse).not.toHaveBeenCalled();
       expect(mockPublisher.emitToStudent).not.toHaveBeenCalled();
+      expect(mockPolls.getResponseCount).not.toHaveBeenCalled();
+      expect(mockPublisher.emitToTeacher).not.toHaveBeenCalled();
       expect(result).toEqual({
         responseId,
         status: "evaluated",
@@ -507,6 +521,8 @@ describe("PollService Unit Tests (Lane B)", () => {
         code: "POLL_RESPONSE_PENDING",
         statusCode: 409,
       });
+      expect(mockPolls.getResponseCount).not.toHaveBeenCalled();
+      expect(mockPublisher.emitToTeacher).not.toHaveBeenCalled();
     });
 
     it("throws 503 SERVICE_UNAVAILABLE when replaying a failed evaluation", async () => {
@@ -532,6 +548,150 @@ describe("PollService Unit Tests (Lane B)", () => {
         statusCode: 503,
         message: expect.stringContaining("failed"),
       });
+      expect(mockPolls.getResponseCount).not.toHaveBeenCalled();
+      expect(mockPublisher.emitToTeacher).not.toHaveBeenCalled();
+    });
+
+    it("completes evidence and returns mastery on evaluated replay missing cached mastery without second AI run or count query", async () => {
+      const evaluatedWithoutMasteryResponse: StoredPollResponse = {
+        id: responseId,
+        questionId: pollId,
+        studentId,
+        answer: rawAnswer,
+        status: "evaluated",
+        evaluation: {
+          outcome: "correct",
+          feedback: "Good answer.",
+        },
+        answeredAt: mockTime,
+      };
+
+      mockPolls.ingestResponse = vi.fn().mockResolvedValue({
+        response: evaluatedWithoutMasteryResponse,
+        inserted: false,
+      });
+      mockPolls.storeMasteryResult = vi.fn().mockResolvedValue({
+        response: {
+          ...evaluatedWithoutMasteryResponse,
+          evaluation: {
+            outcome: "correct",
+            feedback: "Good answer.",
+            mastery: { confidence: 0.85, band: "green", attempts: 1, version: 2 },
+          },
+        },
+        stored: true,
+      });
+
+      const service = createService();
+      const result = await service.respondToPoll(studentActor, pollId, studentId, rawAnswer);
+
+      expect(mockPolls.getResponseCount).not.toHaveBeenCalled();
+      expect(mockPublisher.emitToTeacher).not.toHaveBeenCalled();
+      expect(mockAi.evaluatePollResponse).not.toHaveBeenCalled();
+      expect(mockEvidence.applyResponse).toHaveBeenCalledWith(studentActor, courseId, responseId);
+      expect(mockPolls.storeMasteryResult).toHaveBeenCalled();
+      expect(mockPublisher.emitToStudent).toHaveBeenCalled();
+      expect(result).toEqual({
+        responseId,
+        status: "evaluated",
+        evaluation: { outcome: "correct", feedback: "Good answer." },
+        newConfidence: 0.85,
+        newBand: "green",
+      });
+    });
+
+    it.each([
+      ["count query failure", () => mockPolls.getResponseCount = vi.fn().mockRejectedValue(new Error("Count DB down"))],
+      ["teacher publication failure", () => mockPublisher.emitToTeacher = vi.fn().mockRejectedValue(new Error("Teacher socket down"))],
+    ])("preserves successful grading when %s occurs", async (_name, setupFailure) => {
+      setupFailure();
+      const pendingResponse: StoredPollResponse = {
+        id: responseId,
+        questionId: pollId,
+        studentId,
+        answer: rawAnswer,
+        status: "pending",
+        evaluation: null,
+        answeredAt: mockTime,
+      };
+      mockPolls.ingestResponse = vi.fn().mockResolvedValue({
+        response: pendingResponse,
+        inserted: true,
+      });
+      mockPolls.storeEvaluation = vi.fn().mockResolvedValue({
+        ...pendingResponse,
+        status: "evaluated",
+        evaluation: { outcome: "correct", feedback: "Correct scalar relationship." },
+      });
+      mockPolls.storeMasteryResult = vi.fn().mockResolvedValue({
+        response: {
+          ...pendingResponse,
+          status: "evaluated",
+          evaluation: {
+            outcome: "correct",
+            feedback: "Correct scalar relationship.",
+            mastery: { confidence: 0.85, band: "green", attempts: 1, version: 2 },
+          },
+        },
+        stored: true,
+      });
+
+      const service = createService();
+      const result = await service.respondToPoll(studentActor, pollId, studentId, rawAnswer);
+
+      expect(result.status).toBe("evaluated");
+      expect(result.newConfidence).toBe(0.85);
+      expect(result.newBand).toBe("green");
+      expect(mockEvidence.applyResponse).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      [
+        "ordinary AI Error",
+        new Error("AI connection timeout"),
+        (err: unknown) => {
+          expect(err).toBeInstanceOf(AppError);
+          expect((err as AppError).statusCode).toBe(502);
+          expect((err as AppError).cause).toBeInstanceOf(Error);
+        },
+      ],
+      [
+        "typed AppError(504)",
+        new AppError({ code: "GATEWAY_TIMEOUT", statusCode: 504, message: "AI provider timeout" }),
+        (err: unknown) => {
+          expect(err).toBeInstanceOf(AppError);
+          expect((err as AppError).statusCode).toBe(504);
+        },
+      ],
+    ])("preserves upstream error when AI fails and failure persistence also fails: %s", async (_name, aiError, assertError) => {
+      const pendingResponse: StoredPollResponse = {
+        id: responseId,
+        questionId: pollId,
+        studentId,
+        answer: rawAnswer,
+        status: "pending",
+        evaluation: null,
+        answeredAt: mockTime,
+      };
+      mockPolls.ingestResponse = vi.fn().mockResolvedValue({
+        response: pendingResponse,
+        inserted: true,
+      });
+      mockAi.evaluatePollResponse = vi.fn().mockRejectedValue(aiError);
+      mockPolls.markEvaluationFailed = vi.fn().mockRejectedValue(new Error("Persistence DB failed"));
+
+      const service = createService();
+      let thrownError: unknown;
+      try {
+        await service.respondToPoll(studentActor, pollId, studentId, rawAnswer);
+      } catch (err) {
+        thrownError = err;
+      }
+
+      expect(thrownError).toBeDefined();
+      assertError(thrownError);
+      expect(mockEvidence.applyResponse).not.toHaveBeenCalled();
+      expect(mockPublisher.emitToStudent).not.toHaveBeenCalled();
     });
   });
 });

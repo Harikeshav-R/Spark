@@ -608,14 +608,7 @@ export class PollRepository {
   async getResponseCount(actor: ActorContext, pollId: UUID): Promise<number> {
     await this.getPoll(actor, pollId);
 
-    const clientWithCount = this.client as unknown as {
-      from(t: string): {
-        select(c: string, opts?: { count?: string; head?: boolean }): {
-          eq(col: string, val: string): Promise<{ data: unknown; count: number | null; error: unknown }>;
-        };
-      };
-    };
-    const result = await clientWithCount
+    const result = await this.client
       .from("poll_responses")
       .select("id", { count: "exact", head: true })
       .eq("question_id", pollId);

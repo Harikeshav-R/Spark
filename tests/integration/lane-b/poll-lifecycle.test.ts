@@ -29,6 +29,7 @@ import {
 import type {
   PollNewQuestionEvent,
   PollClosedEvent,
+  PollResponseCountEvent,
 } from "../../../src/contracts/realtime.js";
 import type { MasteryUpdatedEvent } from "../../../src/contracts/mastery.js";
 import type { Clock } from "../../../src/contracts/common.js";
@@ -199,6 +200,11 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       const studentSocket = connectClient(port, studentToken);
       activeSockets.push(teacherSocket, studentSocket);
       await Promise.all([waitForConnect(teacherSocket), waitForConnect(studentSocket)]);
+      // Teacher joins lecture room so they receive professor broadcasts
+      const teacherJoinRes = await emitWithAck<{ success: boolean }>(teacherSocket, "lecture:join", {
+        lectureId,
+      });
+      expect(teacherJoinRes).toEqual({ success: true });
 
       // Student joins lecture room so they receive broadcasts and become attending in presence tracker
       const joinRes = await emitWithAck<{ success: boolean }>(studentSocket, "lecture:join", {
@@ -230,6 +236,7 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
         teacherActor,
         studentActor,
         pollService,
+        teacherSocket,
         studentSocket,
       } = await setupHarnessAndSockets();
 
@@ -274,6 +281,10 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       expect(dbPollActive?.activated_at).toBeDefined();
 
       // 3. Student submits correct answer
+      const countPromise = waitForEvent<PollResponseCountEvent>(
+        teacherSocket,
+        "poll:response-count",
+      );
       const masteryPromise = waitForEvent<MasteryUpdatedEvent>(
         studentSocket,
         "mastery:updated",
@@ -291,6 +302,10 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       expect(responseResult.evaluation.outcome).toBe("correct");
       expect(responseResult.newConfidence).toBe(0.85);
       expect(responseResult.newBand).toBe("green");
+
+      const countEvent = await countPromise;
+      expect(countEvent.pollId).toBe(pollId);
+      expect(countEvent.responseCount).toBe(1);
 
       const masteryEvent = await masteryPromise;
       expect(masteryEvent.studentId).toBe(studentId);
@@ -311,9 +326,13 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       expect(dbResponse?.evaluation?.mastery?.attempts).toBe(1);
 
       // 4. Identical replay returns cached result without incrementing attempts or re-emitting
-      let duplicateEventReceived = false;
+      let duplicateMasteryReceived = false;
       studentSocket.once("mastery:updated", () => {
-        duplicateEventReceived = true;
+        duplicateMasteryReceived = true;
+      });
+      let duplicateCountReceived = false;
+      teacherSocket.once("poll:response-count", () => {
+        duplicateCountReceived = true;
       });
 
       const replayResult = await pollService.respondToPoll(
@@ -324,7 +343,13 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       );
       expect(replayResult.responseId).toBe(responseResult.responseId);
       expect(replayResult.newConfidence).toBe(0.85);
-      expect(duplicateEventReceived).toBe(false);
+
+      // Delivery barrier: same-socket acknowledgement ensures in-flight events are flushed
+      await emitWithAck(teacherSocket, "lecture:join", { lectureId });
+      await emitWithAck(studentSocket, "lecture:join", { lectureId });
+
+      expect(duplicateMasteryReceived).toBe(false);
+      expect(duplicateCountReceived).toBe(false);
 
       // Verify DB attempts remains 1
       const { data: dbMastery } = await harness.serviceClient
