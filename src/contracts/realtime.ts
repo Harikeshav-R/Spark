@@ -27,6 +27,7 @@ export interface TranscriptChunkEvent {
   text: string;
   timestampSec: number;
   speakerName?: string;
+  isSimulated?: boolean;
 }
 
 export interface ConceptDetectedEvent {
@@ -210,6 +211,7 @@ export const transcriptChunkEventSchema = z.object({
   text: z.string().min(1),
   timestampSec: z.number().nonnegative(),
   speakerName: z.string().optional(),
+  isSimulated: z.boolean().optional(),
 });
 
 export const conceptDetectedEventSchema = z.object({

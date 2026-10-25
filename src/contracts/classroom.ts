@@ -28,6 +28,7 @@ export interface TranscriptChunk {
   timestampSec: number;
   speakerName?: string;
   detectedConceptIds: UUID[];
+  isSimulated?: boolean;
   createdAt: ISOTimestamp;
 }
 
@@ -101,7 +102,8 @@ export interface ClassroomService {
     lectureId: UUID,
     text: string,
     timestampSec: number,
-    speakerName?: string
+    speakerName?: string,
+    provenance?: { isSimulated: boolean }
   ): Promise<TranscriptChunk>;
   generatePoll(actor: ActorContext, lectureId: UUID, conceptId?: UUID): Promise<PollQuestion>;
   activatePoll(actor: ActorContext, pollId: UUID): Promise<PollQuestion>;
@@ -182,6 +184,7 @@ export const transcriptChunkSchema = z.object({
   timestampSec: z.number().nonnegative(),
   speakerName: z.string().optional(),
   detectedConceptIds: z.array(uuidSchema),
+  isSimulated: z.boolean().optional(),
   createdAt: isoTimestampSchema,
 });
 
