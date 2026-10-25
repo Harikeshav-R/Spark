@@ -467,6 +467,16 @@ export interface CourseEffortDTO {
   xp: number;
   averageConfidence: number;
   flag: "high_effort_low_mastery" | null;
+  unassessed: boolean; // true if averageConfidence === 0
+}
+
+export interface ClassSkyConcept extends CourseHeatmapConcept {
+  band: MasteryBand;
+  taught: boolean;
+}
+
+export interface ClassSkySnapshot extends CourseHeatmapSnapshot {
+  concepts: ClassSkyConcept[];
 }
 
 export interface GameService {
@@ -474,6 +484,7 @@ export interface GameService {
   getSummary(actor: ActorContext, studentId: UUID): Promise<GameSummaryDTO>;
   getEclipse(actor: ActorContext, studentId: UUID): Promise<EclipseDTO>;
   getCourseEffort(actor: ActorContext, courseId: UUID): Promise<CourseEffortDTO[]>;
+  getClassSky(actor: ActorContext, courseId: UUID): Promise<ClassSkySnapshot>;
 }
 
 export interface EncounterService {

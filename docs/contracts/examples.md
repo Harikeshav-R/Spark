@@ -552,18 +552,43 @@ This document provides complete, canonical JSON fixtures for API requests, respo
     "name": "Rahul Verma",
     "xp": 508,
     "averageConfidence": 0.38,
-    "flag": "high_effort_low_mastery"
+    "flag": "high_effort_low_mastery",
+    "unassessed": false
   },
   {
     "studentId": "44444444-4444-4444-8444-444444444401",
     "name": "Hari Ram",
     "xp": 620,
     "averageConfidence": 0.82,
-    "flag": null
+    "flag": null,
+    "unassessed": false
   }
 ]
 ```
 
+### `GET /api/courses/:courseId/class-sky` (Response)
+```json
+{
+  "courseId": "22222222-2222-4222-8222-222222222222",
+  "totalStudents": 2,
+  "concepts": [
+    {
+      "conceptId": "33333333-3333-4333-8333-333333333301",
+      "label": "Attention Mechanisms",
+      "category": "Neural Networks",
+      "averageConfidence": 0.60,
+      "distribution": {
+        "gray": 0,
+        "red": 0,
+        "yellow": 2,
+        "green": 0
+      },
+      "band": "yellow",
+      "taught": true
+    }
+  ]
+}
+```
 ### `game:updated` (Socket Event Payload)
 ```json
 {
