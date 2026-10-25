@@ -88,6 +88,10 @@ import {
   createSupabaseClients,
   apiErrorHandler,
   readServerConfig,
+  createDemoRouter,
+  DemoController,
+  readDemoConfig,
+  type DemoConfig,
 } from "../src/server/platform/index.js";
 import {
   type RealtimeSocketServer,
@@ -138,10 +142,11 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
   app.use(express.json());
 
   let isClosing = false;
+  let demoController: DemoController | null = null;
   const inFlightResponses = new Set<Response>();
 
-  // Admission middleware: reject new requests once closing begins
-  app.use((_req: Request, res: Response, nextMiddleware) => {
+  // Admission middleware: reject new requests once closing begins or demo maintenance active
+  app.use((req: Request, res: Response, nextMiddleware) => {
     if (isClosing) {
       res.setHeader("Connection", "close");
       res.status(503).json({
@@ -152,6 +157,22 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
             typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
               ? crypto.randomUUID()
               : "00000000-0000-0000-0000-000000000000",
+        },
+      });
+      return;
+    }
+
+    if (
+      demoController?.isMaintenanceActive() &&
+      req.path !== "/api/health" &&
+      req.path !== "/api/demo/reset"
+    ) {
+      res.setHeader("Connection", "close");
+      res.status(409).json({
+        error: {
+          code: "CONFLICT",
+          message: "Demo system maintenance in progress",
+          requestId: dependencies.ids.generateId(),
         },
       });
       return;
@@ -519,13 +540,30 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     courses,
     mastery
   );
+  const env = dependencies.env ?? process.env;
+  const isDemoEnabled = env.NODE_ENV !== "production" && env.DEMO_MODE === "true";
+  const demoConfig: DemoConfig | null = isDemoEnabled ? readDemoConfig(env) : null;
+
+  const pollPublisher = {
+    ...publisher,
+    emitToLecture: async (lectureId: string, event: string, data: unknown) => {
+      await publisher.emitToLecture(lectureId, event, data);
+      if (event === "poll:new-question" && demoController) {
+        const pollId = (data as { pollId?: string })?.pollId;
+        if (pollId) {
+          demoController.onPollActivated(pollId);
+        }
+      }
+    },
+  };
+
   const pollService = new PollService({
     polls: pollRepository,
     rooms,
     presence,
     ai: new EvaluatePollAi(dependencies.aiClient),
     evidence: pollEvidenceService,
-    publisher,
+    publisher: pollPublisher,
     ids: dependencies.ids,
     clock: dependencies.clock,
   });
@@ -566,7 +604,6 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       pollRepo: pollRepository,
     })
   );
-  const env = dependencies.env ?? process.env;
 
   const zoomOAuth = new ZoomOAuth({
     client: dependencies.databaseClient,
@@ -619,6 +656,36 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     })
   );
 
+  if (isDemoEnabled && demoConfig) {
+    demoController = new DemoController({
+      config: demoConfig,
+      env,
+      auth: dependencies.auth,
+      courses,
+      lectures: lectureRepository,
+      polls: pollRepository,
+      pollService,
+      speech,
+      transcripts: transcriptIngestor,
+      transcriptRepo: transcriptRepository,
+      availability: availabilityService,
+      studyGroups: studyGroupService,
+      heatmap,
+      presence,
+      io,
+      databaseClient: dependencies.databaseClient,
+      clock: dependencies.clock,
+    });
+
+    app.use(
+      createDemoRouter({
+        auth: dependencies.auth,
+        controller: demoController,
+        config: demoConfig,
+      }),
+    );
+  }
+
   app.use(apiErrorHandler);
   let disposePromise: Promise<void> | null = null;
   const dispose = async (): Promise<void> => {
@@ -646,6 +713,14 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       }
 
       let speechErr: unknown = null;
+      if (demoController) {
+        try {
+          demoController.dispose();
+        } catch (demoErr) {
+          console.error("Error disposing demo controller:", demoErr);
+        }
+      }
+
       try {
         await speech.dispose();
       } catch (err) {
