@@ -5,7 +5,14 @@ import type { UUID } from "@/contracts/common";
 import type { ConceptNode } from "@/contracts/course";
 import { courseGraphResponseSchema } from "@/contracts/course";
 import { studyGroupOptInResponseSchema } from "@/contracts/classroom";
-import { studyGroupMatchedEventSchema, type StudyGroupMatchedEvent } from "@/contracts/realtime";
+import {
+  studyGroupMatchedEventSchema,
+  partyQuestUpdatedEventSchema,
+  socketAckResponseSchema,
+  type StudyGroupMatchedEvent,
+} from "@/contracts/realtime";
+import { CandidateInvites } from "./candidate-invites";
+import { PartyQuestPanel } from "./party-quest-panel";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { requestJson, getRuntimeAccessToken } from "@/lib/client/http";
@@ -81,6 +88,9 @@ function InnerStudyGroupView({
   const [matchedPeerName, setMatchedPeerName] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
+  const [partyRefreshKey, setPartyRefreshKey] = useState<number>(0);
+  const matchIdRef = useRef<UUID | null>(null);
+  matchIdRef.current = matchId;
 
   // Socket state
   const [socketDisconnected, setSocketDisconnected] = useState<boolean>(false);
@@ -157,6 +167,26 @@ function InnerStudyGroupView({
 
       socket.on("connect", () => {
         setSocketDisconnected(false);
+        if (matchIdRef.current) {
+          const currentMatch = matchIdRef.current;
+          socket.emit(
+            "study-group:join",
+            { matchId: currentMatch },
+            (rawAck: unknown) => {
+              if (matchIdRef.current !== currentMatch) return;
+              const ack = socketAckResponseSchema.safeParse(rawAck);
+              if (!ack.success || !ack.data.success) {
+                setErrorNotice(
+                  ack.success && ack.data.error
+                    ? ack.data.error
+                    : "Failed to join study group realtime session."
+                );
+              } else {
+                setPartyRefreshKey((k) => k + 1);
+              }
+            }
+          );
+        }
       });
 
       socket.on("disconnect", () => {
@@ -165,6 +195,16 @@ function InnerStudyGroupView({
 
       socket.on("connect_error", () => {
         setSocketDisconnected(true);
+      });
+
+      socket.on("party:quest-updated", (rawData: unknown) => {
+        const parsed = partyQuestUpdatedEventSchema.safeParse(rawData);
+        if (!parsed.success) return;
+
+        const event = parsed.data;
+        if (event.matchId !== matchIdRef.current) return;
+
+        setPartyRefreshKey((k) => k + 1);
       });
 
       socket.on("study-group:matched", (rawData: unknown) => {
@@ -202,6 +242,39 @@ function InnerStudyGroupView({
       }
     };
   }, [courseId]);
+  // Join active match room when matchId becomes known
+  useEffect(() => {
+    const socket = socketRef.current;
+    if (!socket || !matchId) {
+      return;
+    }
+
+    const currentMatch = matchId;
+    socket.emit(
+      "study-group:join",
+      { matchId: currentMatch },
+      (rawAck: unknown) => {
+        if (matchIdRef.current !== currentMatch) return;
+        const ack = socketAckResponseSchema.safeParse(rawAck);
+        if (!ack.success || !ack.data.success) {
+          setErrorNotice(
+            ack.success && ack.data.error
+              ? ack.data.error
+              : "Failed to join study group realtime session."
+          );
+        } else {
+          setPartyRefreshKey((k) => k + 1);
+        }
+      }
+    );
+
+    return () => {
+      if (socket.connected) {
+        socket.emit("study-group:leave", { matchId: currentMatch }, () => {});
+      }
+    };
+  }, [matchId]);
+
 
   // Expiration timer countdown
   useEffect(() => {
@@ -210,10 +283,12 @@ function InnerStudyGroupView({
     }
 
     function updateRemaining() {
-      const diffMs = new Date(expiresAt!).getTime() - Date.now();
+      const now = Date.now();
+      const expiryTime = Date.parse(expiresAt!);
+      const diffMs = expiryTime - now;
       const secs = Math.max(0, Math.floor(diffMs / 1000));
       setRemainingSeconds(secs);
-      if (secs <= 0) {
+      if (now >= expiryTime) {
         setLobbyState("expired");
       }
     }
@@ -518,20 +593,35 @@ function InnerStudyGroupView({
           )}
 
           {lobbyState === "matched" && (
-            <div
-              role="status"
-              aria-live="polite"
-              className="p-5 rounded-xl border border-[#2b7f55] bg-[#dff1e5] text-[#2b2a2e] space-y-2 shadow-xs"
-              data-testid="study-pool-matched"
-            >
-              <h4 className="font-bold text-base text-[#2b7f55]">✨ Study Partner Matched!</h4>
-              {matchedPeerName ? (
-                <p className="text-sm font-medium">Matched peer: {matchedPeerName}</p>
-              ) : (
-                <p className="text-sm font-medium">Study partner matched</p>
-              )}
+            <div className="space-y-4">
+              <div
+                role="status"
+                aria-live="polite"
+                className="p-5 rounded-xl border border-[#2b7f55] bg-[#dff1e5] text-[#2b7f55] space-y-2 shadow-xs"
+                data-testid="study-pool-matched"
+              >
+                <h4 className="font-bold text-base text-[#2b7f55]">✨ Study Partner Matched!</h4>
+                {matchedPeerName ? (
+                  <p className="text-sm font-medium">Matched peer: {matchedPeerName}</p>
+                ) : (
+                  <p className="text-sm font-medium">Study partner matched</p>
+                )}
+                {matchId && (
+                  <p className="text-xs font-mono text-[#5f5b54]">Match ID: {matchId}</p>
+                )}
+              </div>
+
               {matchId && (
-                <p className="text-xs font-mono text-[#5f5b54]">Match ID: {matchId}</p>
+                <div className="pt-2">
+                  <PartyQuestPanel
+                    key={`${studentId}-${courseId}-${matchId}`}
+                    matchId={matchId}
+                    studentId={studentId}
+                    concepts={concepts.map((c) => ({ id: c.id, label: c.label }))}
+                    peerName={matchedPeerName ?? undefined}
+                    refreshKey={partyRefreshKey}
+                  />
+                </div>
               )}
             </div>
           )}
@@ -561,6 +651,21 @@ function InnerStudyGroupView({
           )}
         </CardContent>
       </Card>
+      {expiresAt &&
+        (lobbyState === "waiting" ||
+          lobbyState === "leaving" ||
+          lobbyState === "expired") && (
+          <CandidateInvites
+            key={`${courseId}-${studentId}-${expiresAt}`}
+            studentId={studentId}
+            courseId={courseId}
+            conceptIds={selectedConceptIds}
+            pool={{
+              status: lobbyState,
+              expiresAt,
+            }}
+          />
+        )}
     </div>
   );
 }
@@ -569,7 +674,7 @@ export function StudyGroupFeature(props: StudyGroupFeatureProps): React.JSX.Elem
   const resetKey = `${props.studentId}-${props.courseId}`;
   return (
     <FeatureErrorBoundary resetKey={resetKey}>
-      <InnerStudyGroupView {...props} />
+        <InnerStudyGroupView key={resetKey} {...props} />
     </FeatureErrorBoundary>
   );
 }

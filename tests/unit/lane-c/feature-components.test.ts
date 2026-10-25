@@ -68,6 +68,13 @@ class MockSocket {
       h(...args);
     }
   }
+  public emit(event: string, ...args: unknown[]): this {
+    const lastArg = args[args.length - 1];
+    if (typeof lastArg === "function") {
+      lastArg({ success: true });
+    }
+    return this;
+  }
 }
 
 let activeMockSocket: MockSocket | null = null;
@@ -682,13 +689,30 @@ describe("P5-C-05 Feature Components Suite", () => {
       const matchId: UUID = "77777777-7777-4777-8777-777777777777";
       const expiresAt = new Date(Date.now() + 300000).toISOString();
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          status: "waiting",
-          expiresAt,
-        }),
+      mockFetch.mockImplementation(async (url: string | URL | Request) => {
+        const urlStr = url.toString();
+        if (urlStr.includes("/candidates")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ candidates: [] }),
+          };
+        }
+        if (urlStr.includes("/quests")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ partyQuests: [] }),
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: "waiting",
+            expiresAt,
+          }),
+        };
       });
 
       await act(async () => {
@@ -740,20 +764,30 @@ describe("P5-C-05 Feature Components Suite", () => {
       const expiresAt = new Date(Date.now() + 300000).toISOString();
 
       // Opt-in response
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          status: "waiting",
-          expiresAt,
-        }),
-      });
-
-      // Opt-out response
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ success: true }),
+      mockFetch.mockImplementation(async (url: string | URL | Request) => {
+        const urlStr = url.toString();
+        if (urlStr.includes("/candidates")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ candidates: [] }),
+          };
+        }
+        if (urlStr.includes("/opt-out")) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ success: true }),
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: "waiting",
+            expiresAt,
+          }),
+        };
       });
 
       await act(async () => {
