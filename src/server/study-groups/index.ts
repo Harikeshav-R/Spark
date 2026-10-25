@@ -25,3 +25,13 @@ export {
   MessagingService,
   type MessagingServiceDependencies,
 } from "./messaging-service.js";
+
+export {
+  SchedulerRepository,
+  type SchedulingMatch,
+} from "./scheduler-repository.js";
+
+export {
+  Scheduler,
+  type SchedulerDependencies,
+} from "./scheduler.js";
