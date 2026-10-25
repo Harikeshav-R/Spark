@@ -10,6 +10,8 @@ import {
   encounterSchema,
   encounterResultSchema,
   courseEffortSchema,
+  classSkyConceptSchema,
+  classSkySnapshotSchema,
   encounterHintResponseSchema,
   gameUpdatedEventSchema,
   partyQuestUpdatedEventSchema,
@@ -357,6 +359,71 @@ describe("Lane A: Shared Game, Encounter & Party Extension Contracts (P1-A-05)",
       expect(partyQuestUpdatedEventSchema.safeParse({ ...base, totalPairs: 2, completedPairs: 3 }).success).toBe(false);
       // Negative completedPairs
       expect(partyQuestUpdatedEventSchema.safeParse({ ...base, totalPairs: 2, completedPairs: -1 }).success).toBe(false);
+    });
+  });
+
+  describe("8. Class Sky and Course Effort Contracts (P4-A-03)", () => {
+    const validClassSkyConcept = {
+      conceptId: VALID_UUID,
+      label: "Recursion",
+      category: "Algorithms",
+      averageConfidence: 0.75,
+      distribution: { gray: 0, red: 0, yellow: 1, green: 1 },
+      band: "yellow",
+      taught: true,
+    };
+
+    const validClassSkySnapshot = {
+      courseId: VALID_UUID_2,
+      totalStudents: 2,
+      concepts: [validClassSkyConcept],
+    };
+
+    it("rejects missing or non-boolean unassessed in courseEffortSchema", () => {
+      const base = { ...FIXTURE_COURSE_EFFORT[0] };
+
+      expect(courseEffortSchema.safeParse({ ...base, unassessed: true }).success).toBe(true);
+      expect(courseEffortSchema.safeParse({ ...base, unassessed: false }).success).toBe(true);
+
+      const missingUnassessed = { ...base };
+      delete (missingUnassessed as Record<string, unknown>).unassessed;
+      expect(courseEffortSchema.safeParse(missingUnassessed).success).toBe(false);
+
+      expect(courseEffortSchema.safeParse({ ...base, unassessed: "true" }).success).toBe(false);
+      expect(courseEffortSchema.safeParse({ ...base, unassessed: 1 }).success).toBe(false);
+      expect(courseEffortSchema.safeParse({ ...base, unassessed: null }).success).toBe(false);
+    });
+
+    it("validates ClassSkyConcept shape and rejects invalid confidence", () => {
+      expect(classSkyConceptSchema.safeParse(validClassSkyConcept).success).toBe(true);
+
+      expect(classSkyConceptSchema.safeParse({ ...validClassSkyConcept, taught: "yes" }).success).toBe(false);
+      expect(classSkyConceptSchema.safeParse({ ...validClassSkyConcept, band: "purple" }).success).toBe(false);
+      expect(classSkyConceptSchema.safeParse({ ...validClassSkyConcept, averageConfidence: -0.1 }).success).toBe(false);
+      expect(classSkyConceptSchema.safeParse({ ...validClassSkyConcept, averageConfidence: 1.1 }).success).toBe(false);
+      expect(classSkyConceptSchema.safeParse({ ...validClassSkyConcept, averageConfidence: NaN }).success).toBe(false);
+      expect(classSkyConceptSchema.safeParse({ ...validClassSkyConcept, averageConfidence: Infinity }).success).toBe(false);
+    });
+
+    it("enforces distribution sum invariant in ClassSkySnapshot via safeExtend", () => {
+      expect(classSkySnapshotSchema.safeParse(validClassSkySnapshot).success).toBe(true);
+
+      // Distribution sum (1) != totalStudents (2) -> must reject
+      const invalidDistribution = {
+        ...validClassSkySnapshot,
+        concepts: [{
+          ...validClassSkyConcept,
+          distribution: { gray: 1, red: 0, yellow: 0, green: 0 }, // sum 1 !== 2
+        }],
+      };
+      expect(classSkySnapshotSchema.safeParse(invalidDistribution).success).toBe(false);
+
+      // Empty concepts array is valid with totalStudents: 0
+      expect(classSkySnapshotSchema.safeParse({
+        courseId: VALID_UUID_2,
+        totalStudents: 0,
+        concepts: [],
+      }).success).toBe(true);
     });
   });
 });

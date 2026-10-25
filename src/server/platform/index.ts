@@ -11,3 +11,11 @@ export {
 export {
   requireAuth,
 } from "./middleware/require-auth";
+
+export {
+  mapPostgrestError,
+} from "./postgrest-error";
+
+export {
+  apiErrorHandler,
+} from "./middleware/api-error-handler";

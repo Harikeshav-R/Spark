@@ -3,7 +3,7 @@ import type { NextFunction, Request, Response, Router } from "express";
 import { uuidSchema } from "../../../contracts/common.js";
 import { AppError } from "../../../contracts/errors.js";
 import type { AuthGateway } from "../../platform/index.js";
-import { requireAuth } from "../../platform/index.js";
+import { requireAuth, apiErrorHandler } from "../../platform/index.js";
 import type { HeatmapService } from "./heatmap-service.js";
 
 export interface HeatmapRouterDependencies {
@@ -48,27 +48,7 @@ export function createHeatmapRouter(dependencies: HeatmapRouterDependencies): Ro
     },
   );
 
-  router.use(
-    (err: unknown, _req: Request, res: Response, next: NextFunction): void => {
-      if (res.headersSent) {
-        next(err);
-        return;
-      }
-
-      if (err instanceof AppError) {
-        res.status(err.statusCode).json(err.toResponse());
-        return;
-      }
-
-      const internalErr = new AppError({
-        code: "INTERNAL_SERVER_ERROR",
-        statusCode: 500,
-        message: "An internal server error occurred",
-        cause: err,
-      });
-      res.status(500).json(internalErr.toResponse());
-    },
-  );
+  router.use(apiErrorHandler);
 
   return router;
 }

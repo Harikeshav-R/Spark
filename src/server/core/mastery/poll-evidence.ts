@@ -6,7 +6,7 @@ import type { CourseService } from "../../../contracts/course.js";
 import type { MasteryService } from "../../../contracts/mastery.js";
 import { evaluatedPollResponseSchema } from "../../../contracts/ai.js";
 import { AppError } from "../../../contracts/errors.js";
-
+import { mapPostgrestError } from "../../platform/index.js";
 export interface PollEvidenceResult {
   responseId: UUID;
   studentId: UUID;
@@ -38,54 +38,6 @@ const pollResponseRowSchema = z.object({
   }),
 });
 
-interface PostgrestErrorLike {
-  code?: string;
-  message?: string;
-  details?: string;
-  hint?: string;
-}
-
-function mapPostgrestError(errUnknown: unknown, contextMessage: string): AppError {
-  if (errUnknown instanceof AppError) {
-    return errUnknown;
-  }
-  const err = (errUnknown ?? {}) as PostgrestErrorLike;
-  const code = typeof err.code === "string" ? err.code : "";
-
-  if (code === "PGRST000" || code === "PGRST001" || code === "PGRST002") {
-    return new AppError({
-      code: "SERVICE_UNAVAILABLE",
-      statusCode: 503,
-      message: `${contextMessage}: Database service unavailable`,
-      cause: errUnknown,
-    });
-  }
-
-  if (code === "42501") {
-    return new AppError({
-      code: "FORBIDDEN",
-      statusCode: 403,
-      message: `${contextMessage}: Permission denied`,
-      cause: errUnknown,
-    });
-  }
-
-  if (code === "P0002") {
-    return new AppError({
-      code: "NOT_FOUND",
-      statusCode: 404,
-      message: `${contextMessage}: Record not found`,
-      cause: errUnknown,
-    });
-  }
-
-  return new AppError({
-    code: "INTERNAL_SERVER_ERROR",
-    statusCode: 500,
-    message: `${contextMessage}: ${err.message || "Database error"}`,
-    cause: errUnknown,
-  });
-}
 
 export class PollEvidenceService {
   constructor(
@@ -154,11 +106,11 @@ export class PollEvidenceService {
     try {
       queryResult = await query.maybeSingle();
     } catch (err: unknown) {
-      throw mapPostgrestError(err, "Failed to load poll response");
+      throw mapPostgrestError(err, "Failed to load poll response", "poll");
     }
 
     if (queryResult.error) {
-      throw mapPostgrestError(queryResult.error, "Failed to load poll response");
+      throw mapPostgrestError(queryResult.error, "Failed to load poll response", "poll");
     }
 
     if (!queryResult.data) {

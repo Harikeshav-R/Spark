@@ -40,8 +40,6 @@ export {
 export {
   CourseEffortService,
   type CourseEffortServiceDependencies,
-  type ClassSkyConcept,
-  type ClassSkySnapshot,
 } from "./game/course-effort-service";
 
 export {

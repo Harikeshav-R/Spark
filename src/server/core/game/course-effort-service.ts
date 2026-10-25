@@ -2,7 +2,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import type {
   ActorContext,
-  MasteryBand,
   UUID,
 } from "../../../contracts/common.js";
 import { uuidSchema } from "../../../contracts/common.js";
@@ -10,58 +9,22 @@ import type { CourseService } from "../../../contracts/course.js";
 import type {
   CourseEffortDTO,
   GameService,
+  ClassSkySnapshot,
 } from "../../../contracts/game.js";
-import { courseEffortSchema } from "../../../contracts/game.js";
-import type {
-  CourseHeatmapSnapshot,
-} from "../../../contracts/mastery.js";
+import {
+  courseEffortSchema,
+  classSkySnapshotSchema,
+} from "../../../contracts/game.js";
 import {
   confidenceSchema,
   confidenceToBand,
 } from "../../../contracts/mastery.js";
 import { AppError } from "../../../contracts/errors.js";
+import { mapPostgrestError } from "../../platform/index.js";
+import { requireCourseTeacher } from "../courses/require-course-teacher.js";
 import type { HeatmapService } from "../mastery/heatmap-service.js";
-
 const PAGE_SIZE = 500;
 
-interface PostgrestErrorLike {
-  code?: string;
-  message?: string;
-  details?: string;
-  hint?: string;
-}
-
-function mapPostgrestError(errUnknown: unknown, contextMessage: string): AppError {
-  if (errUnknown instanceof AppError) {
-    return errUnknown;
-  }
-  const err = (errUnknown ?? {}) as PostgrestErrorLike;
-  const code = typeof err.code === "string" ? err.code : "";
-
-  if (code === "PGRST000" || code === "PGRST001" || code === "PGRST002") {
-    return new AppError({
-      code: "SERVICE_UNAVAILABLE",
-      statusCode: 503,
-      message: contextMessage,
-      cause: errUnknown,
-    });
-  }
-  if (code === "42501") {
-    return new AppError({
-      code: "FORBIDDEN",
-      statusCode: 403,
-      message: `${contextMessage}: Permission denied`,
-      cause: errUnknown,
-    });
-  }
-
-  return new AppError({
-    code: "INTERNAL_SERVER_ERROR",
-    statusCode: 500,
-    message: `${contextMessage}: ${err.message ?? "Unexpected database error"}`,
-    cause: errUnknown,
-  });
-}
 
 const conceptNodeRowSchema = z.object({
   id: uuidSchema,
@@ -113,38 +76,9 @@ export interface CourseEffortServiceDependencies {
   heatmap: Pick<HeatmapService, "getCourseSnapshot">;
 }
 
-export type ClassSkyConcept = CourseHeatmapSnapshot["concepts"][number] & {
-  band: MasteryBand;
-  taught: boolean;
-};
 
-export interface ClassSkySnapshot {
-  courseId: UUID;
-  totalStudents: number;
-  concepts: ClassSkyConcept[];
-}
-
-export class CourseEffortService implements Pick<GameService, "getCourseEffort"> {
+export class CourseEffortService implements Pick<GameService, "getCourseEffort" | "getClassSky"> {
   constructor(private readonly dependencies: CourseEffortServiceDependencies) {}
-
-  private async authorizeTeacherCourseAccess(actor: ActorContext, courseId: UUID): Promise<void> {
-    if (actor.role !== "teacher" || !actor.teacherId) {
-      throw new AppError({
-        code: "FORBIDDEN",
-        statusCode: 403,
-        message: "Only the owning teacher can view course effort",
-      });
-    }
-
-    const course = await this.dependencies.courses.getCourse(actor, courseId);
-    if (course.teacherId !== actor.teacherId) {
-      throw new AppError({
-        code: "FORBIDDEN",
-        statusCode: 403,
-        message: "Only the owning teacher can view course effort",
-      });
-    }
-  }
 
   async getCourseEffort(actor: ActorContext, courseId: UUID): Promise<CourseEffortDTO[]> {
     const parsedCourseId = uuidSchema.safeParse(courseId);
@@ -158,7 +92,12 @@ export class CourseEffortService implements Pick<GameService, "getCourseEffort">
     }
     const validCourseId = parsedCourseId.data;
 
-    await this.authorizeTeacherCourseAccess(actor, validCourseId);
+    await requireCourseTeacher(
+      actor,
+      validCourseId,
+      this.dependencies.courses,
+      "Only the owning teacher can view course effort",
+    );
 
     // 1. Fetch course concept IDs (bounded at 40)
     let conceptResult: { data: unknown; error: unknown };
@@ -393,6 +332,7 @@ export class CourseEffortService implements Pick<GameService, "getCourseEffort">
         xp: s.xp,
         averageConfidence: s.averageConfidence,
         flag,
+        unassessed: s.averageConfidence === 0,
       };
     });
 
@@ -417,16 +357,22 @@ export class CourseEffortService implements Pick<GameService, "getCourseEffort">
     }
     const validCourseId = parsedCourseId.data;
 
-    await this.authorizeTeacherCourseAccess(actor, validCourseId);
+    await requireCourseTeacher(
+      actor,
+      validCourseId,
+      this.dependencies.courses,
+      "Only the owning teacher can view course effort",
+    );
 
     const snapshot = await this.dependencies.heatmap.getCourseSnapshot(actor, validCourseId);
 
     if (snapshot.concepts.length === 0) {
-      return {
+      const emptySnapshot: ClassSkySnapshot = {
         courseId: validCourseId,
         totalStudents: snapshot.totalStudents,
         concepts: [],
       };
+      return classSkySnapshotSchema.parse(emptySnapshot);
     }
 
     const validConceptIds = new Set(snapshot.concepts.map((c) => c.conceptId));
@@ -481,7 +427,7 @@ export class CourseEffortService implements Pick<GameService, "getCourseEffort">
       chunkOffset += PAGE_SIZE;
     }
 
-    return {
+    const result: ClassSkySnapshot = {
       courseId: validCourseId,
       totalStudents: snapshot.totalStudents,
       concepts: snapshot.concepts.map((c) => ({
@@ -490,5 +436,7 @@ export class CourseEffortService implements Pick<GameService, "getCourseEffort">
         taught: taughtConceptIds.has(c.conceptId),
       })),
     };
+
+    return classSkySnapshotSchema.parse(result);
   }
 }

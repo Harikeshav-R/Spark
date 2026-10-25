@@ -168,8 +168,13 @@ Default limit is 50 items; maximum allowed limit is 100 items.
 
 ### `GET /api/courses/:courseId/students/effort`
 - **Auth**: Course teacher.
-- **Response `200 OK`**: `CourseEffortDTO[]` (Student effort XP, average confidence, and `high_effort_low_mastery` intervention flags)
+- **Headers**: `Cache-Control: private, no-store`
+- **Response `200 OK`**: `CourseEffortDTO[]` (Student effort XP, average confidence, intervention flags, and explicit `unassessed` indicator)
 
+### `GET /api/courses/:courseId/class-sky`
+- **Auth**: Course teacher.
+- **Headers**: `Cache-Control: private, no-store`
+- **Response `200 OK`**: `ClassSkySnapshot` (Aggregated class concept mastery bands with `taught` boolean from committed transcript chunks)
 ### `GET /api/students/:studentId/mastery`
 - **Auth**: Student self or course teacher.
 - **Response `200 OK`**:

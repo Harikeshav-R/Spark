@@ -239,6 +239,7 @@ export const FIXTURE_COURSE_EFFORT = [
     xp: 508,
     averageConfidence: 0.38,
     flag: "high_effort_low_mastery",
+    unassessed: false,
   },
   {
     studentId: "44444444-4444-4444-8444-444444444401",
@@ -246,6 +247,7 @@ export const FIXTURE_COURSE_EFFORT = [
     xp: 620,
     averageConfidence: 0.82,
     flag: null,
+    unassessed: false,
   },
 ] as const satisfies readonly CourseEffortDTO[];
 

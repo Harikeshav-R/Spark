@@ -21,7 +21,8 @@ import {
 import type { RealtimePublisher } from "../../../contracts/realtime.js";
 import { heatmapUpdatedEventSchema } from "../../../contracts/realtime.js";
 import { AppError } from "../../../contracts/errors.js";
-
+import { mapPostgrestError } from "../../platform/index.js";
+import { requireCourseTeacher } from "../courses/require-course-teacher.js";
 
 export interface HeatmapServiceDependencies {
   client: Pick<SupabaseClient, "from">;
@@ -36,12 +37,6 @@ interface CacheEntry {
   expiresAt: number;
 }
 
-interface PostgrestErrorLike {
-  code?: string;
-  message?: string;
-  details?: string;
-  hint?: string;
-}
 
 const conceptNodeRowSchema = z.object({
   id: uuidSchema,
@@ -74,37 +69,6 @@ const CACHE_TTL_MS = 5000;
 const MAX_CACHE_ENTRIES = 128;
 const PAGE_SIZE = 500;
 
-function mapPostgrestError(errUnknown: unknown, contextMessage: string): AppError {
-  if (errUnknown instanceof AppError) {
-    return errUnknown;
-  }
-  const err = (errUnknown ?? {}) as PostgrestErrorLike;
-  const code = typeof err.code === "string" ? err.code : "";
-
-  if (code === "PGRST000" || code === "PGRST001" || code === "PGRST002") {
-    return new AppError({
-      code: "SERVICE_UNAVAILABLE",
-      statusCode: 503,
-      message: contextMessage,
-      cause: errUnknown,
-    });
-  }
-  if (code === "42501") {
-    return new AppError({
-      code: "FORBIDDEN",
-      statusCode: 403,
-      message: `${contextMessage}: Permission denied`,
-      cause: errUnknown,
-    });
-  }
-
-  return new AppError({
-    code: "INTERNAL_SERVER_ERROR",
-    statusCode: 500,
-    message: `${contextMessage}: ${err.message ?? "Unexpected database error"}`,
-    cause: errUnknown,
-  });
-}
 
 function cloneSnapshot(snapshot: CourseHeatmapSnapshot): CourseHeatmapSnapshot {
   return {
@@ -132,24 +96,6 @@ export class HeatmapService implements Pick<MasteryServicePort, "getClassHeatmap
 
   constructor(private readonly dependencies: HeatmapServiceDependencies) {}
 
-  private async authorizeTeacherCourseAccess(actor: ActorContext, courseId: UUID): Promise<void> {
-    if (actor.role !== "teacher" || !actor.teacherId) {
-      throw new AppError({
-        code: "FORBIDDEN",
-        statusCode: 403,
-        message: "Only the owning teacher can view course heatmaps",
-      });
-    }
-
-    const course = await this.dependencies.courses.getCourse(actor, courseId);
-    if (course.teacherId !== actor.teacherId) {
-      throw new AppError({
-        code: "FORBIDDEN",
-        statusCode: 403,
-        message: "Only the owning teacher can view course heatmaps",
-      });
-    }
-  }
 
   private cleanExpiredCache(): void {
     const now = this.dependencies.clock.now().getTime();
@@ -440,7 +386,12 @@ export class HeatmapService implements Pick<MasteryServicePort, "getClassHeatmap
       });
     }
 
-    await this.authorizeTeacherCourseAccess(actor, parsedCourseId.data);
+    await requireCourseTeacher(
+      actor,
+      parsedCourseId.data,
+      this.dependencies.courses,
+      "Only the owning teacher can view course heatmaps",
+    );
 
     return this.loadCourseSnapshot(parsedCourseId.data, false);
   }

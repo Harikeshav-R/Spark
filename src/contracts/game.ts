@@ -6,8 +6,11 @@ import {
   isoTimestampSchema,
   masteryBandSchema,
 } from "./common.js";
-import { confidenceSchema } from "./mastery.js";
-
+import {
+  confidenceSchema,
+  courseHeatmapConceptSchema,
+  courseHeatmapSnapshotSchema,
+} from "./mastery.js";
 // ============================================================================
 // 1. Enums and Primitives
 // ============================================================================
@@ -158,9 +161,20 @@ export const courseEffortSchema = z.object({
   xp: z.number().int().nonnegative(),
   averageConfidence: confidenceSchema,
   flag: z.literal("high_effort_low_mastery").nullable(),
+  unassessed: z.boolean(),
 });
 export type CourseEffortDTO = z.infer<typeof courseEffortSchema>;
 
+export const classSkyConceptSchema = courseHeatmapConceptSchema.extend({
+  band: masteryBandSchema,
+  taught: z.boolean(),
+});
+export type ClassSkyConcept = z.infer<typeof classSkyConceptSchema>;
+
+export const classSkySnapshotSchema = courseHeatmapSnapshotSchema.safeExtend({
+  concepts: z.array(classSkyConceptSchema),
+});
+export type ClassSkySnapshot = z.infer<typeof classSkySnapshotSchema>;
 // ============================================================================
 // 7. Service Interfaces
 // ============================================================================
@@ -170,6 +184,7 @@ export interface GameService {
   getSummary(actor: ActorContext, studentId: UUID): Promise<GameSummaryDTO>;
   getEclipse(actor: ActorContext, studentId: UUID): Promise<EclipseDTO>;
   getCourseEffort(actor: ActorContext, courseId: UUID): Promise<CourseEffortDTO[]>;
+  getClassSky(actor: ActorContext, courseId: UUID): Promise<ClassSkySnapshot>;
 }
 
 export interface EncounterService {
