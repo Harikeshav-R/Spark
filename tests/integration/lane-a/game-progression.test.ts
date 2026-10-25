@@ -1,4 +1,3 @@
-import { execFileSync as nodeExecFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { io as createClientSocket, type Socket as ClientSocket } from "socket.io-client";
@@ -27,32 +26,9 @@ import {
   SupabaseTestHarness,
   type TestContext,
 } from "./supabase-harness.js";
+import { runPsql } from "./postgres-test-helpers.js";
 
 const isLocalSupabase = process.env.RUN_LOCAL_SUPABASE === "1";
-const DB_CONTAINER = process.env.SUPABASE_DB_CONTAINER ?? "supabase_db_spark";
-
-function runPsql(sql: string): string {
-  return nodeExecFileSync(
-    "docker",
-    [
-      "exec",
-      "-i",
-      DB_CONTAINER,
-      "psql",
-      "-U",
-      "postgres",
-      "-d",
-      "postgres",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-t",
-      "-A",
-      "-c",
-      sql,
-    ],
-    { encoding: "utf8" },
-  );
-}
 
 describe.skipIf(!isLocalSupabase)(
   "P5-A-02: Game Progression Integration Tests (live local PostgreSQL)",

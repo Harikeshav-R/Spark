@@ -2,7 +2,7 @@
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
-> **Status Notice**: Phase 0, Phase 1, Phase 2, Phase 3, and Phase 4 are complete. In Phase 5 (Autonomous Learning & Socratic Tutoring), Lane A has completed both core backend tasks: Quiz & Tutoring Evidence RPC Integration (P5-A-01) and Daily Quests, Streak Calculation, XP Ledger & Eclipse Service (P5-A-02). Merged frontend and AI milestones include P5-C-01, P5-C-02, P5-D-01, P5-D-02, and P5-D-03. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
+> **Status Notice**: Phase 0, Phase 1, Phase 2, Phase 3, Phase 4, and Phase 5 are complete. In Phase 6 (Consensual Peer Collaboration & Zoom Scheduling), Lane A has completed both database migrations: Study Group Relational Schema (Migration 0004) & Lock RPCs (P6-A-01) and Additive Collaboration Migration 0005 & Party Quest Constraints (P6-A-02). Lane B has completed Consensual Complementary Matchmaking Engine (P6-B-01), Secure Peer Messaging & Room Broadcaster (P6-B-02), Mutual Availability Overlap Detector & Scheduling State Machine (P6-B-03), and Authentic Zoom OAuth 2.0 Client & Meeting Adapter (P6-B-04). Active pending Phase 6 tasks are P6-D-01, P6-B-05, and P6-C-01. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
 
 ---
 
@@ -79,27 +79,27 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 - [x] P5-A-01 — Quiz & Tutoring Evidence RPC Integration
 - [x] P5-C-01 — Socratic Tutoring Dialogue Pipeline & Understanding Verification
 - [x] P5-C-02 — Concept Learning Page Generation Pipeline
-- [ ] P5-C-03 — Practice Quiz Generation & Server-Side Scoring Engine
-- [ ] P5-C-04 — OpenRouter Academic Resource Search & Cited Q&A (Perplexity Models)
-- [ ] P5-C-05 — TutorFeature, LearningFeature & StudyGroupFeature UI Modules
+- [x] P5-C-03 — Practice Quiz Generation & Server-Side Scoring Engine
+- [x] P5-C-04 — OpenRouter Academic Resource Search & Cited Q&A (Perplexity Models)
+- [x] P5-C-05 — TutorFeature, LearningFeature & StudyGroupFeature UI Modules
 - [x] P5-D-01 — Student Concept Learning & Quiz Route Shell Mounting
 - [x] P5-D-02 — Student Tutoring & Lecture Summaries Shell Mounting
 - [x] P5-A-02 — Daily Quests, Streak Calculation, XP Ledger & Eclipse Service
-- [ ] P5-C-06 — Hint-Capable Question Generation & Practice Encounter Orchestration
-- [ ] P5-C-07 — Exported EncounterFeature Component & Hint Drawer
+- [x] P5-C-06 — Hint-Capable Question Generation & Practice Encounter Orchestration
+- [x] P5-C-07 — Exported EncounterFeature Component & Hint Drawer
 - [x] P5-D-03 — Student Quests, Eclipse, Mascot Shell Mounting & Encounter Integration
 
 ---
 
 ## Phase 6: Consensual Peer Collaboration & Zoom Scheduling
 
-- [ ] P6-A-01 — Study Group Relational Schema (Migration 0004), Availability & Lock RPCs
-- [ ] P6-B-01 — Consensual Complementary Matchmaking Engine
-- [ ] P6-B-02 — Secure Peer Messaging & Room Broadcaster
-- [ ] P6-B-03 — Mutual Availability Overlap Detector & Scheduling State Machine
-- [ ] P6-B-04 — Authentic Zoom OAuth 2.0 Client & Meeting Adapter
+- [x] P6-A-01 — Study Group Relational Schema (Migration 0004), Availability & Lock RPCs
+- [x] P6-B-01 — Consensual Complementary Matchmaking Engine
+- [x] P6-B-02 — Secure Peer Messaging & Room Broadcaster
+- [x] P6-B-03 — Mutual Availability Overlap Detector & Scheduling State Machine
+- [x] P6-B-04 — Authentic Zoom OAuth 2.0 Client & Meeting Adapter
 - [ ] P6-D-01 — Peer Study Group Route Shell & Chat Interface
-- [ ] P6-A-02 — Additive Collaboration Migration 0005 & Party Quest Constraints
+- [x] P6-A-02 — Additive Collaboration Migration 0005 & Party Quest Constraints
 - [ ] P6-B-05 — Collaborative Party Quests, Candidate Invitations & Reward Distribution
 - [ ] P6-C-01 — Extended StudyGroupFeature with Invitations, Fit Badges & Party Goals
 
