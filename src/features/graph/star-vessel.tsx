@@ -16,6 +16,7 @@ export interface StarVesselProps {
   selected: boolean;
   dimmed: boolean;
   onSelect: (id: string) => void;
+  taught?: boolean;
 }
 
 /**
@@ -94,6 +95,7 @@ export function StarVessel({
   selected,
   dimmed,
   onSelect,
+  taught,
 }: StarVesselProps): React.JSX.Element {
   const reactId = useId();
   // Sanitize reactId and node.id for valid SVG ID attribute
@@ -102,6 +104,17 @@ export function StarVessel({
   const clipId = `star-clip-${safeReactId}-${safeNodeId}`;
 
   const { statusText, band } = getStatusText(node);
+  const taughtSuffix =
+    typeof taught === "boolean" ? (taught ? "Taught in lecture" : "Not yet taught") : undefined;
+  const fullAccessibleLabel = taughtSuffix
+    ? `${node.label}, ${statusText}, ${taughtSuffix}`
+    : `${node.label}, ${statusText}`;
+  const fullTitle = taughtSuffix
+    ? `${node.label} — ${statusText} — ${taughtSuffix}`
+    : `${node.label} — ${statusText}`;
+  const fullVisibleStatus = taughtSuffix
+    ? `${statusText} • ${taughtSuffix}`
+    : statusText;
 
   // Confidence fill geometry: height in [0, 48], vertical bottom-up
   const c = node.confidence !== undefined ? Math.max(0, Math.min(1, node.confidence)) : 0;
@@ -137,7 +150,7 @@ export function StarVessel({
       role="button"
       tabIndex={0}
       aria-pressed={selected}
-      aria-label={`${node.label}, ${statusText}`}
+      aria-label={fullAccessibleLabel}
       data-node-id={node.id}
       className="cursor-pointer group outline-none select-none"
       onClick={() => onSelect(node.id)}
@@ -148,7 +161,7 @@ export function StarVessel({
         }
       }}
     >
-      <title>{`${node.label} — ${statusText}`}</title>
+      <title>{fullTitle}</title>
 
       <defs>
         <clipPath id={clipId}>
@@ -200,6 +213,31 @@ export function StarVessel({
             strokeWidth="1.5"
           />
         )}
+
+        {/* Open-book badge for taught concepts */}
+        {taught && (
+          <g
+            transform="translate(14, -22)"
+            aria-hidden="true"
+            pointerEvents="none"
+            className="text-ink"
+          >
+            <rect x="-1" y="-1" width="16" height="16" rx="8" fill="var(--color-paper, #fdfbf7)" />
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+              <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+            </svg>
+          </g>
+        )}
       </g>
 
       {/* Focus ring: visible on keyboard navigation */}
@@ -250,7 +288,7 @@ export function StarVessel({
         className="fill-[#66625d] text-[10px] pointer-events-none"
         style={{ fontFamily: "inherit" }}
       >
-        {statusText}
+        {fullVisibleStatus}
       </text>
     </g>
   );

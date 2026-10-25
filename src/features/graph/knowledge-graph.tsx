@@ -20,10 +20,13 @@ import {
 } from "./d3-force-layout";
 import { StarVessel, getStatusText } from "./star-vessel";
 import { ActiveConceptOverlay } from "./active-concept-overlay";
+import { AttentionConceptOverlay } from "./attention-concept-overlay";
+
 export interface KnowledgeGraphProps {
   graph: GraphData;
   className?: string;
   activeConceptIds?: readonly string[];
+  taughtConceptIds?: readonly string[];
 }
 
 const DEFAULT_ACTIVE_CONCEPT_IDS: readonly string[] = [];
@@ -73,6 +76,7 @@ export function KnowledgeGraph({
   graph,
   className,
   activeConceptIds = DEFAULT_ACTIVE_CONCEPT_IDS,
+  taughtConceptIds,
 }: KnowledgeGraphProps): React.JSX.Element {
   // 1. Invariant and empty validations (run during SSR as well)
   if (graph.nodes.length === 0) {
@@ -133,6 +137,24 @@ export function KnowledgeGraph({
   const safeReactId = reactId.replace(/[^a-zA-Z0-9-_]/g, "");
   const defaultMarkerId = `arrow-marker-${safeReactId}-default`;
   const highlightMarkerId = `arrow-marker-${safeReactId}-highlight`;
+
+  // Taught and attention derivations for Class Sky presentation
+  const taughtSet = useMemo(() => {
+    if (taughtConceptIds === undefined) return undefined;
+    return new Set(taughtConceptIds);
+  }, [taughtConceptIds]);
+
+  const attentionConceptIds = useMemo(() => {
+    if (!taughtSet) return [];
+    return graph.nodes
+      .filter(
+        (node) =>
+          taughtSet.has(node.id) &&
+          node.confidence !== undefined &&
+          node.confidence < 0.4,
+      )
+      .map((node) => node.id);
+  }, [graph.nodes, taughtSet]);
 
   // Measure container and subscribe to prefers-reduced-motion
   useEffect(() => {
@@ -439,6 +461,18 @@ export function KnowledgeGraph({
                     {statusText}
                   </span>
                 </div>
+                {taughtSet !== undefined && (
+                  <div className="text-xs text-muted mt-0.5">
+                    <span>{taughtSet.has(node.id) ? "Taught in lecture" : "Not yet taught"}</span>
+                    {taughtSet.has(node.id) &&
+                      node.confidence !== undefined &&
+                      node.confidence < 0.4 && (
+                        <span className="text-bad font-medium ml-2">
+                          • Needs attention (&lt; 40%)
+                        </span>
+                      )}
+                  </div>
+                )}
                 <p className="text-xs text-charcoal mt-1 line-clamp-2">
                   {node.description}
                 </p>
@@ -611,6 +645,15 @@ export function KnowledgeGraph({
             })}
           </g>
 
+          {/* Attention concept overlay rings (crimson, taught < 0.40) */}
+          {attentionConceptIds.length > 0 && (
+            <AttentionConceptOverlay
+              attentionConceptIds={attentionConceptIds}
+              positionedNodes={positionedNodeMap}
+              reducedMotion={reducedMotion}
+            />
+          )}
+
           {/* Active concept overlay rings */}
           <ActiveConceptOverlay
             activeConceptIds={activeConceptIds}
@@ -642,6 +685,7 @@ export function KnowledgeGraph({
                     selected={isSelected}
                     dimmed={isDimmed}
                     onSelect={handleSelectNode}
+                    taught={taughtSet ? taughtSet.has(node.id) : undefined}
                   />
                 </g>
               );
@@ -670,6 +714,26 @@ export function KnowledgeGraph({
               <Badge variant="secondary">
                 {getStatusText(selectedNode).statusText}
               </Badge>
+              {taughtSet !== undefined && (
+                <Badge
+                  variant="outline"
+                  className={cn(
+                    "text-xs",
+                    taughtSet.has(selectedNode.id) &&
+                      selectedNode.confidence !== undefined &&
+                      selectedNode.confidence < 0.4
+                      ? "border-bad text-bad bg-bad-tint/30 font-medium"
+                      : "",
+                  )}
+                >
+                  {taughtSet.has(selectedNode.id) ? "Taught in lecture" : "Not yet taught"}
+                  {taughtSet.has(selectedNode.id) &&
+                  selectedNode.confidence !== undefined &&
+                  selectedNode.confidence < 0.4
+                    ? " — Needs attention"
+                    : ""}
+                </Badge>
+              )}
               <Button
                 variant="ghost"
                 size="sm"

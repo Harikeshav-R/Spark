@@ -33,10 +33,14 @@ import { mergeTranscriptChunks } from "./teacher-lecture-state";
 import { useTeacherPolls } from "./use-teacher-polls";
 import { PollPanel } from "./poll-panel";
 import { ClassHeatmap } from "./class-heatmap";
+import { ClassSky } from "./class-sky";
+import { cn } from "@/lib/client/utils";
+
 export interface TeacherLectureDashboardProps {
   courseId: UUID;
   lectureId?: UUID;
   getAccessToken?: () => Promise<string | null>;
+  initialToken?: string | null;
 }
 
 type FeedConnectionStatus = "idle" | "connecting" | "connected" | "reconnecting" | "error";
@@ -53,9 +57,10 @@ export function TeacherLectureDashboard({
   courseId,
   lectureId: initialLectureId,
   getAccessToken = getRuntimeAccessToken,
+  initialToken,
 }: TeacherLectureDashboardProps): React.JSX.Element {
-  const [token, setToken] = useState<string | null>(null);
-  const [authChecking, setAuthChecking] = useState<boolean>(true);
+  const [token, setToken] = useState<string | null>(initialToken ?? null);
+  const [authChecking, setAuthChecking] = useState<boolean>(initialToken === undefined);
   const [authForbidden, setAuthForbidden] = useState<boolean>(false);
 
   const [activeLectureId, setActiveLectureId] = useState<UUID | undefined>(initialLectureId);
@@ -65,6 +70,50 @@ export function TeacherLectureDashboard({
   const [conceptLabels, setConceptLabels] = useState<Map<UUID, string>>(new Map());
   const [isSimulated, setIsSimulated] = useState<boolean | null>(null);
   const [courseConcepts, setCourseConcepts] = useState<Array<{ id: UUID; label: string; category?: string }>>([]);
+  const [activeTab, setActiveTab] = useState<"live" | "class-sky">("live");
+  const liveTabRef = useRef<HTMLButtonElement>(null);
+  const classSkyTabRef = useRef<HTMLButtonElement>(null);
+
+  const handleClassSkyAuthError = useCallback((status: 401 | 403) => {
+    if (status === 401) {
+      setToken(null);
+    } else if (status === 403) {
+      setAuthForbidden(true);
+    }
+  }, []);
+
+  const handleTabKeyDown = (
+    e: React.KeyboardEvent<HTMLButtonElement>,
+    current: "live" | "class-sky",
+  ) => {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      if (current === "live") {
+        setActiveTab("class-sky");
+        classSkyTabRef.current?.focus();
+      } else {
+        setActiveTab("live");
+        liveTabRef.current?.focus();
+      }
+    } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      if (current === "class-sky") {
+        setActiveTab("live");
+        liveTabRef.current?.focus();
+      } else {
+        setActiveTab("class-sky");
+        classSkyTabRef.current?.focus();
+      }
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setActiveTab("live");
+      liveTabRef.current?.focus();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setActiveTab("class-sky");
+      classSkyTabRef.current?.focus();
+    }
+  };
 
   const getEffectiveToken = useCallback(async () => {
     if (token) return token;
@@ -94,6 +143,9 @@ export function TeacherLectureDashboard({
 
   // 1. Resolve authentication on mount
   useEffect(() => {
+    if (initialToken !== undefined) {
+      return;
+    }
     let active = true;
     void (async () => {
       try {
@@ -112,7 +164,7 @@ export function TeacherLectureDashboard({
     return () => {
       active = false;
     };
-  }, [getAccessToken]);
+  }, [getAccessToken, initialToken]);
 
   // Snapshot fetching helper with deduplication and dirty flag coalescing
   const refreshSnapshot = useCallback(
@@ -558,12 +610,67 @@ export function TeacherLectureDashboard({
       sessionStatus="authenticated"
     >
       <div className="space-y-6">
-        {isLoadingCourseData && (
-          <div className="text-xs text-[var(--color-fg-muted)] animate-pulse">
-            Syncing course data…
+        {/* Workspace Tab Navigation */}
+        <div className="border-b border-paper-line">
+          <div
+            role="tablist"
+            aria-label="Instructor workspace views"
+            className="flex items-center gap-2 -mb-px"
+          >
+            <button
+              ref={liveTabRef}
+              type="button"
+              role="tab"
+              id="tab-live-lecture"
+              aria-controls="panel-live-lecture"
+              aria-selected={activeTab === "live"}
+              tabIndex={activeTab === "live" ? 0 : -1}
+              onClick={() => setActiveTab("live")}
+              onKeyDown={(e) => handleTabKeyDown(e, "live")}
+              className={cn(
+                "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors rounded-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                activeTab === "live"
+                  ? "border-accent text-ink font-semibold bg-paper"
+                  : "border-transparent text-muted hover:text-ink hover:bg-paper-muted/50",
+              )}
+            >
+              Live lecture
+            </button>
+            <button
+              ref={classSkyTabRef}
+              type="button"
+              role="tab"
+              id="tab-class-sky"
+              aria-controls="panel-class-sky"
+              aria-selected={activeTab === "class-sky"}
+              tabIndex={activeTab === "class-sky" ? 0 : -1}
+              onClick={() => setActiveTab("class-sky")}
+              onKeyDown={(e) => handleTabKeyDown(e, "class-sky")}
+              className={cn(
+                "px-4 py-2.5 text-sm font-medium border-b-2 transition-colors rounded-t focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
+                activeTab === "class-sky"
+                  ? "border-accent text-ink font-semibold bg-paper"
+                  : "border-transparent text-muted hover:text-ink hover:bg-paper-muted/50",
+              )}
+            >
+              Class Sky
+            </button>
           </div>
-        )}
+        </div>
 
+        {/* Tab Panel 1: Live lecture content (kept mounted when inactive) */}
+        <div
+          role="tabpanel"
+          id="panel-live-lecture"
+          aria-labelledby="tab-live-lecture"
+          hidden={activeTab !== "live"}
+          className={cn("space-y-6", activeTab !== "live" && "hidden")}
+        >
+          {isLoadingCourseData && (
+            <div className="text-xs text-[var(--color-fg-muted)] animate-pulse">
+              Syncing course data…
+            </div>
+          )}
         {/* Connection & Status Banner */}
         {lecture && lecture.status === "live" && (
           <div className="flex items-center justify-between px-4 py-2 rounded-lg bg-[var(--color-bg-panel)] border border-[var(--color-border-default)] text-xs">
@@ -669,11 +776,30 @@ export function TeacherLectureDashboard({
         )}
 
         {/* Course Mastery Heatmap Full Width Below */}
-        <ClassHeatmap
-          heatmap={teacherPolls.state.heatmap}
-          loading={teacherPolls.heatmapLoading}
-          error={teacherPolls.heatmapError}
-        />
+          <ClassHeatmap
+            heatmap={teacherPolls.state.heatmap}
+            loading={teacherPolls.heatmapLoading}
+            error={teacherPolls.heatmapError}
+          />
+        </div>
+
+        {/* Tab Panel 2: Class Sky content (mounted when tab is active) */}
+        <div
+          role="tabpanel"
+          id="panel-class-sky"
+          aria-labelledby="tab-class-sky"
+          hidden={activeTab !== "class-sky"}
+          className={cn("space-y-6", activeTab !== "class-sky" && "hidden")}
+        >
+          {activeTab === "class-sky" && (
+            <ClassSky
+              key={courseId}
+              courseId={courseId}
+              getAccessToken={getEffectiveToken}
+              onAuthError={handleClassSkyAuthError}
+            />
+          )}
+        </div>
       </div>
     </AppShell>
   );
