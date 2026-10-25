@@ -1,5 +1,6 @@
 "use client";
 
+import type { MasteryBand } from "@/contracts/common";
 import type { CourseHeatmapSnapshot } from "@/contracts/mastery";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
@@ -9,31 +10,57 @@ export interface ClassHeatmapProps {
   error?: string | null;
 }
 
-const BAND_COLORS = {
-  gray: "#dcd3c4",
-  red: "#b0384a",
-  yellow: "#f4bc55",
-  green: "#2b7f55",
-} as const;
+interface BandDefinition {
+  readonly key: MasteryBand;
+  readonly label: string;
+  readonly barClass: string;
+  readonly dotClass: string;
+}
 
+const MASTERY_BANDS: readonly BandDefinition[] = [
+  {
+    key: "gray",
+    label: "Unassessed",
+    barClass: "bg-[#dcd3c4]",
+    dotClass: "bg-[#dcd3c4] border border-ink/20",
+  },
+  {
+    key: "red",
+    label: "Needs practice",
+    barClass: "bg-mastery-red",
+    dotClass: "bg-mastery-red",
+  },
+  {
+    key: "yellow",
+    label: "Developing",
+    barClass: "bg-mastery-yellow",
+    dotClass: "bg-mastery-yellow",
+  },
+  {
+    key: "green",
+    label: "Mastered",
+    barClass: "bg-mastery-green",
+    dotClass: "bg-mastery-green",
+  },
+] as const;
 export function ClassHeatmap({ heatmap, loading = false, error = null }: ClassHeatmapProps) {
   const totalStudents = heatmap?.totalStudents ?? 0;
   const concepts = heatmap?.concepts ?? [];
 
   return (
-    <Card className="flex flex-col space-y-4 p-4 border border-[#e6d8bd] bg-[#fffdf8]">
-      <CardHeader className="p-0 pb-2 border-b border-[#e6d8bd] space-y-1">
-        <CardTitle as="h2" className="text-lg font-semibold text-[#2b2a2e]">
+    <Card className="flex flex-col space-y-4 p-4 border border-line bg-panel">
+      <CardHeader className="p-0 pb-2 border-b border-line space-y-1">
+        <CardTitle as="h2" className="text-lg font-semibold text-ink">
           Course mastery
         </CardTitle>
-        <p className="text-xs text-[#5f5b54] leading-relaxed">
+        <p className="text-xs text-muted leading-relaxed">
           Displays aggregate course mastery across enrolled students. Course confidence reflects cumulative practice and poll evaluations, distinct from live poll response counters.
         </p>
       </CardHeader>
 
       <CardContent className="p-0 space-y-4">
         {loading && !heatmap && (
-          <div role="status" className="p-4 text-center text-sm text-[#5f5b54]">
+          <div role="status" className="p-4 text-center text-sm text-muted">
             Loading course mastery heatmap...
           </div>
         )}
@@ -41,41 +68,40 @@ export function ClassHeatmap({ heatmap, loading = false, error = null }: ClassHe
         {error && (
           <div
             role="alert"
-            className="p-3 bg-[#f8e0e3] border border-[#b0384a]/30 text-[#b0384a] rounded-md text-sm"
+            className="p-3 bg-bad-tint border border-bad/30 text-bad rounded-md text-sm"
           >
             Failed to load course mastery: {error}
           </div>
         )}
 
         {heatmap && concepts.length === 0 && (
-          <p className="text-sm text-[#5f5b54] py-2">
+          <p className="text-sm text-muted py-2">
             No course concepts found. Add concepts through syllabus setup.
           </p>
         )}
 
         {heatmap && totalStudents === 0 && (
-          <p className="text-sm text-[#5f5b54] py-2">
+          <p className="text-sm text-muted py-2">
             No enrolled students yet.
           </p>
         )}
 
         {heatmap && concepts.length > 0 && (
-          <ol className="divide-y divide-[#e6d8bd]/60 space-y-4 pt-1" aria-label="Course mastery by concept">
+          <ol className="divide-y divide-line/60 space-y-4 pt-1" aria-label="Course mastery by concept">
             {concepts.map((concept, index) => {
-              const grayCount = concept.distribution.gray;
-              const redCount = concept.distribution.red;
-              const yellowCount = concept.distribution.yellow;
-              const greenCount = concept.distribution.green;
-
-              const grayPct = totalStudents > 0 ? (grayCount / totalStudents) * 100 : 0;
-              const redPct = totalStudents > 0 ? (redCount / totalStudents) * 100 : 0;
-              const yellowPct = totalStudents > 0 ? (yellowCount / totalStudents) * 100 : 0;
-              const greenPct = totalStudents > 0 ? (greenCount / totalStudents) * 100 : 0;
-
-              const grayDisplay = totalStudents > 0 ? `${grayPct.toFixed(1)}%` : "0%";
-              const redDisplay = totalStudents > 0 ? `${redPct.toFixed(1)}%` : "0%";
-              const yellowDisplay = totalStudents > 0 ? `${yellowPct.toFixed(1)}%` : "0%";
-              const greenDisplay = totalStudents > 0 ? `${greenPct.toFixed(1)}%` : "0%";
+              const bandData = MASTERY_BANDS.map((band) => {
+                const count = concept.distribution[band.key];
+                const pct = totalStudents > 0 ? (count / totalStudents) * 100 : 0;
+                const displayPct = totalStudents > 0 ? `${pct.toFixed(1)}%` : "0%";
+                const text = `${band.label}: ${count} (${displayPct})`;
+                return {
+                  ...band,
+                  count,
+                  pct,
+                  displayPct,
+                  text,
+                };
+              });
 
               return (
                 <li
@@ -83,11 +109,11 @@ export function ClassHeatmap({ heatmap, loading = false, error = null }: ClassHe
                   className={index === 0 ? "space-y-2" : "pt-4 space-y-2"}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                    <span className="font-semibold text-sm text-[#2b2a2e]">
+                    <span className="font-semibold text-sm text-ink">
                       {concept.label}
                     </span>
                     {concept.category && (
-                      <span className="text-xs text-[#5f5b54]">
+                      <span className="text-xs text-muted">
                         {concept.category}
                       </span>
                     )}
@@ -95,88 +121,42 @@ export function ClassHeatmap({ heatmap, loading = false, error = null }: ClassHe
 
                   {/* 4-Segment Progress Bar */}
                   <div
-                    className="h-3 w-full flex rounded overflow-hidden bg-[#e6d8bd]/30 border border-[#e6d8bd]"
+                    className="h-3 w-full flex rounded overflow-hidden bg-line/30 border border-line"
                     role="progressbar"
                     aria-label={`Mastery distribution for ${concept.label}`}
-                    aria-valuenow={Math.round(greenPct + yellowPct)}
+                    aria-valuenow={
+                      totalStudents > 0
+                        ? Math.round(
+                            ((concept.distribution.yellow + concept.distribution.green) / totalStudents) * 100
+                          )
+                        : 0
+                    }
                     aria-valuemin={0}
                     aria-valuemax={100}
                   >
-                    {grayPct > 0 && (
-                      <div
-                        style={{
-                          width: `${grayPct}%`,
-                          backgroundColor: BAND_COLORS.gray,
-                        }}
-                        title={`Unassessed: ${grayCount} (${grayDisplay})`}
-                      />
-                    )}
-                    {redPct > 0 && (
-                      <div
-                        style={{
-                          width: `${redPct}%`,
-                          backgroundColor: BAND_COLORS.red,
-                        }}
-                        title={`Needs practice: ${redCount} (${redDisplay})`}
-                      />
-                    )}
-                    {yellowPct > 0 && (
-                      <div
-                        style={{
-                          width: `${yellowPct}%`,
-                          backgroundColor: BAND_COLORS.yellow,
-                        }}
-                        title={`Developing: ${yellowCount} (${yellowDisplay})`}
-                      />
-                    )}
-                    {greenPct > 0 && (
-                      <div
-                        style={{
-                          width: `${greenPct}%`,
-                          backgroundColor: BAND_COLORS.green,
-                        }}
-                        title={`Mastered: ${greenCount} (${greenDisplay})`}
-                      />
+                    {bandData.map((band) =>
+                      band.pct > 0 ? (
+                        <div
+                          key={band.key}
+                          className={band.barClass}
+                          style={{ width: `${band.pct}%` }}
+                          title={band.text}
+                        />
+                      ) : null
                     )}
                   </div>
 
                   {/* Text for every band outside colored segments */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-[#2b2a2e] pt-1 tabular-nums">
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="inline-block w-2.5 h-2.5 rounded-full shrink-0 border border-[#2b2a2e]/20"
-                        style={{ backgroundColor: BAND_COLORS.gray }}
-                        aria-hidden="true"
-                      />
-                      <span>{`Unassessed: ${grayCount} (${grayDisplay})`}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: BAND_COLORS.red }}
-                        aria-hidden="true"
-                      />
-                      <span>{`Needs practice: ${redCount} (${redDisplay})`}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: BAND_COLORS.yellow }}
-                        aria-hidden="true"
-                      />
-                      <span>{`Developing: ${yellowCount} (${yellowDisplay})`}</span>
-                    </div>
-
-                    <div className="flex items-center gap-1.5">
-                      <span
-                        className="inline-block w-2.5 h-2.5 rounded-full shrink-0"
-                        style={{ backgroundColor: BAND_COLORS.green }}
-                        aria-hidden="true"
-                      />
-                      <span>{`Mastered: ${greenCount} (${greenDisplay})`}</span>
-                    </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-ink pt-1 tabular-nums">
+                    {bandData.map((band) => (
+                      <div key={band.key} className="flex items-center gap-1.5">
+                        <span
+                          className={`inline-block w-2.5 h-2.5 rounded-full shrink-0 ${band.dotClass}`}
+                          aria-hidden="true"
+                        />
+                        <span>{band.text}</span>
+                      </div>
+                    ))}
                   </div>
                 </li>
               );

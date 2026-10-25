@@ -399,8 +399,8 @@ describe("P4-D-01: Teacher Poll Dashboard UI & Mastery Heatmap Checkpoint", () =
       expect(html).toContain("Question B for draft?");
     });
 
-    it("renders 4 bands at 25% each for total 4 students (1 each), and 0% with 0 students", () => {
-      // 1. Equal distribution across 4 students
+    it("renders 4 bands at 25% each for total 4 students (1 each), 0/1/1/1 for total 3, and 0% with 0 students", () => {
+      // 1. Equal distribution across 4 students: 25.0% each, progress value 50
       const equalHeatmap: CourseHeatmapSnapshot = {
         courseId,
         totalStudents: 4,
@@ -418,13 +418,37 @@ describe("P4-D-01: Teacher Poll Dashboard UI & Mastery Heatmap Checkpoint", () =
       const htmlEqual = renderToString(
         React.createElement(ClassHeatmap, { heatmap: equalHeatmap })
       );
-      expect(htmlEqual).toContain("Course mastery");
+      expect(htmlEqual).toContain('aria-valuenow="50"');
       expect(htmlEqual).toContain("Unassessed: 1 (25.0%)");
       expect(htmlEqual).toContain("Needs practice: 1 (25.0%)");
       expect(htmlEqual).toContain("Developing: 1 (25.0%)");
       expect(htmlEqual).toContain("Mastered: 1 (25.0%)");
 
-      // 2. Zero students: shows 0% and 'No enrolled students yet.' without NaN
+      // 2. Total 3 with 0/1/1/1: 0.0%/33.3%/33.3%/33.3%, progress value 67
+      const threeHeatmap: CourseHeatmapSnapshot = {
+        courseId,
+        totalStudents: 3,
+        concepts: [
+          {
+            conceptId: concept1,
+            label: "Gradient Descent",
+            category: "Optimization",
+            distribution: { gray: 0, red: 1, yellow: 1, green: 1 },
+            averageConfidence: 0.6,
+          },
+        ],
+      };
+
+      const htmlThree = renderToString(
+        React.createElement(ClassHeatmap, { heatmap: threeHeatmap })
+      );
+      expect(htmlThree).toContain('aria-valuenow="67"');
+      expect(htmlThree).toContain("Unassessed: 0 (0.0%)");
+      expect(htmlThree).toContain("Needs practice: 1 (33.3%)");
+      expect(htmlThree).toContain("Developing: 1 (33.3%)");
+      expect(htmlThree).toContain("Mastered: 1 (33.3%)");
+
+      // 3. Zero students: shows 0% and 'No enrolled students yet.' without NaN or Infinity
       const zeroHeatmap: CourseHeatmapSnapshot = {
         courseId,
         totalStudents: 0,
@@ -442,12 +466,13 @@ describe("P4-D-01: Teacher Poll Dashboard UI & Mastery Heatmap Checkpoint", () =
       const htmlZero = renderToString(
         React.createElement(ClassHeatmap, { heatmap: zeroHeatmap })
       );
-      expect(htmlZero).toContain("No enrolled students yet.");
+      expect(htmlZero).toContain('aria-valuenow="0"');
       expect(htmlZero).toContain("Unassessed: 0 (0%)");
       expect(htmlZero).toContain("Needs practice: 0 (0%)");
       expect(htmlZero).toContain("Developing: 0 (0%)");
       expect(htmlZero).toContain("Mastered: 0 (0%)");
       expect(htmlZero).not.toContain("NaN");
+      expect(htmlZero).not.toContain("Infinity");
     });
   });
 });

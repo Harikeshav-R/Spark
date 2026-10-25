@@ -9,6 +9,7 @@ import {
   pollQuestionSchema,
 } from "@/contracts/classroom";
 import { courseHeatmapSnapshotSchema } from "@/contracts/mastery";
+import { requestJson, ClientApiError } from "@/lib/client/http";
 import {
   createTeacherPollState,
   reduceTeacherPollState,
@@ -22,21 +23,6 @@ export interface DraftEditState {
   isDirty: boolean;
 }
 
-function extractErrorMessage(errJson: unknown, fallback: string): string {
-  if (errJson && typeof errJson === "object") {
-    const record = errJson as Record<string, unknown>;
-    if (record.error && typeof record.error === "object") {
-      const inner = record.error as Record<string, unknown>;
-      if (typeof inner.message === "string" && inner.message.trim().length > 0) {
-        return inner.message;
-      }
-    }
-    if (typeof record.message === "string" && record.message.trim().length > 0) {
-      return record.message;
-    }
-  }
-  return fallback;
-}
 
 export interface UseTeacherPollsOptions {
   courseId: UUID;
@@ -144,30 +130,16 @@ export function useTeacherPolls({
   }, [courseId, lectureId]);
 
   const refreshHeatmap = useCallback(async (): Promise<void> => {
-    const token = await getAccessToken();
-    if (!token) return;
-
     setHeatmapLoading(true);
     setHeatmapError(null);
     const startRevision = stateRef.current.eventRevision;
 
     try {
-      const res = await fetch(
+      const parsed = await requestJson(
         `/api/courses/${encodeURIComponent(courseId)}/heatmap`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        courseHeatmapSnapshotSchema,
+        { getAccessToken }
       );
-
-      if (!res.ok) {
-        const errJson = (await res.json().catch(() => ({}))) as {
-          message?: string;
-        };
-        throw new Error(errJson.message ?? `Heatmap load failed (${res.status})`);
-      }
-
-      const raw = await res.json();
-      const parsed = courseHeatmapSnapshotSchema.parse(raw);
       dispatch({
         type: "heatmap:snapshot",
         payload: parsed,
@@ -187,30 +159,16 @@ export function useTeacherPolls({
       return;
     }
 
-    const token = await getAccessToken();
-    if (!token) return;
-
     setPollsLoading(true);
     setPollsError(null);
     const startRevision = stateRef.current.eventRevision;
 
     try {
-      const res = await fetch(
+      const parsed = await requestJson(
         `/api/lectures/${encodeURIComponent(lectureId)}/polls`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+        teacherPollSnapshotSchema,
+        { getAccessToken }
       );
-
-      if (!res.ok) {
-        const errJson = (await res.json().catch(() => ({}))) as {
-          message?: string;
-        };
-        throw new Error(errJson.message ?? `Polls load failed (${res.status})`);
-      }
-
-      const raw = await res.json();
-      const parsed = teacherPollSnapshotSchema.parse(raw);
       dispatch({
         type: "snapshot",
         payload: parsed,
@@ -288,34 +246,20 @@ export function useTeacherPolls({
       if (!lectureIdRef.current) {
         throw new Error("No live lecture selected");
       }
-      const token = await getAccessToken();
-      if (!token) throw new Error("Authentication required");
 
       setActionPending(true);
       setActionError(null);
 
       try {
-        const res = await fetch(
+        const poll = await requestJson(
           `/api/lectures/${encodeURIComponent(lectureIdRef.current)}/poll/generate`,
+          pollQuestionSchema,
           {
+            getAccessToken,
             method: "POST",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(conceptId ? { conceptId } : {}),
+            body: conceptId ? { conceptId } : {},
           }
         );
-
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}));
-          throw new Error(
-            extractErrorMessage(errJson, `Failed to generate poll (${res.status})`)
-          );
-        }
-
-        const raw = await res.json();
-        const poll = pollQuestionSchema.parse(raw);
         dispatch({ type: "poll:confirmed", payload: poll });
         setDraftEditsByPollId((prev) => ({
           ...prev,
@@ -343,8 +287,6 @@ export function useTeacherPolls({
     if (!draftPoll) {
       throw new Error("No draft poll to save");
     }
-    const token = await getAccessToken();
-    if (!token) throw new Error("Authentication required");
 
     const currentEdits = draftEditsByPollId[draftPoll.id] ?? {
       question: draftPoll.question,
@@ -361,24 +303,15 @@ export function useTeacherPolls({
     setActionError(null);
 
     try {
-      const res = await fetch(`/api/polls/${encodeURIComponent(draftPoll.id)}`, {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) {
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(
-          extractErrorMessage(errJson, `Failed to save draft (${res.status})`)
-        );
-      }
-
-      const raw = await res.json();
-      const updated = pollQuestionSchema.parse(raw);
+      const updated = await requestJson(
+        `/api/polls/${encodeURIComponent(draftPoll.id)}`,
+        pollQuestionSchema,
+        {
+          getAccessToken,
+          method: "PATCH",
+          body: payload,
+        }
+      );
       dispatch({ type: "poll:confirmed", payload: updated });
       setDraftEditsByPollId((prev) => ({
         ...prev,
@@ -403,8 +336,6 @@ export function useTeacherPolls({
     if (!draftPoll) {
       throw new Error("No draft poll to activate");
     }
-    const token = await getAccessToken();
-    if (!token) throw new Error("Authentication required");
 
     setActionPending(true);
     setActionError(null);
@@ -412,49 +343,37 @@ export function useTeacherPolls({
     try {
       const currentEdits = draftEditsByPollId[draftPoll.id];
       if (currentEdits && currentEdits.isDirty) {
-        const patchRes = await fetch(
+        await requestJson(
           `/api/polls/${encodeURIComponent(draftPoll.id)}`,
+          pollQuestionSchema,
           {
+            getAccessToken,
             method: "PATCH",
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+            body: {
               question: currentEdits.question,
               expectedAnswer: currentEdits.expectedAnswer,
-            }),
+            },
           }
         );
-
-        if (!patchRes.ok) {
-          const errJson = await patchRes.json().catch(() => ({}));
-          throw new Error(
-            extractErrorMessage(errJson, `Failed to save draft before activation (${patchRes.status})`)
-          );
-        }
       }
 
-      const res = await fetch(
-        `/api/polls/${encodeURIComponent(draftPoll.id)}/activate`,
-        {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      if (!res.ok) {
-        if (res.status === 409) {
+      let activated: PollQuestion;
+      try {
+        activated = await requestJson(
+          `/api/polls/${encodeURIComponent(draftPoll.id)}/activate`,
+          pollQuestionSchema,
+          {
+            getAccessToken,
+            method: "POST",
+          }
+        );
+      } catch (actErr: unknown) {
+        if (actErr instanceof ClientApiError && actErr.status === 409) {
           void refreshPolls();
         }
-        const errJson = await res.json().catch(() => ({}));
-        throw new Error(
-          extractErrorMessage(errJson, `Failed to activate poll (${res.status})`)
-        );
+        throw actErr;
       }
 
-      const raw = await res.json();
-      const activated = pollQuestionSchema.parse(raw);
       dispatch({ type: "poll:confirmed", payload: activated });
       setDraftEditsByPollId((prev) => {
         const next = { ...prev };
@@ -474,30 +393,18 @@ export function useTeacherPolls({
 
   const closePoll = useCallback(
     async (pollId: UUID): Promise<PollQuestion> => {
-      const token = await getAccessToken();
-      if (!token) throw new Error("Authentication required");
-
       setActionPending(true);
       setActionError(null);
 
       try {
-        const res = await fetch(
+        const closed = await requestJson(
           `/api/polls/${encodeURIComponent(pollId)}/close`,
+          pollQuestionSchema,
           {
+            getAccessToken,
             method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
           }
         );
-
-        if (!res.ok) {
-          const errJson = await res.json().catch(() => ({}));
-          throw new Error(
-            extractErrorMessage(errJson, `Failed to close poll (${res.status})`)
-          );
-        }
-
-        const raw = await res.json();
-        const closed = pollQuestionSchema.parse(raw);
         dispatch({ type: "poll:confirmed", payload: closed });
         return closed;
       } catch (err: unknown) {

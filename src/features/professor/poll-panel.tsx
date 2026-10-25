@@ -34,9 +34,9 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
   );
 
   return (
-    <Card className="flex flex-col space-y-4 p-4 border border-[#e6d8bd] bg-[#fffdf8]">
-      <CardHeader className="p-0 pb-2 border-b border-[#e6d8bd] flex flex-row items-center justify-between">
-        <CardTitle as="h2" className="text-lg font-semibold text-[#2b2a2e]">
+    <Card className="flex flex-col space-y-4 p-4 border border-line bg-panel">
+      <CardHeader className="p-0 pb-2 border-b border-line flex flex-row items-center justify-between">
+        <CardTitle as="h2" className="text-lg font-semibold text-ink">
           Lecture Polls
         </CardTitle>
         {isLive ? (
@@ -54,7 +54,7 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
         {!isLive && (
           <div
             role="status"
-            className="p-3 bg-[#f4e9d7] text-[#5f5b54] rounded-md text-sm"
+            className="p-3 bg-cream text-muted rounded-md text-sm"
           >
             Start or resume a live lecture to generate a poll.
           </div>
@@ -63,7 +63,7 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
         {(hook.actionError || hook.pollsError) && (
           <div
             role="alert"
-            className="p-3 bg-[#f8e0e3] border border-[#b0384a]/30 text-[#b0384a] rounded-md text-sm flex justify-between items-center"
+            className="p-3 bg-bad-tint border border-bad/30 text-bad rounded-md text-sm flex justify-between items-center"
           >
             <span>{hook.actionError ?? hook.pollsError}</span>
             <button
@@ -80,11 +80,11 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
         {/* 1. ACTIVE POLL SECTION */}
         {activePollSummary && (
           <div
-            className="p-4 border border-[#2b7f55]/40 bg-[#dff1e5]/30 rounded-lg space-y-3"
+            className="p-4 border border-good/40 bg-good-tint/30 rounded-lg space-y-3"
             aria-label="Active Poll"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#2b7f55]">
+              <span className="text-xs font-semibold uppercase tracking-wider text-good">
                 Current Active Poll
               </span>
               <Badge variant="solid" mastery="green">
@@ -92,14 +92,14 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
               </Badge>
             </div>
 
-            <p className="text-base text-[#2b2a2e] font-medium leading-relaxed">
+            <p className="text-base text-ink font-medium leading-relaxed">
               {activePollSummary.poll.question}
             </p>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2 border-t border-[#2b7f55]/20">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2 border-t border-good/20">
               <p
                 aria-live="polite"
-                className="text-sm font-semibold text-[#2b7f55] tabular-nums"
+                className="text-sm font-semibold text-good tabular-nums"
               >
                 {activeCount === 1
                   ? "1 response received"
@@ -111,7 +111,7 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
                 size="sm"
                 isLoading={hook.actionPending}
                 disabled={!isLive || hook.actionPending}
-                onClick={() => void hook.closePoll(activePollSummary.poll.id)}
+                onClick={() => void hook.closePoll(activePollSummary.poll.id).catch(() => {})}
               >
                 Close poll
               </Button>
@@ -122,11 +122,11 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
         {/* 2. DRAFT POLL SECTION */}
         {draftPollSummary && (
           <div
-            className="p-4 border border-[#ed793c]/40 bg-[#fffdf8] rounded-lg space-y-3 shadow-xs"
+            className="p-4 border border-orange/40 bg-panel rounded-lg space-y-3 shadow-xs"
             aria-label="Draft Poll"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold uppercase tracking-wider text-[#ed793c]">
+              <span className="text-xs font-semibold uppercase tracking-wider text-orange">
                 Draft Poll
               </span>
               <Badge variant="secondary" className="text-xs">
@@ -137,7 +137,7 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
             <div className="space-y-1.5">
               <label
                 htmlFor="poll-question-input"
-                className="block text-xs font-semibold text-[#2b2a2e]"
+                className="block text-xs font-semibold text-ink"
               >
                 Question
               </label>
@@ -149,19 +149,18 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
                 onChange={(e) =>
                   hook.updateDraftField("question", e.target.value)
                 }
-                className="w-full rounded-md border border-[#3a3a3d] bg-[#fffdf8] p-2 text-sm text-[#2b2a2e] focus:outline-none focus:ring-2 focus:ring-[#2b2a2e]"
+                className="w-full rounded-md border border-charcoal bg-panel p-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               />
             </div>
-
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <label
                   htmlFor="poll-rubric-input"
-                  className="block text-xs font-semibold text-[#2b2a2e]"
+                  className="block text-xs font-semibold text-ink"
                 >
                   Expected answer / rubric
                 </label>
-                <span className="text-[11px] bg-[#f4e9d7] px-1.5 py-0.5 rounded font-mono text-[#2b2a2e]">
+                <span className="text-[11px] bg-cream px-1.5 py-0.5 rounded font-mono text-ink">
                   Teacher only
                 </span>
               </div>
@@ -173,16 +172,16 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
                 onChange={(e) =>
                   hook.updateDraftField("expectedAnswer", e.target.value)
                 }
-                className="w-full rounded-md border border-[#3a3a3d] bg-[#fffdf8] p-2 text-sm text-[#2b2a2e] focus:outline-none focus:ring-2 focus:ring-[#2b2a2e]"
+                className="w-full rounded-md border border-charcoal bg-panel p-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               />
             </div>
 
             {/* Text Preview */}
-            <div className="p-3 bg-[#fdfbf7] border border-[#e6d8bd] rounded-md space-y-1 text-xs text-[#5f5b54]">
-              <span className="font-semibold text-[#2b2a2e] block">
+            <div className="p-3 bg-[#fdfbf7] border border-line rounded-md space-y-1 text-xs text-muted">
+              <span className="font-semibold text-ink block">
                 Preview (Students see only the question):
               </span>
-              <p className="text-sm text-[#2b2a2e]">
+              <p className="text-sm text-ink">
                 {hook.activeDraftEdits.question || "(Empty question)"}
               </p>
             </div>
@@ -190,13 +189,13 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
             {hasActivePoll && (
               <p
                 role="note"
-                className="text-xs text-[#b0384a] font-medium"
+                className="text-xs text-bad font-medium"
               >
                 Close the active poll before activating another.
               </p>
             )}
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#e6d8bd]">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-line">
               <Button
                 variant="outline"
                 size="sm"
@@ -206,7 +205,7 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
                   hook.actionPending ||
                   !hook.activeDraftEdits.isDirty
                 }
-                onClick={() => void hook.saveDraft()}
+                onClick={() => void hook.saveDraft().catch(() => {})}
               >
                 Save draft
               </Button>
@@ -215,7 +214,7 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
                 size="sm"
                 isLoading={hook.actionPending}
                 disabled={!isLive || hook.actionPending || hasActivePoll}
-                onClick={() => void hook.activatePoll()}
+                onClick={() => void hook.activatePoll().catch(() => {})}
               >
                 Activate poll
               </Button>
@@ -225,15 +224,15 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
 
         {/* 3. GENERATE POLL CONTROLS */}
         {!draftPollSummary && isLive && (
-          <div className="p-3 border border-dashed border-[#e6d8bd] rounded-lg space-y-3 bg-[#fffdf8]">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-[#5f5b54]">
+          <div className="p-3 border border-dashed border-line rounded-lg space-y-3 bg-panel">
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
               Generate New Formative Poll
             </h3>
 
             <div className="space-y-1.5">
               <label
                 htmlFor="poll-concept-select"
-                className="block text-xs font-medium text-[#2b2a2e]"
+                className="block text-xs font-medium text-ink"
               >
                 Topic Concept
               </label>
@@ -242,7 +241,7 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
                 disabled={hook.actionPending || concepts.length === 0}
                 value={selectedConceptId}
                 onChange={(e) => setSelectedConceptId(e.target.value)}
-                className="w-full rounded-md border border-[#3a3a3d] bg-[#fffdf8] p-2 text-sm text-[#2b2a2e] focus:outline-none focus:ring-2 focus:ring-[#2b2a2e]"
+                className="w-full rounded-md border border-charcoal bg-panel p-2 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-ink"
               >
                 <option value="">Use recently detected concept</option>
                 {concepts.map((c) => (
@@ -254,7 +253,7 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
             </div>
 
             {concepts.length === 0 ? (
-              <p className="text-xs text-[#5f5b54]">
+              <p className="text-xs text-muted">
                 No course concepts found. Add concepts to syllabus to generate
                 polls.
               </p>
@@ -265,9 +264,11 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
                 isLoading={hook.actionPending}
                 disabled={hook.actionPending}
                 onClick={() =>
-                  void hook.generatePoll(
-                    selectedConceptId ? (selectedConceptId as UUID) : undefined
-                  )
+                  void hook
+                    .generatePoll(
+                      selectedConceptId ? (selectedConceptId as UUID) : undefined
+                    )
+                    .catch(() => {})
                 }
               >
                 Generate poll
@@ -279,21 +280,21 @@ export function PollPanel({ isLive, concepts, hook }: PollPanelProps) {
         {/* 4. CLOSED POLL SECTION (Most recent closed) */}
         {closedPollSummary && !activePollSummary && !draftPollSummary && (
           <div
-            className="p-3 border border-[#e6d8bd] bg-[#f4e9d7]/20 rounded-lg space-y-2 text-sm"
+            className="p-3 border border-line bg-cream/20 rounded-lg space-y-2 text-sm"
             aria-label="Previous Closed Poll"
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-[#5f5b54]">
+              <span className="text-xs font-semibold text-muted">
                 Previous Poll
               </span>
               <Badge variant="secondary" className="text-xs">
                 Closed
               </Badge>
             </div>
-            <p className="text-[#2b2a2e] text-sm font-medium">
+            <p className="text-ink text-sm font-medium">
               {closedPollSummary.poll.question}
             </p>
-            <p className="text-xs text-[#5f5b54] tabular-nums">
+            <p className="text-xs text-muted tabular-nums">
               Final: {closedCount === 1 ? "1 response received" : `${closedCount} responses received`}
             </p>
           </div>
