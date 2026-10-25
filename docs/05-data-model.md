@@ -558,6 +558,8 @@ SET search_path = '';
 
 ### 3.4 `claim_and_create_match`
 Atomically claims two waiting pool entries and creates a canonically ordered match:
+
+Note: Pool and match requests accept 1–3 concepts per the opt-in HTTP contract (`docs/06-http-api.md`), while party quests enforce their separate 1–3 target concept rule.
 ```sql
 CREATE OR REPLACE FUNCTION claim_and_create_match(
     p_course_id UUID,
@@ -623,7 +625,7 @@ $$;
 All relational changes follow a strict chronological, single-writer migration sequence:
 
 1. **`20261020000001_initial_schema.sql`** (Phase 0 — *Completed History*):
-   - Creates initial 18 base tables, constraints, foreign keys, and indexes.
+   - Creates initial 18 base tables, constraints, foreign keys, and indexes (including initial `study_group_pool` and `study_group_matches` tables).
 2. **`20261020000002_mastery_rpc.sql`** (Phase 1 — *Target*):
    - Implements atomic `apply_mastery_evidence` PostgreSQL stored procedure with row-level locks.
 3. **`20261021000003_spark_learning.sql`** (Phase 1 — *Target*):
@@ -632,7 +634,7 @@ All relational changes follow a strict chronological, single-writer migration se
    - Adds `concept_quiz_questions.hints` (JSONB NULL) with 3-element length validation.
    - Adds `quiz_attempts.encounter_id` (UUID NULL UNIQUE REFERENCES `encounters(id)`).
 4. **`20261022000004_study_groups.sql`** (Phase 6 — *Target*, rescheduled from old 0003):
-   - Creates base collaboration tables: `study_group_pool`, `study_group_matches`, `student_availability`, `study_group_messages`.
+   - Preserves preexisting `study_group_pool` and `study_group_matches` tables, creates `student_availability` and `study_group_messages` tables.
    - Implements atomic `claim_and_create_match` stored procedure.
 5. **`20261022000005_spark_collaboration.sql`** (Phase 6 — *Target*):
    - Creates `study_group_invitations`, `party_quests`, and `party_quest_progress` tables.

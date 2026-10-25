@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
-import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   SupabaseTestHarness,
@@ -7,78 +7,14 @@ import {
 } from "./supabase-harness";
 import { EnrollmentService } from "../../../src/server/core/enrollment/enrollment-service";
 import { EnrollmentRepository } from "../../../src/server/core/enrollment/enrollment-repository";
+import {
+  DB_CONTAINER,
+  runPsql,
+  runPsqlExpectError,
+} from "./postgres-test-helpers";
 
 const isFixtureMode = process.env.INTEGRATION_MODE === "fixture";
 
-const DB_CONTAINER = process.env.SUPABASE_DB_CONTAINER ?? (
-  (() => {
-    try {
-      execFileSync("docker", ["inspect", "supabase_db_spark"], { stdio: "ignore" });
-      return "supabase_db_spark";
-    } catch {
-      return "supabase_db_HackOHIO-2026";
-    }
-  })()
-);
-
-function runPsql(sql: string): string {
-  return execFileSync(
-    "docker",
-    [
-      "exec",
-      "-i",
-      DB_CONTAINER,
-      "psql",
-      "-U",
-      "postgres",
-      "-d",
-      "postgres",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-t",
-      "-A",
-      "-c",
-      sql,
-    ],
-    { encoding: "utf8" }
-  );
-}
-
-function runPsqlExpectError(sql: string): { code: string; message: string; stderr: string } {
-  try {
-    execFileSync(
-      "docker",
-      [
-        "exec",
-        "-i",
-        DB_CONTAINER,
-        "psql",
-        "-U",
-        "postgres",
-        "-d",
-        "postgres",
-        "-v",
-        "ON_ERROR_STOP=1",
-        "-v",
-        "VERBOSITY=verbose",
-        "-c",
-        sql,
-      ],
-      { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] }
-    );
-    throw new Error("Expected psql command to fail but it succeeded");
-  } catch (err: unknown) {
-    const stderr =
-      err && typeof err === "object" && "stderr" in err && err.stderr
-        ? String(err.stderr)
-        : String(err);
-
-    // Match SQLSTATE code: e.g. ERROR:  55000: ... or ERROR:  23514: ... or SQLSTATE: 55000
-    const codeMatch = stderr.match(/ERROR:\s+([0-9A-Z]{5}):/i) ?? stderr.match(/SQLSTATE:\s+([0-9A-Z]{5})/i);
-    const code = codeMatch ? codeMatch[1] : "";
-    return { code, message: stderr, stderr };
-  }
-}
 
 function sleep(ms: number): Promise<void> {
   // Real clock wait required for polling external PostgreSQL engine lock-table in Docker
@@ -579,7 +515,7 @@ describe.skipIf(isFixtureMode)(
       expect(totalMatches).toHaveLength(1);
     });
 
-    it("5. concept consent: rejects empty, nulls, >3, unrequested, and other-course concepts with 22023", async () => {
+    it("5. concept consent: rejects empty, nulls, unrequested, and other-course concepts with 22023", async () => {
       currentContext = { users: [], teacherIds: [], courseIds: [] };
       const course1 = await harness.createTestCourse(currentContext, { conceptCount: 4 });
       const course2 = await harness.createTestCourse(currentContext, { conceptCount: 2 });
@@ -624,16 +560,6 @@ describe.skipIf(isFixtureMode)(
       expect(nullElemErr).not.toBeNull();
       expect(nullElemErr?.code).toBe("22023");
 
-      // 5c. >3 concepts array -> 22023
-      const { error: tooManyErr } = await harness.serviceClient.rpc("claim_and_create_match", {
-        p_course_id: course1.courseId,
-        p_student_a: studentA.id,
-        p_student_b: studentB.id,
-        p_concept_ids: [course1.conceptIds[0], course1.conceptIds[1], course1.conceptIds[2], course1.conceptIds[3]],
-      });
-      expect(tooManyErr).not.toBeNull();
-      expect(tooManyErr?.code).toBe("22023");
-
       // 5d. Duplicate concepts in array -> 22023
       const { error: dupErr } = await harness.serviceClient.rpc("claim_and_create_match", {
         p_course_id: course1.courseId,
@@ -670,6 +596,87 @@ describe.skipIf(isFixtureMode)(
 
       const { data: matches } = await harness.serviceClient.from("study_group_matches").select("id").eq("course_id", course1.courseId);
       expect(matches).toHaveLength(0);
+    });
+
+    it("5b. concept cardinality boundary: rejects 4 jointly requested concepts with 22023, succeeds with 3", async () => {
+      currentContext = { users: [], teacherIds: [], courseIds: [] };
+      const course = await harness.createTestCourse(currentContext, { conceptCount: 4 });
+      const userA = await harness.createTestUser(currentContext, "student");
+      const userB = await harness.createTestUser(currentContext, "student");
+      const studentA = await enrollmentService.enrollStudent(harness.buildStudentActor(userA), course.joinCode);
+      const studentB = await enrollmentService.enrollStudent(harness.buildStudentActor(userB), course.joinCode);
+
+      // Both student A and student B request all 4 course concepts
+      await harness.serviceClient.from("study_group_pool").insert([
+        {
+          student_id: studentA.id,
+          course_id: course.courseId,
+          concept_ids: course.conceptIds,
+          status: "waiting",
+        },
+        {
+          student_id: studentB.id,
+          course_id: course.courseId,
+          concept_ids: course.conceptIds,
+          status: "waiting",
+        },
+      ]);
+
+      // Calling claim_and_create_match with 4 concepts -> rejects with 22023
+      const { data: failMatchId, error: fourConceptsErr } = await harness.serviceClient.rpc("claim_and_create_match", {
+        p_course_id: course.courseId,
+        p_student_a: studentA.id,
+        p_student_b: studentB.id,
+        p_concept_ids: course.conceptIds,
+      });
+      expect(fourConceptsErr).not.toBeNull();
+      expect(fourConceptsErr?.code).toBe("22023");
+      expect(failMatchId).toBeFalsy();
+
+      // Verify both entries still waiting and no match created
+      const { data: poolsBefore } = await harness.serviceClient
+        .from("study_group_pool")
+        .select("status")
+        .eq("course_id", course.courseId);
+      expect(poolsBefore).toHaveLength(2);
+      expect(poolsBefore?.every((p) => p.status === "waiting")).toBe(true);
+
+      const { data: matchesBefore } = await harness.serviceClient
+        .from("study_group_matches")
+        .select("id")
+        .eq("course_id", course.courseId);
+      expect(matchesBefore).toHaveLength(0);
+
+      // Calling claim_and_create_match with 3 concepts -> succeeds
+      const threeConcepts = course.conceptIds.slice(0, 3);
+      const { data: matchId, error: successErr } = await harness.serviceClient.rpc("claim_and_create_match", {
+        p_course_id: course.courseId,
+        p_student_a: studentA.id,
+        p_student_b: studentB.id,
+        p_concept_ids: threeConcepts,
+      });
+      expect(successErr).toBeNull();
+      expect(matchId).toBeDefined();
+
+      // Verify persisted match: canonical peer ordering and exactly those 3 concept IDs
+      const { data: matchRow } = await harness.serviceClient
+        .from("study_group_matches")
+        .select("*")
+        .eq("id", matchId)
+        .single();
+      expect(matchRow).not.toBeNull();
+      const [expectedStudent1, expectedStudent2] = [studentA.id, studentB.id].sort();
+      expect(matchRow.student1_id).toBe(expectedStudent1);
+      expect(matchRow.student2_id).toBe(expectedStudent2);
+      expect(matchRow.concept_ids).toEqual(threeConcepts);
+
+      // Verify both pool entries transitioned to 'matched'
+      const { data: poolsAfter } = await harness.serviceClient
+        .from("study_group_pool")
+        .select("status")
+        .eq("course_id", course.courseId);
+      expect(poolsAfter).toHaveLength(2);
+      expect(poolsAfter?.every((p) => p.status === "matched")).toBe(true);
     });
 
     it("6. deterministic concurrent winner: session 1 holds lock, session 2 blocks and fails with 55000", async () => {
