@@ -82,7 +82,7 @@ export class PollService
     const context = await this.deps.polls.getPoll(actor, pollId);
     await this.deps.rooms.authorizeRoom(actor, `professor:${context.poll.lectureId}`);
 
-    const now = this.deps.clock.nowISO ? this.deps.clock.nowISO() : this.deps.clock.now().toISOString();
+    const now = this.deps.clock.nowISO();
     const activePoll = await this.deps.polls.transitionPoll(
       actor,
       pollId,
@@ -128,7 +128,7 @@ export class PollService
     const context = await this.deps.polls.getPoll(actor, pollId);
     await this.deps.rooms.authorizeRoom(actor, `professor:${context.poll.lectureId}`);
 
-    const now = this.deps.clock.nowISO ? this.deps.clock.nowISO() : this.deps.clock.now().toISOString();
+    const now = this.deps.clock.nowISO();
     const closedPoll = await this.deps.polls.transitionPoll(
       actor,
       pollId,
@@ -208,7 +208,7 @@ export class PollService
     }
 
     const responseId = this.deps.ids.generateId();
-    const answeredAt = this.deps.clock.nowISO ? this.deps.clock.nowISO() : this.deps.clock.now().toISOString();
+    const answeredAt = this.deps.clock.nowISO();
     const { response, inserted } = await this.deps.polls.ingestResponse(
       actor,
       pollId,
@@ -217,22 +217,24 @@ export class PollService
       answeredAt,
     );
 
-    try {
-      const responseCount = await this.deps.polls.getResponseCount(actor, pollId);
-      const countEventPayload: PollResponseCountEvent = {
-        eventId: this.deps.ids.generateId(),
-        occurredAt: this.deps.clock.nowISO ? this.deps.clock.nowISO() : this.deps.clock.now().toISOString(),
-        lectureId: context.poll.lectureId,
-        pollId,
-        responseCount,
-      };
-      const validCountEvent = pollResponseCountEventSchema.parse(countEventPayload);
-      await this.deps.publisher.emitToTeacher(context.poll.lectureId, "poll:response-count", validCountEvent);
-    } catch (countErr) {
-      console.error(
-        `Failed to publish poll:response-count for lectureId=${context.poll.lectureId} pollId=${pollId}:`,
-        countErr
-      );
+    if (inserted) {
+      try {
+        const responseCount = await this.deps.polls.getResponseCount(actor, pollId);
+        const countEventPayload: PollResponseCountEvent = {
+          eventId: this.deps.ids.generateId(),
+          occurredAt: this.deps.clock.nowISO(),
+          lectureId: context.poll.lectureId,
+          pollId,
+          responseCount,
+        };
+        const validCountEvent = pollResponseCountEventSchema.parse(countEventPayload);
+        await this.deps.publisher.emitToTeacher(context.poll.lectureId, "poll:response-count", validCountEvent);
+      } catch (countErr) {
+        console.error(
+          `Failed to publish poll:response-count for lectureId=${context.poll.lectureId} pollId=${pollId}:`,
+          countErr
+        );
+      }
     }
 
     if (!inserted) {
@@ -278,8 +280,13 @@ export class PollService
       } catch (aiErr) {
         try {
           await this.deps.polls.markEvaluationFailed(response.id, studentId);
-        } catch {
-          // preserve upstream failure
+        } catch (failurePersistenceError: unknown) {
+          console.error("Failed to persist failed poll evaluation status", {
+            pollId,
+            responseId: response.id,
+            studentId,
+            error: failurePersistenceError,
+          });
         }
 
         if (aiErr instanceof AppError) {
@@ -322,7 +329,7 @@ export class PollService
     if (stored) {
       const masteryEvent: MasteryUpdatedEvent = {
         eventId: this.deps.ids.generateId(),
-        occurredAt: this.deps.clock.nowISO ? this.deps.clock.nowISO() : this.deps.clock.now().toISOString(),
+        occurredAt: this.deps.clock.nowISO(),
         studentId,
         conceptId: context.poll.conceptId,
         confidence: finalResponse.evaluation!.mastery!.confidence,

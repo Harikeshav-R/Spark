@@ -276,7 +276,7 @@ Default limit is 50 items; maximum allowed limit is 100 items.
 ### `POST /api/polls/:pollId/respond`
 - **Auth**: Enrolled student attending lecture.
 - **Body**: `{ answer: string }`
-- **Response `200 OK`**:
+- **Response `200 OK`**: (Fresh evaluated submissions and completed identical replays return the cached evaluation result without repeating teacher notification or mastery evidence side effects):
   ```typescript
   {
     responseId: string;
@@ -289,7 +289,7 @@ Default limit is 50 items; maximum allowed limit is 100 items.
     newBand: "gray" | "red" | "yellow" | "green";
   }
   ```
-- **Errors**: `400 INVALID_POLL_STATUS` if poll is closed; `409 RESPONSE_ALREADY_SUBMITTED` on conflicting duplicate.
+- **Errors**: `400 INVALID_POLL_STATUS` if poll is not active (draft or closed); `403 FORBIDDEN` if student is not enrolled or attending; `409 POLL_RESPONSE_PENDING` if an identical submission is still pending evaluation; `409 RESPONSE_ALREADY_SUBMITTED` on conflicting answer submission; `503 SERVICE_UNAVAILABLE` if an identical submission evaluation previously failed.
 
 ### `POST /api/polls/:pollId/close`
 - **Auth**: Course teacher.

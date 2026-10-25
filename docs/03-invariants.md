@@ -124,7 +124,7 @@ stateDiagram-v2
 ```
 - **Single Active Poll Invariant (INV-P01)**: Within any single lecture, at most ONE poll may have status `active` at any given time. Activating a poll while another is active MUST return `409 ACTIVE_POLL_EXISTS`.
 - **Response Invariant (INV-P02)**: Responses are accepted ONLY when the poll status is `active`. Submissions to `draft` or `closed` polls MUST be rejected with `400 INVALID_POLL_STATUS`.
-- **Single Student Submission (INV-P03)**: A student may submit at most one response per poll. Subsequent identical submissions return the existing evaluated response; conflicting submissions return `409 RESPONSE_ALREADY_SUBMITTED`.
+- **Single Student Submission (INV-P03)**: A student may submit at most one response per poll. Responses still require an active poll and live lecture under admission rules. Subsequent identical submissions return the existing result once evaluated with cached mastery without repeating grading or side effects; a still-pending evaluation returns `409 POLL_RESPONSE_PENDING`, and a failed evaluation returns `503 SERVICE_UNAVAILABLE` without grading or mastery mutation. Conflicting submissions return `409 RESPONSE_ALREADY_SUBMITTED`.
 
 ---
 
