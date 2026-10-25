@@ -72,6 +72,7 @@ export function createCourseEffortRouter(
           });
         }
 
+
         const rawCourseId = req.params["courseId"];
         const courseIdParam = typeof rawCourseId === "string" ? rawCourseId : "";
         const parsedCourseId = uuidSchema.safeParse(courseIdParam);

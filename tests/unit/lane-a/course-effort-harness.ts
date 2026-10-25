@@ -13,6 +13,7 @@ export interface StudentRow {
   course_id: UUID;
   name: string;
   auth_id?: UUID;
+  created_at?: string;
 }
 
 export interface XpEventRow {
@@ -131,7 +132,16 @@ export function createFakeSupabaseClient(store: FakeDbStore): Pick<SupabaseClien
           if (selectOptions?.head) {
             return { data: null, count: rows.length, error: null };
           }
-          return { data: rows.map((r) => ({ id: r.id, name: r.name, course_id: r.course_id })), count: rows.length, error: null };
+          return {
+            data: rows.map((r) => ({
+              id: r.id,
+              name: r.name,
+              course_id: r.course_id,
+              created_at: r.created_at ?? "2026-10-01T10:00:00.000Z",
+            })),
+            count: rows.length,
+            error: null,
+          };
         }
 
         if (table === "xp_events") {

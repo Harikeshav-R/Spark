@@ -11,6 +11,7 @@ import {
   courseHeatmapConceptSchema,
   courseHeatmapSnapshotSchema,
 } from "./mastery.js";
+
 // ============================================================================
 // 1. Enums and Primitives
 // ============================================================================
@@ -161,6 +162,7 @@ export const courseEffortSchema = z.object({
   xp: z.number().int().nonnegative(),
   averageConfidence: confidenceSchema,
   flag: z.literal("high_effort_low_mastery").nullable(),
+  enrolledAt: isoTimestampSchema,
   unassessed: z.boolean(),
 });
 export type CourseEffortDTO = z.infer<typeof courseEffortSchema>;

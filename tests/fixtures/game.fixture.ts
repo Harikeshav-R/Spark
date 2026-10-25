@@ -6,6 +6,7 @@ import type {
   EncounterHintResponse,
   EncounterResultDTO,
   CourseEffortDTO,
+  ClassSkySnapshot,
   GameUpdatedEvent,
   PartyQuestUpdatedEvent,
 } from "../../src/contracts/index.js";
@@ -239,6 +240,7 @@ export const FIXTURE_COURSE_EFFORT = [
     xp: 508,
     averageConfidence: 0.38,
     flag: "high_effort_low_mastery",
+    enrolledAt: "2026-10-01T10:00:00.000Z",
     unassessed: false,
   },
   {
@@ -247,9 +249,35 @@ export const FIXTURE_COURSE_EFFORT = [
     xp: 620,
     averageConfidence: 0.82,
     flag: null,
+    enrolledAt: "2026-10-01T10:05:00.000Z",
     unassessed: false,
   },
 ] as const satisfies readonly CourseEffortDTO[];
+
+export const FIXTURE_CLASS_SKY_SNAPSHOT = {
+  courseId: "22222222-2222-4222-8222-222222222222",
+  totalStudents: 2,
+  concepts: [
+    {
+      conceptId: "33333333-3333-4333-8333-333333333317",
+      label: "Graph Traversal",
+      category: "Algorithms",
+      distribution: { gray: 0, red: 1, yellow: 1, green: 0 },
+      averageConfidence: 0.38,
+      band: "red",
+      taught: true,
+    },
+    {
+      conceptId: "33333333-3333-4333-8333-333333333318",
+      label: "Dynamic Programming",
+      category: "Algorithms",
+      distribution: { gray: 0, red: 0, yellow: 1, green: 1 },
+      averageConfidence: 0.82,
+      band: "green",
+      taught: false,
+    },
+  ],
+} as const satisfies ClassSkySnapshot;
 
 export const FIXTURE_GAME_UPDATED_PAYLOAD = {
   eventId: "66666666-6666-4666-8666-666666666604",

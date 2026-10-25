@@ -4,17 +4,18 @@ import type {
   ActorContext,
   UUID,
 } from "../../../contracts/common.js";
-import { uuidSchema } from "../../../contracts/common.js";
+import { isoTimestampSchema, uuidSchema } from "../../../contracts/common.js";
 import type { CourseService } from "../../../contracts/course.js";
 import type {
+  ClassSkySnapshot,
   CourseEffortDTO,
   GameService,
-  ClassSkySnapshot,
 } from "../../../contracts/game.js";
 import {
   courseEffortSchema,
   classSkySnapshotSchema,
 } from "../../../contracts/game.js";
+
 import {
   confidenceSchema,
   confidenceToBand,
@@ -34,6 +35,9 @@ const studentRowSchema = z.object({
   id: uuidSchema,
   name: z.string().min(1),
   course_id: uuidSchema,
+  created_at: z.string().min(1).refine((val) => Number.isFinite(Date.parse(val)), {
+    message: "Invalid created_at timestamp",
+  }),
 });
 
 const xpEventRowSchema = z.object({
@@ -127,7 +131,7 @@ export class CourseEffortService implements Pick<GameService, "getCourseEffort" 
     const conceptIds = new Set<UUID>(parsedConcepts.data.map((c) => c.id));
 
     // 2. Fetch all enrolled students
-    const students: Array<{ id: UUID; name: string }> = [];
+    const students: Array<{ id: UUID; name: string; enrolledAt: string }> = [];
     const studentIds = new Set<UUID>();
     let studentOffset = 0;
 
@@ -136,7 +140,7 @@ export class CourseEffortService implements Pick<GameService, "getCourseEffort" 
       try {
         pageResult = await this.dependencies.client
           .from("students")
-          .select("id,name,course_id")
+          .select("id,name,course_id,created_at")
           .eq("course_id", validCourseId)
           .order("id")
           .range(studentOffset, studentOffset + PAGE_SIZE - 1);
@@ -166,7 +170,9 @@ export class CourseEffortService implements Pick<GameService, "getCourseEffort" 
             message: "Database returned invalid course effort data",
           });
         }
-        students.push({ id: row.id, name: row.name });
+        const enrolledAt = new Date(row.created_at).toISOString();
+        isoTimestampSchema.parse(enrolledAt);
+        students.push({ id: row.id, name: row.name, enrolledAt });
         studentIds.add(row.id);
       }
 
@@ -295,6 +301,8 @@ export class CourseEffortService implements Pick<GameService, "getCourseEffort" 
         name: s.name,
         xp,
         averageConfidence,
+        enrolledAt: s.enrolledAt,
+        unassessed: averageConfidence === 0,
       };
     });
 
@@ -332,7 +340,8 @@ export class CourseEffortService implements Pick<GameService, "getCourseEffort" 
         xp: s.xp,
         averageConfidence: s.averageConfidence,
         flag,
-        unassessed: s.averageConfidence === 0,
+        enrolledAt: s.enrolledAt,
+        unassessed: s.unassessed,
       };
     });
 

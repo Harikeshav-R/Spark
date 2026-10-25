@@ -18,7 +18,6 @@ import {
   createFakeSupabaseClient,
 } from "./course-effort-harness.js";
 
-
 describe("CourseEffortService", () => {
   const teacherId: UUID = "00000000-0000-4000-8000-000000000030";
   const otherTeacherId: UUID = "00000000-0000-4000-8000-000000000031";
@@ -76,10 +75,10 @@ describe("CourseEffortService", () => {
         { id: foreignConceptId, course_id: foreignCourseId, label: "Quantum", category: "Physics" },
       ],
       students: [
-        { id: rahulId, course_id: courseId, name: "Rahul Verma" },
-        { id: hariId, course_id: courseId, name: "Hari Ram" },
-        { id: miraId, course_id: courseId, name: "Mira" },
-        { id: leeId, course_id: courseId, name: "Lee" },
+        { id: rahulId, course_id: courseId, name: "Rahul Verma", created_at: "2026-10-01T10:00:00.000Z" },
+        { id: hariId, course_id: courseId, name: "Hari Ram", created_at: "2026-10-01T10:05:00.000Z" },
+        { id: miraId, course_id: courseId, name: "Mira", created_at: "2026-10-01T10:10:00.000Z" },
+        { id: leeId, course_id: courseId, name: "Lee", created_at: "2026-10-01T10:15:00.000Z" },
       ],
       xpEvents: [],
       mastery: [],
@@ -236,6 +235,7 @@ describe("CourseEffortService", () => {
           xp: 600,
           averageConfidence: 0.2,
           flag: "high_effort_low_mastery",
+          enrolledAt: "2026-10-01T10:00:00.000Z",
           unassessed: false,
         },
         {
@@ -244,6 +244,7 @@ describe("CourseEffortService", () => {
           xp: 480,
           averageConfidence: 0.8,
           flag: null,
+          enrolledAt: "2026-10-01T10:05:00.000Z",
           unassessed: false,
         },
         {
@@ -252,6 +253,7 @@ describe("CourseEffortService", () => {
           xp: 120,
           averageConfidence: 0.4,
           flag: null,
+          enrolledAt: "2026-10-01T10:10:00.000Z",
           unassessed: false,
         },
         {
@@ -260,6 +262,7 @@ describe("CourseEffortService", () => {
           xp: 0,
           averageConfidence: 0,
           flag: null,
+          enrolledAt: "2026-10-01T10:15:00.000Z",
           unassessed: true,
         },
       ]);
@@ -426,7 +429,41 @@ describe("CourseEffortService", () => {
       const rahul = result.find((r) => r.studentId === rahulId);
       expect(rahul?.xp).toBe(600);
       expect(rahul?.averageConfidence).toBe(0);
+      expect(rahul?.unassessed).toBe(true);
       expect(rahul?.flag).toBeNull();
+    });
+
+    it("normalizes PostgreSQL timestamp strings with timezones to canonical UTC ISO strings", async () => {
+      store.students = [
+        {
+          id: rahulId,
+          course_id: courseId,
+          name: "Rahul Verma",
+          created_at: "2026-10-01 10:00:00+00",
+        },
+      ];
+      store.xpEvents = store.xpEvents.filter((e) => e.student_id === rahulId);
+      store.mastery = store.mastery.filter((m) => m.student_id === rahulId);
+
+      const result = await effortService.getCourseEffort(teacherActor, courseId);
+      expect(result).toHaveLength(1);
+      expect(result[0]?.enrolledAt).toBe("2026-10-01T10:00:00.000Z");
+    });
+
+    it("throws 500 when database student record has malformed created_at", async () => {
+      store.students = [
+        {
+          id: rahulId,
+          course_id: courseId,
+          name: "Rahul Verma",
+          created_at: "invalid-timestamp-value",
+        },
+      ];
+
+      await expect(effortService.getCourseEffort(teacherActor, courseId)).rejects.toMatchObject({
+        statusCode: 500,
+        message: "Database returned invalid course effort data",
+      });
     });
 
     it("treats missing mastery rows as zero in full concept denominator", async () => {

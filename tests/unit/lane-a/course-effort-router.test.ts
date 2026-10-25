@@ -281,6 +281,7 @@ describe("CourseEffortRouter (Service-backed HTTP Integration)", () => {
           xp: 600,
           averageConfidence: 0.2,
           flag: "high_effort_low_mastery",
+          enrolledAt: "2026-10-01T10:00:00.000Z",
           unassessed: false,
         },
         {
@@ -289,6 +290,7 @@ describe("CourseEffortRouter (Service-backed HTTP Integration)", () => {
           xp: 480,
           averageConfidence: 0.8,
           flag: null,
+          enrolledAt: "2026-10-01T10:00:00.000Z",
           unassessed: false,
         },
         {
@@ -297,6 +299,7 @@ describe("CourseEffortRouter (Service-backed HTTP Integration)", () => {
           xp: 120,
           averageConfidence: 0.4,
           flag: null,
+          enrolledAt: "2026-10-01T10:00:00.000Z",
           unassessed: false,
         },
         {
@@ -305,6 +308,7 @@ describe("CourseEffortRouter (Service-backed HTTP Integration)", () => {
           xp: 0,
           averageConfidence: 0,
           flag: null,
+          enrolledAt: "2026-10-01T10:00:00.000Z",
           unassessed: true,
         },
       ]);

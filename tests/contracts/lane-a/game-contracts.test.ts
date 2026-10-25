@@ -24,6 +24,7 @@ import {
   FIXTURE_ENCOUNTER_HINT,
   FIXTURE_ENCOUNTER_RESULT,
   FIXTURE_COURSE_EFFORT,
+  FIXTURE_CLASS_SKY_SNAPSHOT,
   FIXTURE_GAME_UPDATED_PAYLOAD,
   FIXTURE_PARTY_QUEST_UPDATED_PAYLOAD,
 } from "../../fixtures/game.fixture.js";
@@ -101,7 +102,25 @@ describe("Lane A: Shared Game, Encounter & Party Extension Contracts (P1-A-05)",
       const parsed = FIXTURE_COURSE_EFFORT.map((item: unknown) => courseEffortSchema.parse(item));
       expect(parsed).toHaveLength(2);
       expect(parsed[0].flag).toBe("high_effort_low_mastery");
+      expect(parsed[0].enrolledAt).toBe("2026-10-01T10:00:00.000Z");
+      expect(parsed[0].unassessed).toBe(false);
       expect(parsed[1].flag).toBeNull();
+      expect(parsed[1].enrolledAt).toBe("2026-10-01T10:05:00.000Z");
+      expect(parsed[1].unassessed).toBe(false);
+    });
+
+    it("parses FIXTURE_CLASS_SKY_SNAPSHOT into documented shape", () => {
+      const parsed = classSkySnapshotSchema.parse(FIXTURE_CLASS_SKY_SNAPSHOT);
+      expect(parsed.courseId).toBe(FIXTURE_CLASS_SKY_SNAPSHOT.courseId);
+      expect(parsed.totalStudents).toBe(2);
+      expect(parsed.concepts).toHaveLength(2);
+      for (const concept of parsed.concepts) {
+        expect(() => classSkyConceptSchema.parse(concept)).not.toThrow();
+      }
+      expect(parsed.concepts[0].band).toBe("red");
+      expect(parsed.concepts[0].taught).toBe(true);
+      expect(parsed.concepts[1].band).toBe("green");
+      expect(parsed.concepts[1].taught).toBe(false);
     });
 
     it("parses FIXTURE_GAME_UPDATED_PAYLOAD into documented shape", () => {
@@ -392,6 +411,14 @@ describe("Lane A: Shared Game, Encounter & Party Extension Contracts (P1-A-05)",
       expect(courseEffortSchema.safeParse({ ...base, unassessed: "true" }).success).toBe(false);
       expect(courseEffortSchema.safeParse({ ...base, unassessed: 1 }).success).toBe(false);
       expect(courseEffortSchema.safeParse({ ...base, unassessed: null }).success).toBe(false);
+    });
+
+    it("rejects CourseEffortDTO with invalid enrolledAt timestamp", () => {
+      const invalidEffort = {
+        ...FIXTURE_COURSE_EFFORT[0],
+        enrolledAt: "not-a-timestamp",
+      };
+      expect(courseEffortSchema.safeParse(invalidEffort).success).toBe(false);
     });
 
     it("validates ClassSkyConcept shape and rejects invalid confidence", () => {
