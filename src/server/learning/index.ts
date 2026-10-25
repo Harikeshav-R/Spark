@@ -31,3 +31,15 @@ export {
   LearningPageService,
   type LearningPageServiceDependencies,
 } from "./learning-page-service.js";
+
+export {
+  QuizRepository,
+  type QuizRepositoryPort,
+  type QuizDatabaseClientPort,
+  type QuizAttemptRecord,
+} from "./quiz-repository.js";
+
+export {
+  QuizService,
+  type QuizServiceDependencies,
+} from "./quiz-service.js";

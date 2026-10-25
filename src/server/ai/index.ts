@@ -34,3 +34,5 @@ export { SuggestInterventionsAi } from "./pipelines/suggest-interventions.js";
 export { fixtureSuggestedInterventions } from "./fixtures/suggested-interventions.js";
 export { GenerateLearningPageAi } from "./pipelines/generate-learning-page.js";
 export { fixtureGenerateLearningPage } from "./fixtures/learning-page.js";
+export { GenerateQuizAi } from "./pipelines/generate-quiz.js";
+export { fixtureGenerateQuizQuestions } from "./fixtures/quiz-questions.js";
