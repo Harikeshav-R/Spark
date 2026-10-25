@@ -209,6 +209,58 @@ describe("MasteryService", () => {
       expect(result).toEqual(expectedResult);
       expect(mockRepo.applyEvidence).toHaveBeenCalledWith(studentActor, studentId, conceptId, validPollEvidence);
     });
+
+    it("invokes onEvidenceApplied observer after successful repository persistence", async () => {
+      const expectedResult = {
+        confidence: 0.85,
+        band: "green" as const,
+        attempts: 1,
+        version: 2,
+      };
+      const mockRepo: Pick<MasteryRepository, "getMastery" | "applyEvidence" | "initializeStudentMastery"> = {
+        getMastery: vi.fn(),
+        applyEvidence: vi.fn().mockResolvedValue(expectedResult),
+        initializeStudentMastery: vi.fn(),
+      };
+      const mockObserver = vi.fn().mockResolvedValue(undefined);
+      const service = new MasteryService(mockRepo, mockObserver);
+
+      const result = await service.applyEvidence(studentActor, studentId, conceptId, validPollEvidence);
+      expect(result).toEqual(expectedResult);
+      expect(mockObserver).toHaveBeenCalledWith(studentActor, studentId, conceptId);
+    });
+
+    it("does not invoke observer if repository persistence fails", async () => {
+      const mockRepo: Pick<MasteryRepository, "getMastery" | "applyEvidence" | "initializeStudentMastery"> = {
+        getMastery: vi.fn(),
+        applyEvidence: vi.fn().mockRejectedValue(new Error("RPC failed")),
+        initializeStudentMastery: vi.fn(),
+      };
+      const mockObserver = vi.fn();
+      const service = new MasteryService(mockRepo, mockObserver);
+
+      await expect(service.applyEvidence(studentActor, studentId, conceptId, validPollEvidence)).rejects.toThrow("RPC failed");
+      expect(mockObserver).not.toHaveBeenCalled();
+    });
+
+    it("returns committed evidence result even if observer throws an error", async () => {
+      const expectedResult = {
+        confidence: 0.85,
+        band: "green" as const,
+        attempts: 1,
+        version: 2,
+      };
+      const mockRepo: Pick<MasteryRepository, "getMastery" | "applyEvidence" | "initializeStudentMastery"> = {
+        getMastery: vi.fn(),
+        applyEvidence: vi.fn().mockResolvedValue(expectedResult),
+        initializeStudentMastery: vi.fn(),
+      };
+      const mockObserver = vi.fn().mockRejectedValue(new Error("Observer network error"));
+      const service = new MasteryService(mockRepo, mockObserver);
+
+      const result = await service.applyEvidence(studentActor, studentId, conceptId, validPollEvidence);
+      expect(result).toEqual(expectedResult);
+    });
   });
 
   describe("initializeStudentMastery", () => {

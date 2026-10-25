@@ -11,6 +11,12 @@ import { uuidSchema } from "../../../contracts/common";
 import { AppError } from "../../../contracts/errors";
 import type { MasteryRepository } from "./mastery-repository";
 
+export type MasteryEvidenceObserver = (
+  actor: ActorContext,
+  studentId: UUID,
+  conceptId: UUID,
+) => Promise<void>;
+
 export class MasteryService
   implements
     Pick<
@@ -23,6 +29,7 @@ export class MasteryService
       MasteryRepository,
       "getMastery" | "applyEvidence" | "initializeStudentMastery"
     >,
+    private readonly onEvidenceApplied?: MasteryEvidenceObserver,
   ) {}
 
   private checkActorAuthorization(actor: ActorContext, studentId: UUID): void {
@@ -111,8 +118,21 @@ export class MasteryService
     }
 
     this.checkActorAuthorization(actor, studentId);
+    const result = await this.repository.applyEvidence(actor, studentId, conceptId, evidenceParsed.data);
 
-    return this.repository.applyEvidence(actor, studentId, conceptId, evidenceParsed.data);
+    if (this.onEvidenceApplied) {
+      try {
+        await this.onEvidenceApplied(actor, studentId, conceptId);
+      } catch (err) {
+        console.error("Failed to refresh course heatmap after committed mastery evidence", {
+          studentId,
+          conceptId,
+          error: err,
+        });
+      }
+    }
+
+    return result;
   }
 
   async initializeStudentMastery(studentId: UUID, courseId: UUID): Promise<number> {

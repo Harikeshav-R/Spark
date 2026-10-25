@@ -22,8 +22,10 @@ import {
   CourseRepository,
   CourseService,
   CryptoIdGenerator,
+  HeatmapService,
   MasteryRepository,
   MasteryService,
+  createHeatmapRouter,
 } from "../src/server/core/index.js";
 import {
   LectureSummaryRepository,
@@ -87,8 +89,23 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     new CourseRepository(dependencies.databaseClient),
     new CryptoIdGenerator()
   );
+  const heatmap = new HeatmapService({
+    client: dependencies.databaseClient,
+    courses,
+    publisher,
+    clock: dependencies.clock,
+    ids: dependencies.ids,
+  });
   const mastery = new MasteryService(
-    new MasteryRepository(dependencies.databaseClient)
+    new MasteryRepository(dependencies.databaseClient),
+    (actor, studentId, conceptId) =>
+      heatmap.afterEvidenceApplied(actor, studentId, conceptId)
+  );
+  app.use(
+    createHeatmapRouter({
+      auth: dependencies.auth,
+      heatmap,
+    })
   );
   const attendance = new AttendanceEvidenceService(
     dependencies.databaseClient,
