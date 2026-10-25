@@ -99,3 +99,36 @@ export {
   type SyllabusGraphExtractor,
   SyllabusIngestionService,
 } from "./ingestion/syllabus-ingestion-service";
+
+export {
+  GameRepository,
+  type DailyQuestRecord,
+  type StudentRecord,
+  type PracticeRewardRpcResult,
+} from "./game/game-repository";
+
+export {
+  ConcreteGameService,
+  type GameServiceDependencies,
+  type PracticeRewardResult,
+  calculateStreakDays,
+  calculateMascotEvolution,
+} from "./game/game-service";
+
+export {
+  createGameRouter,
+  type GameRouterDependencies,
+} from "./game/game-router";
+
+export {
+  isConceptReady,
+  computeReviewState,
+  selectDailyQuestCandidates,
+  hydrateDailyQuestItems,
+  type ReviewState,
+} from "./game/daily-quest-generator";
+
+export {
+  calculateEclipse,
+  type EclipseCalculationInput,
+} from "./game/eclipse-service";

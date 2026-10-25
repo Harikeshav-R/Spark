@@ -39,6 +39,9 @@ import {
   createGraphRouter,
   createHeatmapRouter,
   CourseEffortService,
+  GameRepository,
+  ConcreteGameService,
+  createGameRouter,
 } from "../src/server/core/index.js";
 import {
   LectureSummaryRepository,
@@ -145,6 +148,23 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       courses: courseRepository,
       graphRepository,
       masteryRepository,
+    })
+  );
+  const gameRepository = new GameRepository(dependencies.databaseClient);
+  const gameService = new ConcreteGameService({
+    repository: gameRepository,
+    courses,
+    graph: graphRepository,
+    mastery,
+    courseEffort,
+    publisher,
+    clock: dependencies.clock,
+    ids: dependencies.ids,
+  });
+  app.use(
+    createGameRouter({
+      auth: dependencies.auth,
+      game: gameService,
     })
   );
   const attendance = new AttendanceEvidenceService(
