@@ -15,6 +15,7 @@ import type {
 import { FakeRealtimePublisher } from "../../fixtures/classroom.fixture.js";
 import {
   PoolRepository,
+  type PoolDatabaseClientPort,
   MatchRepository,
   StudyGroupService,
 } from "../../../src/server/study-groups/index.js";
@@ -105,7 +106,8 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       { onConflict: "student_id,concept_id" },
     );
 
-    const poolRepo = new PoolRepository(harness.serviceClient);
+    // Cast serviceClient to PoolDatabaseClientPort to avoid postgrest deep generic recursion
+    const poolRepo = new PoolRepository(harness.serviceClient as unknown as PoolDatabaseClientPort);
     const matchRepo = new MatchRepository(harness.serviceClient);
     const publisher = new FakeRealtimePublisher();
 
@@ -246,7 +248,7 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       { onConflict: "student_id,concept_id" },
     );
 
-    const poolRepo = new PoolRepository(harness.serviceClient);
+    const poolRepo = new PoolRepository(harness.serviceClient as unknown as PoolDatabaseClientPort);
     const matchRepo = new MatchRepository(harness.serviceClient);
 
     const serviceWorker1 = new StudyGroupService({
@@ -379,7 +381,7 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
 
     const service = new StudyGroupService({
       courses: courseService,
-      pool: new PoolRepository(harness.serviceClient),
+      pool: new PoolRepository(harness.serviceClient as unknown as PoolDatabaseClientPort),
       matches: new MatchRepository(harness.serviceClient),
       publisher: new FakeRealtimePublisher(),
       clock,
