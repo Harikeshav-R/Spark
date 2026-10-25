@@ -1,4 +1,4 @@
-import type { SparkForm } from "../../contracts/index.js";
+import type { SparkForm } from "../../contracts";
 
 export type SparkMood = "calm" | "think" | "cheer" | "oops" | "sleepy";
 

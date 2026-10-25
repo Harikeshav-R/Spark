@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useId } from "react";
-import { cn } from "../../lib/client/utils.js";
+import { cn } from "../../lib/client/utils";
 import {
   type SparkMood,
   SPARK_MOODS,
   SPARK_FORM_LABELS,
   getSparkForm,
   type SparkSparkleDefinition,
-} from "./spark-moods.js";
-import type { SparkForm } from "../../contracts/index.js";
+} from "./spark-moods";
+import type { SparkForm } from "../../contracts";
 
 export interface SparkMascotProps {
   skyBrightness: number;

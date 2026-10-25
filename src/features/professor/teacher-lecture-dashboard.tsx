@@ -21,7 +21,7 @@ import { AppShell } from "@/components/ui/app-shell";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { SignInPrompt } from "@/features/auth/sign-in-prompt";
-import { requestJson, ClientApiError } from "@/lib/client/http";
+import { requestJson, ClientApiError, getRuntimeAccessToken } from "@/lib/client/http";
 import { createLectureSocket, type LectureSocket } from "@/lib/client/socket";
 import { LectureControls } from "./lecture-controls";
 import { TranscriptFeed } from "./transcript-feed";
@@ -42,21 +42,11 @@ function deriveSnapshotProvenance(chunks: readonly TranscriptChunk[]): boolean |
   return null;
 }
 
-const defaultGetAccessToken = async (): Promise<string | null> => {
-  if (typeof window !== "undefined") {
-    const candidate = (window as unknown as Record<string, unknown>)["__spark_token"];
-    if (typeof candidate === "string" && candidate.length > 0) {
-      return candidate;
-    }
-  }
-  return null;
-};
-
 
 export function TeacherLectureDashboard({
   courseId,
   lectureId: initialLectureId,
-  getAccessToken = defaultGetAccessToken,
+  getAccessToken = getRuntimeAccessToken,
 }: TeacherLectureDashboardProps): React.JSX.Element {
   const [token, setToken] = useState<string | null>(null);
   const [authChecking, setAuthChecking] = useState<boolean>(true);

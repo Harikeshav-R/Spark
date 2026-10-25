@@ -21,6 +21,20 @@ export interface RequestJsonOptions {
 }
 
 /**
+ * Reads the runtime client access token from window.__spark_token.
+ * Returns null in non-browser environments or when the token is missing/empty.
+ */
+export async function getRuntimeAccessToken(): Promise<string | null> {
+  if (typeof window !== "undefined") {
+    const candidate = (window as unknown as Record<string, unknown>)["__spark_token"];
+    if (typeof candidate === "string" && candidate.length > 0) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/**
  * Performs an authenticated HTTP JSON request against the same origin.
  * Never leaks access tokens in logging or error details.
  */

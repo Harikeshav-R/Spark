@@ -19,11 +19,14 @@ import {
   type PositionedNode,
 } from "./d3-force-layout";
 import { StarVessel, getStatusText } from "./star-vessel";
-
+import { ActiveConceptOverlay } from "./active-concept-overlay";
 export interface KnowledgeGraphProps {
   graph: GraphData;
   className?: string;
+  activeConceptIds?: readonly string[];
 }
+
+const DEFAULT_ACTIVE_CONCEPT_IDS: readonly string[] = [];
 
 function captureGraphPointer(element: SVGSVGElement, pointerId: number): void {
   if (typeof element.setPointerCapture !== "function") {
@@ -69,6 +72,7 @@ function releaseGraphPointer(element: SVGSVGElement, pointerId: number): void {
 export function KnowledgeGraph({
   graph,
   className,
+  activeConceptIds = DEFAULT_ACTIVE_CONCEPT_IDS,
 }: KnowledgeGraphProps): React.JSX.Element {
   // 1. Invariant and empty validations (run during SSR as well)
   if (graph.nodes.length === 0) {
@@ -606,6 +610,13 @@ export function KnowledgeGraph({
               );
             })}
           </g>
+
+          {/* Active concept overlay rings */}
+          <ActiveConceptOverlay
+            activeConceptIds={activeConceptIds}
+            positionedNodes={positionedNodeMap}
+            reducedMotion={reducedMotion}
+          />
 
           {/* Interactive Star Vessels (traversed in topological order) */}
           <g className="nodes-layer">
