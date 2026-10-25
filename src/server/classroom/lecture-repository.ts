@@ -41,8 +41,9 @@ interface SelectBuilder {
   maybeSingle(): Promise<{ data: unknown; error: unknown }>;
 }
 
-interface FilterBuilder {
+interface FilterBuilder extends PromiseLike<{ data: unknown; error: unknown }> {
   eq(column: string, value: string): FilterBuilder;
+  order(column: string, options?: { ascending?: boolean }): FilterBuilder;
   single(): Promise<{ data: unknown; error: unknown }>;
   maybeSingle(): Promise<{ data: unknown; error: unknown }>;
 }
@@ -81,7 +82,7 @@ export class LectureRepository {
   private readonly client: LectureDatabaseClientPort;
 
   constructor(
-    client: Pick<SupabaseClient, "from"> | LectureDatabaseClientPort,
+    client: SupabaseClient | Pick<SupabaseClient, "from"> | LectureDatabaseClientPort,
   ) {
     this.client = client as unknown as LectureDatabaseClientPort;
   }
@@ -263,5 +264,64 @@ export class LectureRepository {
     }
 
     return mapLectureRow(parsedRow);
+  }
+
+  async listLectures(courseId: UUID): Promise<LectureSession[]> {
+    if (!uuidSchema.safeParse(courseId).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid course ID format",
+      });
+    }
+
+    let result: { data: unknown; error: unknown };
+    try {
+      result = await this.client
+        .from("lecture_sessions")
+        .select("id, course_id, title, status, started_at, ended_at")
+        .eq("course_id", courseId)
+        .order("started_at", { ascending: false })
+        .order("id", { ascending: true });
+    } catch (err) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Failed to list lecture sessions",
+        cause: err,
+      });
+    }
+
+    if (result.error) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database error listing lecture sessions",
+        cause: result.error,
+      });
+    }
+
+    if (!Array.isArray(result.data)) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database returned non-array for lecture sessions",
+      });
+    }
+
+    return result.data.map((raw) => {
+      let parsedRow: z.infer<typeof lectureRowSchema>;
+      try {
+        parsedRow = lectureRowSchema.parse(raw);
+      } catch (err) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database returned malformed lecture row",
+          cause: err,
+        });
+      }
+      return mapLectureRow(parsedRow);
+    });
   }
 }

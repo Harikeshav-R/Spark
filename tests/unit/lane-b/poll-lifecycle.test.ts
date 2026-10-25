@@ -74,6 +74,7 @@ describe("PollService Unit Tests (Lane B)", () => {
     | "storeEvaluation"
     | "markEvaluationFailed"
     | "storeMasteryResult"
+    | "getResponseCount"
   >;
   let mockRooms: PollServiceDependencies["rooms"];
   let mockPresence: PollServiceDependencies["presence"];
@@ -115,6 +116,7 @@ describe("PollService Unit Tests (Lane B)", () => {
       storeEvaluation: vi.fn(),
       markEvaluationFailed: vi.fn(),
       storeMasteryResult: vi.fn(),
+      getResponseCount: vi.fn().mockResolvedValue(1),
     };
     mockRooms = {
       authorizeRoom: vi.fn().mockResolvedValue(undefined),
@@ -139,6 +141,7 @@ describe("PollService Unit Tests (Lane B)", () => {
     mockPublisher = {
       emitToLecture: vi.fn().mockResolvedValue(undefined),
       emitToStudent: vi.fn().mockResolvedValue(undefined),
+      emitToTeacher: vi.fn().mockResolvedValue(undefined),
     };
   });
 

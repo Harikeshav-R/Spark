@@ -56,3 +56,13 @@ export {
   PollService,
   type PollServiceDependencies,
 } from "./poll-service.js";
+
+export {
+  TeacherPollService,
+  type TeacherPollServiceDependencies,
+} from "./teacher-poll-service.js";
+
+export {
+  createPollRouter,
+  type PollRouterDependencies,
+} from "./poll-router.js";
