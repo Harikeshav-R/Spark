@@ -29,7 +29,6 @@ export {
 } from "./mastery/mastery-service";
 
 export {
-  type CourseHeatmapSnapshot,
   HeatmapService,
   type HeatmapServiceDependencies,
 } from "./mastery/heatmap-service";

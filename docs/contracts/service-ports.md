@@ -187,12 +187,31 @@ export interface PollQuestion {
   closedAt?: ISOTimestamp;
 }
 
+export type PublicPollQuestion = Omit<PollQuestion, "expectedAnswer">;
+
+export interface PollDraftInput {
+  question: string;
+  expectedAnswer: string;
+}
+
+export interface TeacherPollSummary {
+  poll: PollQuestion;
+  responseCount: number;
+}
+
+export interface TeacherPollSnapshot {
+  lectureId: UUID;
+  draft: TeacherPollSummary | null;
+  active: TeacherPollSummary | null;
+  closed: TeacherPollSummary | null;
+}
+
 export interface ClassroomService {
   startLecture(actor: ActorContext, courseId: UUID, title: string): Promise<LectureSession>;
   endLecture(actor: ActorContext, lectureId: UUID): Promise<LectureSession>;
   getLectureSnapshot(actor: ActorContext, lectureId: UUID): Promise<{
     lecture: LectureSession;
-    activePoll: PollQuestion | null;
+    activePoll: PublicPollQuestion | null;
     recentChunks: TranscriptChunk[];
     activeConceptIds: UUID[];
   }>;
@@ -218,6 +237,12 @@ export interface ClassroomService {
     newBand: MasteryBand;
   }>;
   closePoll(actor: ActorContext, pollId: UUID): Promise<PollQuestion>;
+}
+
+export interface TeacherPollService {
+  generatePoll(actor: ActorContext, lectureId: UUID, conceptId?: UUID): Promise<PollQuestion>;
+  editDraft(actor: ActorContext, pollId: UUID, input: PollDraftInput): Promise<PollQuestion>;
+  getSnapshot(actor: ActorContext, lectureId: UUID): Promise<TeacherPollSnapshot>;
 }
 
 export interface StudyGroupService {

@@ -220,7 +220,7 @@ Default limit is 50 items; maximum allowed limit is 100 items.
   ```typescript
   {
     lecture: LectureDTO;
-    activePoll: PollDTO | null;
+    activePoll: PublicPollDTO | null; // Public projection: expectedAnswer stripped
     recentChunks: TranscriptChunkDTO[];
     activeConceptIds: string[];
   }
@@ -249,6 +249,24 @@ Default limit is 50 items; maximum allowed limit is 100 items.
 - **Auth**: Course teacher.
 - **Body**: `{ conceptId?: string }` (if omitted, uses recently detected concepts).
 - **Response `201 Created`**: `PollDTO` (status: `"draft"`, includes generated question and expected answer).
+
+### `GET /api/lectures/:lectureId/polls`
+- **Auth**: Course teacher.
+- **Response `200 OK`**:
+  ```typescript
+  {
+    lectureId: string;
+    draft: { poll: PollDTO; responseCount: number } | null;
+    active: { poll: PollDTO; responseCount: number } | null;
+    closed: { poll: PollDTO; responseCount: number } | null;
+  }
+  ```
+
+### `PATCH /api/polls/:pollId`
+- **Auth**: Course teacher.
+- **Body**: `{ question: string; expectedAnswer: string }`
+- **Response `200 OK`**: `PollDTO` (status: `"draft"`, saved question and expected answer).
+- **Errors**: `400 INVALID_POLL_STATUS` if poll is not in draft status; `404 NOT_FOUND` if absent.
 
 ### `POST /api/polls/:pollId/activate`
 - **Auth**: Course teacher.

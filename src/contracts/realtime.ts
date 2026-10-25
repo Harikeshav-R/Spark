@@ -57,6 +57,14 @@ export interface PollClosedEvent {
   closedAt: ISOTimestamp;
 }
 
+export interface PollResponseCountEvent {
+  eventId: UUID;
+  occurredAt: ISOTimestamp;
+  lectureId: UUID;
+  pollId: UUID;
+  responseCount: number;
+}
+
 export interface HeatmapUpdatedEvent {
   eventId: UUID;
   occurredAt: ISOTimestamp;
@@ -173,6 +181,7 @@ export interface ServerToClientEvents {
   "lecture:concept-detected": (payload: ConceptDetectedEvent) => void;
   "poll:new-question": (payload: PollNewQuestionEvent) => void;
   "poll:closed": (payload: PollClosedEvent) => void;
+  "poll:response-count": (payload: PollResponseCountEvent) => void;
   "mastery:updated": (payload: MasteryUpdatedEvent) => void;
   "heatmap:updated": (payload: HeatmapUpdatedEvent) => void;
   "lecture:ended": (payload: LectureEndedEvent) => void;
@@ -250,6 +259,29 @@ export const pollClosedEventSchema = z.object({
   status: z.literal("closed"),
   closedAt: isoTimestampSchema,
 });
+
+export const pollResponseCountEventSchema = z
+  .object({
+    eventId: uuidSchema,
+    occurredAt: isoTimestampSchema,
+    lectureId: uuidSchema,
+    pollId: uuidSchema,
+    responseCount: z.number().int().nonnegative(),
+  })
+  .strict()
+  .refine(
+    (data: Record<string, unknown>) =>
+      !("expectedAnswer" in data) &&
+      !("rubric" in data) &&
+      !("answer" in data) &&
+      !("evaluation" in data) &&
+      !("studentId" in data) &&
+      !("name" in data),
+    {
+      message:
+        "Violation: Poll response count event must never leak answer, rubric, studentId, evaluation, or name",
+    }
+  );
 
 export const heatmapUpdatedEventSchema = z.object({
   eventId: uuidSchema,

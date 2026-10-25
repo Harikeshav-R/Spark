@@ -171,6 +171,63 @@ This document provides complete, canonical JSON fixtures for API requests, respo
 }
 ```
 
+### `poll:response-count` (Socket Event Payload — Professor Room Only)
+```json
+{
+  "eventId": "66666666-6666-4666-8666-666666666603",
+  "occurredAt": "2026-10-20T14:36:02.150Z",
+  "lectureId": "88888888-8888-4888-8888-888888888888",
+  "pollId": "77777777-7777-4777-8777-777777777777",
+  "responseCount": 1
+}
+```
+
+### `GET /api/lectures/:lectureId/polls` (Teacher Poll Snapshot Response)
+```json
+{
+  "lectureId": "88888888-8888-4888-8888-888888888888",
+  "draft": null,
+  "active": {
+    "poll": {
+      "id": "77777777-7777-4777-8777-777777777777",
+      "lectureId": "88888888-8888-4888-8888-888888888888",
+      "conceptId": "33333333-3333-4333-8333-333333333317",
+      "question": "What happens to the gradient descent optimization trajectory if the learning rate is chosen too large?",
+      "expectedAnswer": "Large learning rate causes oscillations and divergence away from the local minimum.",
+      "status": "active",
+      "generatedAt": "2026-10-20T14:35:00.000Z",
+      "activatedAt": "2026-10-20T14:35:09.500Z"
+    },
+    "responseCount": 1
+  },
+  "closed": null
+}
+```
+
+### `GET /api/courses/:courseId/heatmap` (Course Heatmap Snapshot Response)
+```json
+{
+  "courseId": "11111111-1111-4111-8111-111111111111",
+  "totalStudents": 2,
+  "concepts": [
+    {
+      "conceptId": "33333333-3333-4333-8333-333333333316",
+      "label": "Linear Regression",
+      "category": "Foundations",
+      "distribution": { "gray": 2, "red": 0, "yellow": 0, "green": 0 },
+      "averageConfidence": 0.0
+    },
+    {
+      "conceptId": "33333333-3333-4333-8333-333333333317",
+      "label": "Gradient Descent",
+      "category": "Optimization",
+      "distribution": { "gray": 0, "red": 1, "yellow": 0, "green": 1 },
+      "averageConfidence": 0.525
+    }
+  ]
+}
+```
+
 ---
 
 ## 3. Tutoring & Practice Quiz Fixtures

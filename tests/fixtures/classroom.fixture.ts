@@ -13,6 +13,7 @@ import {
   type ClassroomService,
   type RealtimePublisher,
   type LectureSnapshot,
+  type PublicPollQuestion,
   type PollResponseResult,
   type ActorContext,
   applyMasteryEvidence,
@@ -337,9 +338,22 @@ export class FakeClassroomService implements ClassroomService {
       activeConceptIdsSet.add(activePoll.conceptId);
     }
 
+    const publicActivePoll: PublicPollQuestion | null = activePoll
+      ? {
+          id: activePoll.id,
+          lectureId: activePoll.lectureId,
+          conceptId: activePoll.conceptId,
+          question: activePoll.question,
+          status: activePoll.status,
+          generatedAt: activePoll.generatedAt,
+          ...(activePoll.activatedAt ? { activatedAt: activePoll.activatedAt } : {}),
+          ...(activePoll.closedAt ? { closedAt: activePoll.closedAt } : {}),
+        }
+      : null;
+
     return {
       lecture,
-      activePoll,
+      activePoll: publicActivePoll,
       recentChunks,
       activeConceptIds: Array.from(activeConceptIdsSet),
     };

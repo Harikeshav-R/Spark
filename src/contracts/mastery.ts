@@ -43,6 +43,12 @@ export interface ClassHeatmapItem {
   averageConfidence: number;
 }
 
+export interface CourseHeatmapSnapshot {
+  courseId: UUID;
+  totalStudents: number;
+  concepts: Array<ClassHeatmapItem & { label: string; category: string }>;
+}
+
 export interface MasteryService {
   getMastery(actor: ActorContext, studentId: UUID): Promise<StudentMastery[]>;
   applyEvidence(
@@ -189,3 +195,32 @@ export const classHeatmapItemSchema = z.object({
   }),
   averageConfidence: confidenceSchema,
 });
+
+export const courseHeatmapConceptSchema = classHeatmapItemSchema.extend({
+  label: z.string().min(1),
+  category: z.string(),
+});
+
+export const courseHeatmapSnapshotSchema = z
+  .object({
+    courseId: uuidSchema,
+    totalStudents: z.number().int().nonnegative(),
+    concepts: z.array(courseHeatmapConceptSchema),
+  })
+  .superRefine((data, ctx) => {
+    for (let i = 0; i < data.concepts.length; i++) {
+      const c = data.concepts[i];
+      const sum =
+        c.distribution.gray +
+        c.distribution.red +
+        c.distribution.yellow +
+        c.distribution.green;
+      if (sum !== data.totalStudents) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Concept distribution sum (${sum}) must equal totalStudents (${data.totalStudents})`,
+          path: ["concepts", i, "distribution"],
+        });
+      }
+    }
+  });

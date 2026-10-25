@@ -12,6 +12,7 @@ import type { CourseService as CourseServicePort } from "../../../contracts/cour
 import type {
   ClassHeatmapItem,
   MasteryService as MasteryServicePort,
+  CourseHeatmapSnapshot,
 } from "../../../contracts/mastery.js";
 import {
   confidenceSchema,
@@ -21,11 +22,6 @@ import type { RealtimePublisher } from "../../../contracts/realtime.js";
 import { heatmapUpdatedEventSchema } from "../../../contracts/realtime.js";
 import { AppError } from "../../../contracts/errors.js";
 
-export interface CourseHeatmapSnapshot {
-  courseId: UUID;
-  totalStudents: number;
-  concepts: Array<ClassHeatmapItem & { label: string; category: string }>;
-}
 
 export interface HeatmapServiceDependencies {
   client: Pick<SupabaseClient, "from">;
