@@ -25,7 +25,19 @@ export {
 
 export {
   MasteryService,
+  type MasteryEvidenceObserver,
 } from "./mastery/mastery-service";
+
+export {
+  type CourseHeatmapSnapshot,
+  HeatmapService,
+  type HeatmapServiceDependencies,
+} from "./mastery/heatmap-service";
+
+export {
+  type HeatmapRouterDependencies,
+  createHeatmapRouter,
+} from "./mastery/heatmap-router";
 
 export {
   type AttendanceEvidenceResult,
