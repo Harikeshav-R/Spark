@@ -225,6 +225,43 @@ describe("TranscriptIngestor Unit Tests", () => {
     });
   });
 
+  it("attaches explicit isSimulated provenance to stored chunk and broadcast event", async () => {
+    const { ingestor, insertedChunks, emittedEvents } = createTestHarness();
+
+    const res = await ingestor.ingestTranscriptChunk(
+      teacherActor,
+      lectureId,
+      "Simulated demo speech segment.",
+      10.0,
+      "Simulator",
+      { isSimulated: true },
+    );
+
+    expect(insertedChunks[0].isSimulated).toBe(true);
+    const chunkEvent = emittedEvents.find((e) => e.event === "transcript:chunk");
+    expect(chunkEvent).toBeDefined();
+    expect((chunkEvent?.payload as TranscriptChunkEvent).isSimulated).toBe(true);
+    expect(res.isSimulated).toBe(true);
+  });
+
+  it("rejects invalid provenance object with 400 VALIDATION_ERROR", async () => {
+    const { ingestor } = createTestHarness();
+
+    await expect(
+      ingestor.ingestTranscriptChunk(
+        teacherActor,
+        lectureId,
+        "Invalid provenance test.",
+        10.0,
+        "Simulator",
+        { isSimulated: "true" as unknown as boolean },
+      ),
+    ).rejects.toMatchObject({
+      code: "VALIDATION_ERROR",
+      statusCode: 400,
+    });
+  });
+
   it("proves persist-before-publish invariant: writes complete before events emitted", async () => {
     let chunkInserted = false;
     let linksInserted = false;

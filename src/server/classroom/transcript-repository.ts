@@ -17,6 +17,7 @@ const transcriptChunkRowSchema = z.object({
   text: z.string().min(1),
   timestamp_sec: z.union([z.number(), z.string()]).transform((val) => Number(val)),
   speaker_name: z.string().nullable().optional(),
+  is_simulated: z.boolean().nullable().optional(),
   created_at: z.string().min(1),
 });
 
@@ -113,9 +114,10 @@ export class TranscriptRepository {
           text: validated.data.text,
           timestamp_sec: validated.data.timestampSec,
           speaker_name: validated.data.speakerName ?? null,
+          is_simulated: validated.data.isSimulated ?? null,
           created_at: validated.data.createdAt,
         })
-        .select("id, lecture_id, text, timestamp_sec, speaker_name, created_at")
+        .select("id, lecture_id, text, timestamp_sec, speaker_name, is_simulated, created_at")
         .single();
     } catch (err: unknown) {
       throw new AppError({
@@ -165,6 +167,9 @@ export class TranscriptRepository {
     };
     if (parsedRow.speaker_name !== null && parsedRow.speaker_name !== undefined) {
       stored.speakerName = parsedRow.speaker_name;
+    }
+    if (parsedRow.is_simulated !== null && parsedRow.is_simulated !== undefined) {
+      stored.isSimulated = parsedRow.is_simulated;
     }
 
     return transcriptChunkSchema.parse(stored);

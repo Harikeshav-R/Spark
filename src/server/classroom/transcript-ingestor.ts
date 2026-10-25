@@ -50,6 +50,7 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
     text: string,
     timestampSec: number,
     speakerName?: string,
+    provenance?: { isSimulated: boolean },
   ): Promise<TranscriptChunk> {
     // 1. Validate before persistence
     if (!uuidSchema.safeParse(lectureId).success) {
@@ -85,6 +86,19 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
         });
       }
     }
+    if (provenance !== undefined) {
+      const provSchema = z.object({ isSimulated: z.boolean() }).strict();
+      const parsedProv = provSchema.safeParse(provenance);
+      if (!parsedProv.success) {
+        throw new AppError({
+          code: "VALIDATION_ERROR",
+          statusCode: 400,
+          message: "Invalid provenance payload",
+          cause: parsedProv.error,
+        });
+      }
+    }
+
 
     // 2. Authorize actor
     if (!actor || actor.role !== "teacher" || !actor.teacherId) {
@@ -126,7 +140,9 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
     if (speakerName !== undefined) {
       chunkToInsert.speakerName = speakerName;
     }
-
+    if (provenance !== undefined) {
+      chunkToInsert.isSimulated = provenance.isSimulated;
+    }
     const storedChunk = await this.deps.transcripts.insertChunk(chunkToInsert);
 
     // 6. Concept detection
@@ -180,6 +196,9 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
     };
     if (storedChunk.speakerName !== undefined) {
       chunkEvent.speakerName = storedChunk.speakerName;
+    }
+    if (storedChunk.isSimulated !== undefined) {
+      chunkEvent.isSimulated = storedChunk.isSimulated;
     }
     const validatedChunkEvent = transcriptChunkEventSchema.parse(chunkEvent);
 
