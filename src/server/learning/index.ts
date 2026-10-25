@@ -20,3 +20,14 @@ export {
   LectureSummaryService,
   type LectureSummaryServiceDependencies,
 } from "./lecture-summary-service.js";
+
+export {
+  LearningPageRepository,
+  type LearningPageRepositoryPort,
+  type LearningPageDatabaseClientPort,
+} from "./learning-page-repository.js";
+
+export {
+  LearningPageService,
+  type LearningPageServiceDependencies,
+} from "./learning-page-service.js";
