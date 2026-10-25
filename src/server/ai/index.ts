@@ -24,3 +24,5 @@ export { DetectConceptsAi } from "./pipelines/detect-concepts.js";
 export { fixtureDetectConcepts } from "./fixtures/detected-concepts.js";
 export { SummarizeLectureAi } from "./pipelines/summarize-lecture.js";
 export { fixtureSummarizeLecture } from "./fixtures/summarized-lecture.js";
+export { GeneratePollAi } from "./pipelines/generate-poll.js";
+export { fixturePollQuestion } from "./fixtures/poll-question.js";
