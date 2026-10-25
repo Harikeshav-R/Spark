@@ -53,6 +53,7 @@ export interface InsertPoolEntryInput {
   studentId: UUID;
   courseId: UUID;
   conceptIds: UUID[];
+  createdAt?: ISOTimestamp;
   expiresAt?: ISOTimestamp;
 }
 
@@ -66,6 +67,7 @@ export interface PoolSelectFilterBuilder {
   eq(column: string, value: string): PoolSelectFilterBuilder;
   neq(column: string, value: string): PoolSelectFilterBuilder;
   gt(column: string, value: string): PoolSelectFilterBuilder;
+  gte(column: string, value: string): PoolSelectFilterBuilder;
   lt(column: string, value: string): PoolSelectFilterBuilder;
   single(): Promise<QueryResult<unknown>>;
   maybeSingle(): Promise<QueryResult<unknown>>;
@@ -76,6 +78,7 @@ export interface PoolSelectBuilder {
   eq(column: string, value: string): PoolSelectFilterBuilder;
   neq(column: string, value: string): PoolSelectFilterBuilder;
   gt(column: string, value: string): PoolSelectFilterBuilder;
+  gte(column: string, value: string): PoolSelectFilterBuilder;
   lt(column: string, value: string): PoolSelectFilterBuilder;
   single(): Promise<QueryResult<unknown>>;
   maybeSingle(): Promise<QueryResult<unknown>>;
@@ -172,23 +175,39 @@ export class PoolRepository {
       });
     }
 
+    if (
+      entry.createdAt !== undefined &&
+      !isoTimestampSchema.safeParse(entry.createdAt).success
+    ) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid created_at timestamp format",
+      });
+    }
+
     const id = entry.id ?? crypto.randomUUID();
     const expiresAt =
       entry.expiresAt ??
       new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
+    const insertValues: Record<string, unknown> = {
+      id,
+      student_id: entry.studentId,
+      course_id: entry.courseId,
+      concept_ids: entry.conceptIds,
+      status: "waiting",
+      expires_at: expiresAt,
+    };
+    if (entry.createdAt) {
+      insertValues.created_at = entry.createdAt;
+    }
+
     let insertResult;
     try {
       insertResult = await this.client
         .from("study_group_pool")
-        .insert({
-          id,
-          student_id: entry.studentId,
-          course_id: entry.courseId,
-          concept_ids: entry.conceptIds,
-          status: "waiting",
-          expires_at: expiresAt,
-        })
+        .insert(insertValues)
         .select(
           "id, student_id, course_id, concept_ids, status, created_at, expires_at",
         )
@@ -275,7 +294,7 @@ export class PoolRepository {
         )
         .eq("course_id", courseId)
         .eq("status", "waiting")
-        .gt("expires_at", now);
+        .gte("expires_at", now);
     } catch (err) {
       throw new AppError({
         code: "INTERNAL_SERVER_ERROR",
@@ -562,5 +581,213 @@ export class PoolRepository {
     }
 
     return 0;
+  }
+
+  async cleanupExpiredForCourse(
+    courseId: UUID,
+    now: ISOTimestamp,
+  ): Promise<number> {
+    if (!uuidSchema.safeParse(courseId).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid course ID format",
+      });
+    }
+
+    if (!isoTimestampSchema.safeParse(now).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid timestamp format",
+      });
+    }
+
+    let result;
+    try {
+      result = await this.client
+        .from("study_group_pool")
+        .update({ status: "expired" })
+        .eq("course_id", courseId)
+        .eq("status", "waiting")
+        .lt("expires_at", now)
+        .select("id");
+    } catch (err) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Failed to cleanup expired pool entries for course",
+        cause: err,
+      });
+    }
+
+    if (result.error) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database error cleaning up expired pool entries for course",
+        cause: result.error,
+      });
+    }
+
+    if (Array.isArray(result.data)) {
+      return result.data.length;
+    }
+
+    if (typeof result.count === "number") {
+      return result.count;
+    }
+
+    return 0;
+  }
+
+  async reactivateInactiveEntry(
+    studentId: UUID,
+    courseId: UUID,
+    conceptIds: UUID[],
+    createdAt: ISOTimestamp,
+    expiresAt: ISOTimestamp,
+  ): Promise<PoolEntry | null> {
+    if (!uuidSchema.safeParse(studentId).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid student ID format",
+      });
+    }
+
+    if (!uuidSchema.safeParse(courseId).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid course ID format",
+      });
+    }
+
+    const conceptsParse = z.array(uuidSchema).min(1).safeParse(conceptIds);
+    if (!conceptsParse.success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "At least one valid concept ID is required",
+      });
+    }
+
+    if (!isoTimestampSchema.safeParse(createdAt).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid created_at timestamp format",
+      });
+    }
+
+    if (!isoTimestampSchema.safeParse(expiresAt).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid expires_at timestamp format",
+      });
+    }
+
+    const updatePayload = {
+      concept_ids: conceptIds,
+      status: "waiting",
+      created_at: createdAt,
+      expires_at: expiresAt,
+    };
+
+    // Attempt 1: Guarded update for 'expired' status
+    let expiredResult;
+    try {
+      expiredResult = await this.client
+        .from("study_group_pool")
+        .update(updatePayload)
+        .eq("student_id", studentId)
+        .eq("course_id", courseId)
+        .eq("status", "expired")
+        .select(
+          "id, student_id, course_id, concept_ids, status, created_at, expires_at",
+        )
+        .maybeSingle();
+    } catch (err) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Failed to reactivate expired pool entry",
+        cause: err,
+      });
+    }
+
+    if (expiredResult.error) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database error reactivating expired pool entry",
+        cause: expiredResult.error,
+      });
+    }
+
+    if (expiredResult.data) {
+      let parsedRow: z.infer<typeof poolRowSchema>;
+      try {
+        parsedRow = poolRowSchema.parse(expiredResult.data);
+      } catch (err) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database returned malformed pool row",
+          cause: err,
+        });
+      }
+      return mapPoolRow(parsedRow);
+    }
+
+    // Attempt 2: Guarded update for 'cancelled' status
+    let cancelledResult;
+    try {
+      cancelledResult = await this.client
+        .from("study_group_pool")
+        .update(updatePayload)
+        .eq("student_id", studentId)
+        .eq("course_id", courseId)
+        .eq("status", "cancelled")
+        .select(
+          "id, student_id, course_id, concept_ids, status, created_at, expires_at",
+        )
+        .maybeSingle();
+    } catch (err) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Failed to reactivate cancelled pool entry",
+        cause: err,
+      });
+    }
+
+    if (cancelledResult.error) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database error reactivating cancelled pool entry",
+        cause: cancelledResult.error,
+      });
+    }
+
+    if (cancelledResult.data) {
+      let parsedRow: z.infer<typeof poolRowSchema>;
+      try {
+        parsedRow = poolRowSchema.parse(cancelledResult.data);
+      } catch (err) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database returned malformed pool row",
+          cause: err,
+        });
+      }
+      return mapPoolRow(parsedRow);
+    }
+
+    return null;
   }
 }
