@@ -22,21 +22,5 @@ export {
 export { ExtractGraphAi } from "./pipelines/extract-graph.js";
 export { DetectConceptsAi } from "./pipelines/detect-concepts.js";
 export { fixtureDetectConcepts } from "./fixtures/detected-concepts.js";
-export {
-  SummarizeLectureAi,
-  LectureSummaryRepository,
-  PostLectureSummarizer,
-  lectureSummaryRecordSchema,
-  type LectureSummaryRecord,
-  type LectureSummaryDatabaseClientPort,
-  type TranscriptSourcePort,
-  type LectureSummaryRepositoryPort,
-  type PostLectureSummarizerDependencies,
-  type SummarizerAiPort,
-} from "./pipelines/summarize-lecture.js";
-export {
-  fixtureSummarizeLecture,
-  ZERO_CHUNKS_SUMMARY_TEXT,
-  FIXTURE_SUMMARY_CONCEPT_ID_1,
-  FIXTURE_SUMMARY_CONCEPT_ID_2,
-} from "./fixtures/lecture-summary.js";
+export { SummarizeLectureAi } from "./pipelines/summarize-lecture.js";
+export { fixtureSummarizeLecture } from "./fixtures/summarized-lecture.js";

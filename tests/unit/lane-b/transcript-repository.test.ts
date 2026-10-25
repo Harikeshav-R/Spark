@@ -589,40 +589,62 @@ describe("TranscriptRepository Unit Tests", () => {
     });
   });
 
-  describe("getTranscriptChunks", () => {
-    it("rejects invalid lectureId format with 400 VALIDATION_ERROR", async () => {
+  describe("getLectureTranscript", () => {
+    it("validates lectureId UUID format", async () => {
       const mockClient = { from: vi.fn() } as unknown as TranscriptDatabaseClientPort;
       const repo = new TranscriptRepository(mockClient);
 
-      await expect(repo.getTranscriptChunks("not-a-valid-uuid")).rejects.toMatchObject({
+      await expect(repo.getLectureTranscript("invalid-uuid")).rejects.toMatchObject({
         code: "VALIDATION_ERROR",
         statusCode: 400,
       });
+      expect(mockClient.from).not.toHaveBeenCalled();
     });
 
-    it("fetches, orders, and returns all transcript chunks across pagination boundaries", async () => {
+    it("fetches and paginates all lecture chunks ordered by timestamp_sec and id", async () => {
       const page1 = Array.from({ length: 500 }, (_, i) => ({
-        id: `00000000-0000-4000-8000-${String(i).padStart(12, "0")}`,
+        id: "11111111-1111-4111-8111-111111111111",
         text: `Chunk ${i}`,
-        timestamp_sec: i * 2,
+        timestamp_sec: i,
       }));
       const page2 = [
         {
-          id: "00000000-0000-4000-8000-000000000500",
+          id: "22222222-2222-4222-8222-222222222222",
           text: "Chunk 500",
-          timestamp_sec: 1000,
+          timestamp_sec: 500,
         },
       ];
-
-      const rangeMock = vi
-        .fn()
-        .mockResolvedValueOnce({ data: page1, error: null })
-        .mockResolvedValueOnce({ data: page2, error: null });
 
       const queryObj = {
         eq: vi.fn().mockReturnThis(),
         order: vi.fn().mockReturnThis(),
-        range: rangeMock,
+        range: vi
+          .fn()
+          .mockResolvedValueOnce({ data: page1, error: null })
+          .mockResolvedValueOnce({ data: page2, error: null }),
+      };
+
+      const mockClient = {
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue(queryObj),
+        }),
+      } as unknown as TranscriptDatabaseClientPort;
+      const repo = new TranscriptRepository(mockClient);
+
+      const result = await repo.getLectureTranscript(lectureId);
+      expect(result).toHaveLength(501);
+      expect(result[0]).toEqual({ text: "Chunk 0", timestampSec: 0 });
+      expect(result[500]).toEqual({ text: "Chunk 500", timestampSec: 500 });
+      expect(queryObj.range).toHaveBeenCalledTimes(2);
+      expect(queryObj.range).toHaveBeenNthCalledWith(1, 0, 499);
+      expect(queryObj.range).toHaveBeenNthCalledWith(2, 500, 999);
+    });
+
+    it("returns empty array when lecture has no transcript chunks", async () => {
+      const queryObj = {
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        range: vi.fn().mockResolvedValue({ data: [], error: null }),
       };
       const mockClient = {
         from: vi.fn().mockReturnValue({
@@ -631,20 +653,55 @@ describe("TranscriptRepository Unit Tests", () => {
       } as unknown as TranscriptDatabaseClientPort;
       const repo = new TranscriptRepository(mockClient);
 
-      const chunks = await repo.getTranscriptChunks(lectureId);
-      expect(chunks).toHaveLength(501);
-      expect(chunks[0]).toEqual({ text: "Chunk 0", timestampSec: 0 });
-      expect(chunks[500]).toEqual({ text: "Chunk 500", timestampSec: 1000 });
-      expect(rangeMock).toHaveBeenCalledTimes(2);
+      const result = await repo.getLectureTranscript(lectureId);
+      expect(result).toEqual([]);
     });
 
-    it("handles database query error gracefully with 500 INTERNAL_SERVER_ERROR", async () => {
+    it("maps database transport error to 503 SERVICE_UNAVAILABLE", async () => {
+      const queryObj = {
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        range: vi.fn().mockRejectedValue(new Error("Network disconnect")),
+      };
+      const mockClient = {
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue(queryObj),
+        }),
+      } as unknown as TranscriptDatabaseClientPort;
+      const repo = new TranscriptRepository(mockClient);
+
+      await expect(repo.getLectureTranscript(lectureId)).rejects.toMatchObject({
+        code: "SERVICE_UNAVAILABLE",
+        statusCode: 503,
+      });
+    });
+
+    it("maps database error to 500 INTERNAL_SERVER_ERROR", async () => {
+      const queryObj = {
+        eq: vi.fn().mockReturnThis(),
+        order: vi.fn().mockReturnThis(),
+        range: vi.fn().mockResolvedValue({ data: null, error: { message: "DB error" } }),
+      };
+      const mockClient = {
+        from: vi.fn().mockReturnValue({
+          select: vi.fn().mockReturnValue(queryObj),
+        }),
+      } as unknown as TranscriptDatabaseClientPort;
+      const repo = new TranscriptRepository(mockClient);
+
+      await expect(repo.getLectureTranscript(lectureId)).rejects.toMatchObject({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+      });
+    });
+
+    it("maps malformed chunk row to 500 INTERNAL_SERVER_ERROR", async () => {
       const queryObj = {
         eq: vi.fn().mockReturnThis(),
         order: vi.fn().mockReturnThis(),
         range: vi.fn().mockResolvedValue({
-          data: null,
-          error: { message: "Connection reset" },
+          data: [{ id: "bad-id", text: "", timestamp_sec: -1 }],
+          error: null,
         }),
       };
       const mockClient = {
@@ -654,10 +711,20 @@ describe("TranscriptRepository Unit Tests", () => {
       } as unknown as TranscriptDatabaseClientPort;
       const repo = new TranscriptRepository(mockClient);
 
-      await expect(repo.getTranscriptChunks(lectureId)).rejects.toMatchObject({
+      await expect(repo.getLectureTranscript(lectureId)).rejects.toMatchObject({
         code: "INTERNAL_SERVER_ERROR",
         statusCode: 500,
       });
+    });
+
+    it("provides getTranscriptChunks alias delegating to getLectureTranscript", async () => {
+      const mockClient = { from: vi.fn() } as unknown as TranscriptDatabaseClientPort;
+      const repo = new TranscriptRepository(mockClient);
+      const spy = vi.spyOn(repo, "getLectureTranscript").mockResolvedValue([{ text: "test", timestampSec: 0 }]);
+
+      const result = await repo.getTranscriptChunks(lectureId);
+      expect(spy).toHaveBeenCalledWith(lectureId);
+      expect(result).toEqual([{ text: "test", timestampSec: 0 }]);
     });
   });
 });

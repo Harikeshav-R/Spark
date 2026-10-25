@@ -5,6 +5,10 @@ import { transcriptChunkSchema } from "../../contracts/classroom.js";
 import type { UUID } from "../../contracts/common.js";
 import { uuidSchema } from "../../contracts/common.js";
 import { AppError } from "../../contracts/errors.js";
+export interface LectureTranscriptChunk {
+  text: string;
+  timestampSec: number;
+}
 
 const candidateConceptRowSchema = z.object({
   id: uuidSchema,
@@ -335,9 +339,9 @@ export class TranscriptRepository {
     return allTexts.join("\n");
   }
 
-  async getTranscriptChunks(
+  async getLectureTranscript(
     lectureId: UUID
-  ): Promise<Array<{ text: string; timestampSec: number }>> {
+  ): Promise<{ text: string; timestampSec: number }[]> {
     if (!uuidSchema.safeParse(lectureId).success) {
       throw new AppError({
         code: "VALIDATION_ERROR",
@@ -348,7 +352,7 @@ export class TranscriptRepository {
 
     const PAGE_SIZE = 500;
     let offset = 0;
-    const allChunks: Array<{ text: string; timestampSec: number }> = [];
+    const allChunks: { text: string; timestampSec: number }[] = [];
 
     while (true) {
       let result: { data: unknown; error: unknown };
@@ -364,7 +368,7 @@ export class TranscriptRepository {
         throw new AppError({
           code: "SERVICE_UNAVAILABLE",
           statusCode: 503,
-          message: "Database service unavailable while fetching lecture transcript chunks",
+          message: "Database service unavailable while fetching lecture transcript",
           cause: err,
         });
       }
@@ -373,7 +377,7 @@ export class TranscriptRepository {
         throw new AppError({
           code: "INTERNAL_SERVER_ERROR",
           statusCode: 500,
-          message: "Database error querying lecture transcript chunks",
+          message: "Database error querying lecture transcript",
           cause: result.error,
         });
       }
@@ -382,7 +386,7 @@ export class TranscriptRepository {
         throw new AppError({
           code: "INTERNAL_SERVER_ERROR",
           statusCode: 500,
-          message: "Database returned non-array for transcript chunks",
+          message: "Database returned non-array for lecture transcript chunks",
         });
       }
 
@@ -409,5 +413,11 @@ export class TranscriptRepository {
     }
 
     return allChunks;
+  }
+
+  async getTranscriptChunks(
+    lectureId: UUID
+  ): Promise<{ text: string; timestampSec: number }[]> {
+    return this.getLectureTranscript(lectureId);
   }
 }

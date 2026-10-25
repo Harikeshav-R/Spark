@@ -13,9 +13,9 @@ import { fixtureSocraticTutorTurn } from "../../src/server/ai/fixtures/tutoring-
 import {
   FIXTURE_33_CONCEPTS,
   fixturePrerequisiteGraph,
+  fixtureSummarizeLecture,
 } from "../../src/server/ai/index.js";
 import { fixtureDetectConcepts } from "../../src/server/ai/fixtures/detected-concepts.js";
-import { fixtureSummarizeLecture } from "../../src/server/ai/index.js";
 
 // ============================================================================
 // Canonical Fixture IDs
@@ -251,7 +251,7 @@ export class FakeAiService implements AiService {
     keyConceptsCovered: UUID[];
     timelineHighlights: { timestampSec: number; conceptLabel: string; description: string }[];
   }> {
-    return fixtureSummarizeLecture(transcriptChunks);
+    return fixtureSummarizeLecture(transcriptChunks, FIXTURE_33_CONCEPTS);
   }
 
   async suggestInterventions(

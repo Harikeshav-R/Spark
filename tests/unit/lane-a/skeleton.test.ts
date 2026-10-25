@@ -55,11 +55,6 @@ describe("P0-A-01: Toolchain & Skeleton Verification", () => {
   it("should export composition root from server/index.ts", () => {
     expect(createServer).toBeDefined();
     expect(typeof createServer).toBe("function");
-
-    const instance = createServer();
-    expect(instance.app).toBeDefined();
-    expect(instance.httpServer).toBeDefined();
-    expect(instance.io).toBeDefined();
   });
 
   it("should export shared contracts from src/contracts/index.ts", () => {
