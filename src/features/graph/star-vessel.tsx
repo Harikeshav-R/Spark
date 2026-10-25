@@ -107,11 +107,8 @@ export function StarVessel({
   const taughtSuffix =
     typeof taught === "boolean" ? (taught ? "Taught in lecture" : "Not yet taught") : undefined;
   const fullAccessibleLabel = taughtSuffix
-    ? `${node.label}, ${statusText}, ${taughtSuffix}`
+    ? `${node.label}, ${statusText} • ${taughtSuffix}`
     : `${node.label}, ${statusText}`;
-  const fullTitle = taughtSuffix
-    ? `${node.label} — ${statusText} — ${taughtSuffix}`
-    : `${node.label} — ${statusText}`;
   const fullVisibleStatus = taughtSuffix
     ? `${statusText} • ${taughtSuffix}`
     : statusText;
@@ -161,7 +158,6 @@ export function StarVessel({
         }
       }}
     >
-      <title>{fullTitle}</title>
 
       <defs>
         <clipPath id={clipId}>
@@ -267,8 +263,9 @@ export function StarVessel({
         textAnchor="middle"
         className="fill-[#2b2a2e] text-[12px] font-medium pointer-events-none"
         style={{ fontFamily: "inherit" }}
+        aria-hidden="true"
       >
-        {labelLine1}
+        {labelLine1 + " "}
       </text>
       {labelLine2 && (
         <text
@@ -277,8 +274,9 @@ export function StarVessel({
           textAnchor="middle"
           className="fill-[#2b2a2e] text-[12px] font-medium pointer-events-none"
           style={{ fontFamily: "inherit" }}
+          aria-hidden="true"
         >
-          {labelLine2}
+          {labelLine2 + " "}
         </text>
       )}
       <text
@@ -287,6 +285,7 @@ export function StarVessel({
         textAnchor="middle"
         className="fill-[#66625d] text-[10px] pointer-events-none"
         style={{ fontFamily: "inherit" }}
+        aria-hidden="true"
       >
         {fullVisibleStatus}
       </text>

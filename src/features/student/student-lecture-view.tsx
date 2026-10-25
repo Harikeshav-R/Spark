@@ -1125,9 +1125,9 @@ export function StudentLectureView({
               </span>
             </div>
 
-            <div className="flex items-center gap-4 text-[var(--color-fg-muted)]">
+            <div className="flex flex-wrap items-center gap-4 text-[var(--color-fg-muted)]">
               <span>{lectureState.lecture.title}</span>
-              <span>Room: lecture:{lectureState.lecture.id}</span>
+              <span className="break-all">Room: lecture:{lectureState.lecture.id}</span>
             </div>
           </div>
         )}
@@ -1281,10 +1281,10 @@ export function StudentLectureView({
             - Desktop (1024px-1359px): 2 columns 65/35: Left Graph, Right Spark + Stream
             - Wide (>=1360px): 3 columns 20/55/25: Left Spark Rail, Center Graph, Right Stream
         */}
-        <div className="flex flex-col gap-6 lg:grid lg:grid-cols-[65fr_35fr] 2xl:grid-cols-[20fr_55fr_25fr]">
+        <div className="flex flex-col gap-6 lg:grid lg:max-[1360px]:grid-cols-[65fr_35fr] min-[1360px]:grid-cols-[20fr_55fr_25fr]">
           {/* Panel 1: Spark Companion Rail & Daily Quests */}
           <div
-            className={`order-1 2xl:order-1 2xl:col-start-1 lg:order-2 lg:col-start-2 lg:row-start-1 space-y-4 ${
+            className={`min-w-0 order-1 lg:max-[1360px]:order-2 lg:max-[1360px]:col-start-2 lg:max-[1360px]:row-start-1 min-[1360px]:order-1 min-[1360px]:col-start-1 space-y-4 ${
               mobileTab === "stream" ? "hidden md:block" : "block"
             }`}
           >
@@ -1334,7 +1334,7 @@ export function StudentLectureView({
           </div>
           {/* Panel 2: Knowledge Graph Visualization */}
           <div
-            className={`order-2 2xl:order-2 2xl:col-start-2 lg:order-1 lg:col-start-1 lg:row-start-1 lg:row-span-2 ${
+            className={`min-w-0 order-2 lg:max-[1360px]:order-1 lg:max-[1360px]:col-start-1 lg:max-[1360px]:row-start-1 lg:max-[1360px]:row-span-2 min-[1360px]:order-2 min-[1360px]:col-start-2 ${
               mobileTab === "stream" || mobileTab === "quests" ? "hidden md:block" : "block"
             }`}
           >
@@ -1353,7 +1353,7 @@ export function StudentLectureView({
 
           {/* Panel 3: Live Lecture Stream & Transcript Timeline */}
           <div
-            className={`order-3 2xl:order-3 2xl:col-start-3 lg:order-3 lg:col-start-2 lg:row-start-2 ${
+            className={`min-w-0 order-3 lg:max-[1360px]:order-3 lg:max-[1360px]:col-start-2 lg:max-[1360px]:row-start-2 min-[1360px]:order-3 min-[1360px]:col-start-3 ${
               mobileTab === "graph" || mobileTab === "quests" ? "hidden md:block" : "block"
             }`}
           >

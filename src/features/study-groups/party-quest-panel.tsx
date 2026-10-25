@@ -242,7 +242,7 @@ export function PartyQuestPanel({
                 break;
               case "completed":
                 statusLabel = "Completed";
-                statusBadgeClass = "border-[#2b7f55]/40 bg-[#dff1e5] text-[#2b7f55]";
+                statusBadgeClass = "border-[#1b5e3b]/40 bg-[#dff1e5] text-[#1b5e3b]";
                 break;
               case "cancelled":
                 statusLabel = "Cancelled";

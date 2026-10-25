@@ -385,7 +385,7 @@ export function LectureSummariesView({
                 <div className="flex flex-col md:flex-row md:items-start justify-between gap-3">
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs px-2 py-0.5 rounded font-mono font-semibold bg-[#dff1e5] text-[#2b7f55] border border-[#2b7f55]">
+                      <span className="text-xs px-2 py-0.5 rounded font-mono font-semibold bg-[#dff1e5] text-[#1b5e3b] border border-[#1b5e3b]">
                         COMPLETED
                       </span>
                       <span className="text-xs text-[#5f5b54]">

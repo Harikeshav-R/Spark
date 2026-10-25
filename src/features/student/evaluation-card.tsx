@@ -26,7 +26,7 @@ export function EvaluationCard({
   const outcomeConfig = {
     correct: {
       label: "Correct",
-      badgeClass: "bg-[#dff1e5] text-[#2b7f55] border-[#2b7f55]",
+      badgeClass: "bg-[#dff1e5] text-[#1b5e3b] border-[#1b5e3b]",
     },
     partial: {
       label: "Partially correct",

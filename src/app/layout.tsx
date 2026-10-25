@@ -16,12 +16,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="min-h-screen bg-[var(--color-bg-canvas)] text-[var(--color-fg-default)] font-sans antialiased flex flex-col">
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-50 focus:px-4 focus:py-2 focus:bg-[var(--color-bg-canvas)] focus:text-[var(--color-fg-default)] focus:border-2 focus:border-[var(--focus-ring-color)] focus:rounded-md focus:shadow-md focus:outline-none"
-        >
-          Skip to content
-        </a>
         {isDemo && <DemoToolbar />}
         {children}
       </body>

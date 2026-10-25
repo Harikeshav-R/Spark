@@ -304,7 +304,7 @@ export function StudyGroupAvailability({ courseId }: StudyGroupAvailabilityProps
                 size="sm"
                 onClick={handleSave}
                 disabled={isSaving || loadError !== null}
-                className="bg-[#ed793c] text-white hover:bg-[#db692b]"
+                className="bg-[#ed793c] text-[#2b2a2e] hover:bg-[#db692b] font-medium"
               >
                 {isSaving ? "Saving..." : "Save Availability"}
               </Button>

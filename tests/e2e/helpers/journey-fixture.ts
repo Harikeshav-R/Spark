@@ -329,29 +329,56 @@ export const test = base.extend<{ journey: JourneyFixture }>({
       trackStudentId: (id: string) => trackedStudentIds.add(id),
     };
 
+    let testError: unknown = null;
     try {
       await use(journey);
-    } finally {
-      await harness.closeAll();
+    } catch (err) {
+      testError = err;
+    }
 
-      const errors: unknown[] = [];
+    try {
+      await harness.closeAll();
+    } catch {
+      // capture closeAll error
+    }
+
+    const errors: unknown[] = [];
+
+      if (trackedCourseIds.size > 0) {
+        const courseIdList = Array.from(trackedCourseIds);
+        try {
+          const { data: matches, error: matchErr } = await supabase.serviceClient
+            .from("study_group_matches")
+            .select("id")
+            .in("course_id", courseIdList);
+
+          if (matchErr) {
+            errors.push(
+              new Error(
+                `Teardown failed to query study_group_matches: ${matchErr.message}`
+              )
+            );
+          } else if (matches && matches.length > 0) {
+            const matchIds = matches.map((m: { id: string }) => m.id);
+            const { error: pqErr } = await supabase.serviceClient
+              .from("party_quests")
+              .delete()
+              .in("match_id", matchIds);
+
+            if (pqErr) {
+              errors.push(
+                new Error(
+                  `Teardown failed to delete party_quests: ${pqErr.message}`
+                )
+              );
+            }
+          }
+        } catch (err) {
+          errors.push(err);
+        }
+      }
 
       for (const courseId of trackedCourseIds) {
-        try {
-          const { error: pqErr } = await supabase.serviceClient
-            .from("party_quest_progress")
-            .delete()
-            .neq(
-              "party_quest_id",
-              "00000000-0000-0000-0000-000000000000"
-            );
-          if (pqErr) {
-            // best-effort cleanup of party quest progress
-          }
-        } catch {
-          // ignore
-        }
-
         try {
           const { error } = await supabase.serviceClient
             .from("courses")
@@ -403,9 +430,23 @@ export const test = base.extend<{ journey: JourneyFixture }>({
         }
       }
 
-      if (errors.length > 0) {
-        console.error("[journey-fixture] Cleanup errors:", errors);
+    if (errors.length > 0) {
+      console.error("[journey-fixture] Cleanup errors:", errors);
+      const cleanupErr = new AggregateError(
+        errors,
+        "[journey-fixture] Cleanup failed"
+      );
+      if (testError) {
+        throw new AggregateError(
+          [testError, cleanupErr],
+          "[journey-fixture] Test and cleanup failed"
+        );
       }
+      throw cleanupErr;
+    }
+
+    if (testError) {
+      throw testError;
     }
   },
 });

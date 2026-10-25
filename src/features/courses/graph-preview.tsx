@@ -155,7 +155,13 @@ export function GraphPreview({
                 No prerequisite relationships identified.
               </p>
             ) : (
-              <ul className="divide-y divide-[#e6d8bd] max-h-96 overflow-y-auto">
+              <div
+                role="region"
+                aria-label="Identified prerequisite edges"
+                tabIndex={0}
+                className="max-h-96 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2b2a2e]"
+              >
+                <ul className="divide-y divide-[#e6d8bd]">
                 {edges.map(([source, target], idx) => (
                   <li
                     key={`${source}-${target}-${idx}`}
@@ -171,7 +177,8 @@ export function GraphPreview({
                     <span className="font-medium text-[#2b2a2e]">{target}</span>
                   </li>
                 ))}
-              </ul>
+                </ul>
+              </div>
             )}
           </CardContent>
         </Card>
