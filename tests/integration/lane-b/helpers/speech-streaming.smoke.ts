@@ -73,8 +73,10 @@ async function runSmoke(): Promise<void> {
 
   let clientSocket: ClientSocket | null = null;
   let mockZoomHttpServer: http.Server | null = null;
-  let signalingConn: MockServerWebSocket | null = null;
-  let mediaConn: MockServerWebSocket | null = null;
+  const conns: { signaling: MockServerWebSocket | null; media: MockServerWebSocket | null } = {
+    signaling: null,
+    media: null,
+  };
   try {
     const ingestor = new TranscriptIngestor({
       lectures: lectureRepository,
@@ -181,15 +183,14 @@ async function runSmoke(): Promise<void> {
     await zoomListenPromise;
     const zoomPort = (mockZoomHttpServer.address() as AddressInfo).port;
 
-  signalingConn = null;
-  mediaConn = null;
+
     let signalingHandshakeSignature: string | null = null;
     let mediaHandshakeReceived = false;
 
     wss.on("connection", (ws: MockServerWebSocket, req: http.IncomingMessage) => {
       const url = req.url ?? "";
       if (url.includes("/signaling")) {
-        signalingConn = ws;
+        conns.signaling = ws;
         ws.on("message", (raw: Buffer) => {
           const msg = JSON.parse(raw.toString());
           if (msg.msg_type === 1) {
@@ -211,7 +212,7 @@ async function runSmoke(): Promise<void> {
           }
         });
       } else if (url.includes("/media")) {
-        mediaConn = ws;
+        conns.media = ws;
         ws.on("message", (raw: Buffer) => {
           const msg = JSON.parse(raw.toString());
           if (msg.msg_type === 3) {
@@ -269,7 +270,11 @@ async function runSmoke(): Promise<void> {
     const lecture = await lectureRepository.getLecture(FIXTURE_IDS.teacher1.lectureId);
     const lectureStartEpoch = Date.parse(lecture.startedAt);
 
-    mediaConn.send(
+    const activeMediaConn: MockServerWebSocket | null = conns.media;
+    if (!activeMediaConn) {
+      throw new Error("Zoom RTMS media connection not established");
+    }
+    activeMediaConn.send(
       JSON.stringify({
         msg_type: 17,
         content: {
@@ -309,11 +314,11 @@ async function runSmoke(): Promise<void> {
 
     console.log("=== All Smoke Checks PASSED Cleanly ===");
   } finally {
-    if (signalingConn) {
-      signalingConn.close();
+    if (conns.signaling) {
+      conns.signaling.close();
     }
-    if (mediaConn) {
-      mediaConn.close();
+    if (conns.media) {
+      conns.media.close();
     }
     if (clientSocket?.connected) {
       clientSocket.disconnect();
