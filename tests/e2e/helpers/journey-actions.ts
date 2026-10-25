@@ -1,6 +1,7 @@
 import type { Page, Response as PlaywrightResponse } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
+import type { SupabaseTestHarness } from "../../integration/lane-a/supabase-harness";
 import type { JourneyFixture } from "./journey-fixture";
 export interface SignInResult {
   user: {
@@ -189,4 +190,50 @@ export async function ingestTranscript(
       : [];
 
   return { chunkId, detectedConceptIds };
+}
+
+/**
+ * Resolves the exact displayed option index for the correct answer
+ * of each question in an encounter using Node-only persisted database keys.
+ */
+export async function getEncounterCorrectOptions(
+  supabase: SupabaseTestHarness,
+  encounterId: string
+): Promise<number[]> {
+  const { data: enc, error: encErr } = await supabase.serviceClient
+    .from("encounters")
+    .select("option_permutations, question_ids")
+    .eq("id", encounterId)
+    .single();
+
+  if (encErr || !enc) {
+    throw new Error(
+      `Failed to load encounter for answer resolution: ${encErr?.message}`
+    );
+  }
+
+  const questionIds = enc.question_ids as string[];
+  const { data: questions, error: qErr } = await supabase.serviceClient
+    .from("concept_quiz_questions")
+    .select("id, correct_answer")
+    .in("id", questionIds);
+
+  if (qErr || !questions) {
+    throw new Error(
+      `Failed to load questions for answer resolution: ${qErr?.message}`
+    );
+  }
+
+  const perms = enc.option_permutations as
+    | Record<string, number[]>
+    | number[][];
+  return questionIds.map((qId: string, i: number) => {
+    const q = questions.find((row) => row.id === qId);
+    if (!q) throw new Error(`Missing question ${qId}`);
+    const perm = Array.isArray(perms)
+      ? perms[i]
+      : perms[String(i + 1)] || perms[String(i)];
+    if (!perm) return q.correct_answer;
+    return perm.indexOf(q.correct_answer);
+  });
 }

@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { test as base, expect } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import {
