@@ -847,7 +847,7 @@ export class PollRepository {
     }
 
     const { data: pollsData, error: pollsErr } = await (
-      this.client.from("polls") as unknown as {
+      this.client.from("poll_questions") as unknown as {
         select(cols: string): {
           eq(col: string, val: string): Promise<{ data: unknown; error: unknown }>;
         };

@@ -456,7 +456,7 @@ export class TutoringRepository implements TutoringRepositoryPort {
     try {
       conceptResult = await this.client
         .from("concept_nodes")
-        .select("id, course_id, label, description, category, difficulty, x, y")
+        .select("id, course_id, label, description, category, difficulty, x, y, created_at")
         .eq("id", conceptId)
         .eq("course_id", courseId)
         .maybeSingle();
