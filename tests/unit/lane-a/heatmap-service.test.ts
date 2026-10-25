@@ -43,6 +43,7 @@ interface FakeDbStore {
     table?: string;
     error: { code: string; message: string };
   };
+  beforeQueryResolve?: (table: string, result: QueryResult<unknown>) => Promise<void> | void;
 }
 
 class FakeClock implements Clock {
@@ -133,7 +134,7 @@ function createFakeSupabaseClient(store: FakeDbStore): Pick<SupabaseClient, "fro
         }
 
         if (table === "student_mastery") {
-          let rows = [...store.mastery];
+          let rows = store.mastery.map((r) => ({ ...r, concept: { ...r.concept }, student: { ...r.student } }));
           for (const f of filters) {
             if (f.col === "concept.course_id") {
               rows = rows.filter((r) => r.concept.course_id === f.val);
@@ -212,12 +213,18 @@ function createFakeSupabaseClient(store: FakeDbStore): Pick<SupabaseClient, "fro
           onfulfilled?: ((value: QueryResult<unknown>) => TResult1 | PromiseLike<TResult1>) | null,
           onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
         ): Promise<TResult1 | TResult2> => {
-          try {
-            const res = executeQuery();
-            return Promise.resolve(onfulfilled ? onfulfilled(res) : (res as unknown as TResult1));
-          } catch (err) {
-            return onrejected ? Promise.resolve(onrejected(err)) : Promise.reject(err);
-          }
+          return Promise.resolve()
+            .then(async () => {
+              const res = executeQuery();
+              if (store.beforeQueryResolve) {
+                await store.beforeQueryResolve(table, res);
+              }
+              return res;
+            })
+            .then(
+              (res) => (onfulfilled ? onfulfilled(res) : (res as unknown as TResult1)),
+              (err) => (onrejected ? Promise.resolve(onrejected(err)) : Promise.reject(err))
+            );
         },
       };
 
@@ -730,6 +737,173 @@ describe("HeatmapService", () => {
       expect(mockPublisher.calls).toHaveLength(2);
       const secondCallPayload = mockPublisher.calls[1]!.payload as { distribution: { green: number } };
       expect(secondCallPayload.distribution.green).toBe(1);
+    });
+    it("isolates cache invalidation between courses and does not evict unrelated course cache", async () => {
+      const lectureAId: UUID = "00000000-0000-4000-8000-000000000050";
+      const lectureBId: UUID = "00000000-0000-4000-8000-000000000055";
+      const student2Id: UUID = "00000000-0000-4000-8000-000000000002";
+      const studentAuth2: UUID = "00000000-0000-4000-8000-0000000000a2";
+
+      store.students = [
+        { id: student1Id, auth_id: studentAuth1, course_id: courseId },
+        { id: student2Id, auth_id: studentAuth2, course_id: foreignCourseId },
+      ];
+      store.lectures = [
+        { id: lectureAId, course_id: courseId, status: "live" },
+        { id: lectureBId, course_id: foreignCourseId, status: "live" },
+      ];
+      store.mastery = [
+        {
+          id: "00000000-0000-4000-8000-000000000001",
+          student_id: student1Id,
+          concept_id: concept1Id,
+          confidence: 0.2,
+          concept: { course_id: courseId },
+          student: { course_id: courseId },
+        },
+        {
+          id: "00000000-0000-4000-8000-000000000002",
+          student_id: student2Id,
+          concept_id: foreignConceptId,
+          confidence: 0.2,
+          concept: { course_id: foreignCourseId },
+          student: { course_id: foreignCourseId },
+        },
+      ];
+
+      // Warm both caches
+      const snapA1 = await service.getCourseSnapshot(teacherActor, courseId);
+      expect(snapA1.concepts[0]!.averageConfidence).toBe(0.2);
+      const snapB1 = await service.getCourseSnapshot(otherTeacherActor, foreignCourseId);
+      expect(snapB1.concepts[0]!.averageConfidence).toBe(0.2);
+
+      // Update fixture storage for both courses without advancing clock
+      store.mastery[0]!.confidence = 0.85;
+      store.mastery[1]!.confidence = 0.9;
+
+      // Trigger authorized observer for course A
+      await service.afterEvidenceApplied(studentActor, student1Id, concept1Id);
+
+      // Broadcast must only emit to lecture A
+      expect(mockPublisher.calls).toHaveLength(1);
+      expect(mockPublisher.calls[0]!.lectureId).toBe(lectureAId);
+      expect((mockPublisher.calls[0]!.payload as { averageConfidence: number }).averageConfidence).toBe(0.85);
+
+      // Course A reads refreshed green/0.85
+      const snapA2 = await service.getCourseSnapshot(teacherActor, courseId);
+      expect(snapA2.concepts[0]!.averageConfidence).toBe(0.85);
+      expect(snapA2.concepts[0]!.distribution.green).toBe(1);
+
+      // Course B must still return cached red/0.2 (course A evidence must not have evicted B)
+      const snapB2 = await service.getCourseSnapshot(otherTeacherActor, foreignCourseId);
+      expect(snapB2.concepts[0]!.averageConfidence).toBe(0.2);
+      expect(snapB2.concepts[0]!.distribution.red).toBe(1);
+
+      // At exactly 5000 ms, course B cache expires and reloads green/0.9
+      fakeClock.advance(5000);
+      const snapB3 = await service.getCourseSnapshot(otherTeacherActor, foreignCourseId);
+      expect(snapB3.concepts[0]!.averageConfidence).toBe(0.9);
+      expect(snapB3.concepts[0]!.distribution.green).toBe(1);
+    });
+
+    it("prevents stale initial load from overwriting refreshed cache during race", async () => {
+      const lectureId: UUID = "00000000-0000-4000-8000-000000000050";
+      store.students = [
+        { id: student1Id, auth_id: studentAuth1, course_id: courseId },
+      ];
+      store.lectures = [
+        { id: lectureId, course_id: courseId, status: "live" },
+      ];
+      store.mastery = [
+        {
+          id: "00000000-0000-4000-8000-000000000001",
+          student_id: student1Id,
+          concept_id: concept1Id,
+          confidence: 0.2,
+          concept: { course_id: courseId },
+          student: { course_id: courseId },
+        },
+      ];
+
+      const { promise: pausePromise, resolve: resolvePause } = Promise.withResolvers<void>();
+      const { promise: queryReached, resolve: pausedQueryDeferred } = Promise.withResolvers<void>();
+      let pauseHookArmed = true;
+
+      store.beforeQueryResolve = async (table) => {
+        if (table === "student_mastery" && pauseHookArmed) {
+          pauseHookArmed = false;
+          pausedQueryDeferred();
+          await pausePromise;
+        }
+      };
+
+      // Start initial uncached load (startRevision = 0)
+      const initialLoadPromise = service.getCourseSnapshot(teacherActor, courseId);
+      await queryReached;
+
+      // While initial load is paused with captured 0.2 mastery, persist 0.85 and run observer
+      store.mastery[0]!.confidence = 0.85;
+      await service.afterEvidenceApplied(studentActor, student1Id, concept1Id);
+
+      // Release initial load
+      resolvePause();
+      const initialSnapshot = await initialLoadPromise;
+      expect(initialSnapshot.concepts[0]!.averageConfidence).toBe(0.2);
+
+      // Next read must remain green/0.85, not overwritten by the stale initial load
+      const currentSnapshot = await service.getCourseSnapshot(teacherActor, courseId);
+      expect(currentSnapshot.concepts[0]!.averageConfidence).toBe(0.85);
+      expect(currentSnapshot.concepts[0]!.distribution.green).toBe(1);
+    });
+
+    it("isolates failure on unknown changed concept without wedging queue and preserves cache on failed auth", async () => {
+      const lectureId: UUID = "00000000-0000-4000-8000-000000000050";
+      store.students = [
+        { id: student1Id, auth_id: studentAuth1, course_id: courseId },
+      ];
+      store.lectures = [
+        { id: lectureId, course_id: courseId, status: "live" },
+      ];
+      store.mastery = [
+        {
+          id: "00000000-0000-4000-8000-000000000001",
+          student_id: student1Id,
+          concept_id: concept1Id,
+          confidence: 0.2,
+          concept: { course_id: courseId },
+          student: { course_id: courseId },
+        },
+      ];
+
+      // Warm cache
+      await service.getCourseSnapshot(teacherActor, courseId);
+
+      // Update storage
+      store.mastery[0]!.confidence = 0.85;
+
+      // Observer with non-existent student enrollment must fail and not evict warm cache
+      const unknownStudentId: UUID = "00000000-0000-4000-8000-000000000999";
+      await expect(
+        service.afterEvidenceApplied(studentActor, unknownStudentId, concept1Id)
+      ).rejects.toThrow(AppError);
+
+      const cachedSnapshotAfterFailedAuth = await service.getCourseSnapshot(teacherActor, courseId);
+      expect(cachedSnapshotAfterFailedAuth.concepts[0]!.averageConfidence).toBe(0.2);
+
+      // Observer with unknown concept for this course must throw NOT_FOUND and not emit
+      const unknownConceptId: UUID = "00000000-0000-4000-8000-000000000888";
+      await expect(
+        service.afterEvidenceApplied(studentActor, student1Id, unknownConceptId)
+      ).rejects.toMatchObject({
+        code: "NOT_FOUND",
+        message: "Concept not found in course knowledge graph during heatmap refresh",
+      });
+      expect(mockPublisher.calls).toHaveLength(0);
+
+      // Following valid refresh must succeed and emit correct counts (queue not wedged)
+      await service.afterEvidenceApplied(studentActor, student1Id, concept1Id);
+      expect(mockPublisher.calls).toHaveLength(1);
+      expect((mockPublisher.calls[0]!.payload as { averageConfidence: number }).averageConfidence).toBe(0.85);
     });
   });
 });
