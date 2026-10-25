@@ -2,7 +2,7 @@
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
-> **Status Notice**: Phase 0, Phase 1, Phase 2, and Phase 3 are complete. All Phase 3 tasks (P3-A-01, P3-B-01, P3-B-02, P3-B-03, P3-B-04, P3-C-01, P3-C-02, P3-D-01, and P3-D-02) have been implemented, verified, and merged into `main`. The dependency frontier has advanced to Phase 4 (Formative Polls & Teaching Interventions): P4-A-01, P4-A-02, P4-B-01, and P4-C-01. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
+> **Status Notice**: Phase 0, Phase 1, Phase 2, and Phase 3 are complete. In Phase 4 (Formative Polls & Teaching Interventions), all core backend mastery, realtime lifecycle, and AI evaluation/intervention services (P4-A-01, P4-A-02, P4-B-01, P4-C-01, P4-C-02, and P4-C-03) have been implemented, verified, and merged into `main`. The dependency frontier has advanced to the remaining Phase 4 tasks (P4-D-01, P4-D-02, P4-A-03, and P4-D-03) as well as unblocked Phase 5 tasks (P5-A-01 and P5-C-01). In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
 
 ---
 
@@ -61,12 +61,12 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 
 ## Phase 4: Formative Polls & Teaching Interventions
 
-- [ ] P4-A-01 — Poll Response Atomic Mastery Evidence Application
-- [ ] P4-A-02 — Course Heatmap Aggregation Service & Cache
-- [ ] P4-B-01 — Poll Lifecycle Manager & Response Ingestion
-- [ ] P4-C-01 — Socratic Formative Poll Question Generation Pipeline
-- [ ] P4-C-02 — Server-Side Poll Response Evaluation Pipeline
-- [ ] P4-C-03 — Real-Time Misconception Clustering & Pedagogical Interventions
+- [x] P4-A-01 — Poll Response Atomic Mastery Evidence Application
+- [x] P4-A-02 — Course Heatmap Aggregation Service & Cache
+- [x] P4-B-01 — Poll Lifecycle Manager & Response Ingestion
+- [x] P4-C-01 — Socratic Formative Poll Question Generation Pipeline
+- [x] P4-C-02 — Server-Side Poll Response Evaluation Pipeline
+- [x] P4-C-03 — Real-Time Misconception Clustering & Pedagogical Interventions
 - [ ] P4-D-01 — Formative Poll Teacher Dashboard & Live Response Heatmap
 - [ ] P4-D-02 — Student Active Poll Modal & Evaluation Card
 - [ ] P4-A-03 — Class Sky Aggregate Confidence & Course Effort Service
