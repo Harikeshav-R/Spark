@@ -46,6 +46,25 @@ export interface PollQuestion {
   closedAt?: ISOTimestamp;
 }
 
+export type PublicPollQuestion = Omit<PollQuestion, "expectedAnswer">;
+
+export interface PollDraftInput {
+  question: string;
+  expectedAnswer: string;
+}
+
+export interface TeacherPollSummary {
+  poll: PollQuestion;
+  responseCount: number;
+}
+
+export interface TeacherPollSnapshot {
+  lectureId: UUID;
+  draft: TeacherPollSummary | null;
+  active: TeacherPollSummary | null;
+  closed: TeacherPollSummary | null;
+}
+
 export type PollResponseOutcome = "correct" | "partial" | "wrong";
 
 export interface PollResponseEvaluation {
@@ -63,7 +82,7 @@ export interface PollResponseResult {
 
 export interface LectureSnapshot {
   lecture: LectureSession;
-  activePoll: PollQuestion | null;
+  activePoll: PublicPollQuestion | null;
   recentChunks: TranscriptChunk[];
   activeConceptIds: UUID[];
 }
@@ -202,6 +221,29 @@ export const pollQuestionSchema = z.object({
   closedAt: isoTimestampSchema.optional(),
 });
 
+export const publicPollQuestionSchema = pollQuestionSchema.omit({
+  expectedAnswer: true,
+});
+
+export const pollDraftInputSchema = z
+  .object({
+    question: z.string().trim().min(15).max(500),
+    expectedAnswer: z.string().trim().min(15).max(1000),
+  })
+  .strict();
+
+export const teacherPollSummarySchema = z.object({
+  poll: pollQuestionSchema,
+  responseCount: z.number().int().nonnegative(),
+});
+
+export const teacherPollSnapshotSchema = z.object({
+  lectureId: uuidSchema,
+  draft: teacherPollSummarySchema.nullable(),
+  active: teacherPollSummarySchema.nullable(),
+  closed: teacherPollSummarySchema.nullable(),
+});
+
 export const pollResponseOutcomeSchema = z.enum(["correct", "partial", "wrong"]);
 
 export const pollResponseEvaluationSchema = z.object({
@@ -219,7 +261,7 @@ export const pollResponseResultSchema = z.object({
 
 export const lectureSnapshotSchema = z.object({
   lecture: lectureSessionSchema,
-  activePoll: pollQuestionSchema.nullable(),
+  activePoll: publicPollQuestionSchema.nullable(),
   recentChunks: z.array(transcriptChunkSchema),
   activeConceptIds: z.array(uuidSchema),
 });

@@ -3,7 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ActorContext, Clock, UUID } from "../../../src/contracts/common.js";
 import type { Course, CourseService } from "../../../src/contracts/course.js";
 import { AppError } from "../../../src/contracts/errors.js";
-import { HeatmapService, type CourseHeatmapSnapshot } from "../../../src/server/core/mastery/heatmap-service.js";
+import type { CourseHeatmapSnapshot } from "../../../src/contracts/mastery.js";
+import { HeatmapService } from "../../../src/server/core/mastery/heatmap-service.js";
 
 interface ConceptNodeRow {
   id: string;

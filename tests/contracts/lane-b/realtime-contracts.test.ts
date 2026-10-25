@@ -9,7 +9,12 @@ import {
   pollResponseOutcomeSchema,
   pollResponseEvaluationSchema,
   pollResponseResultSchema,
+  publicPollQuestionSchema,
+  pollDraftInputSchema,
+  teacherPollSummarySchema,
+  teacherPollSnapshotSchema,
   lectureSnapshotSchema,
+  courseHeatmapSnapshotSchema,
   transcriptIngestResponseSchema,
   studyGroupOptInResponseSchema,
   timeIntervalSchema,
@@ -19,6 +24,7 @@ import {
   conceptDetectedEventSchema,
   pollNewQuestionEventSchema,
   pollClosedEventSchema,
+  pollResponseCountEventSchema,
   heatmapUpdatedEventSchema,
   lectureEndedEventSchema,
   lectureSummaryReadyEventSchema,
@@ -415,10 +421,13 @@ describe("Lane B: Classroom & Collaboration Contracts & Realtime Fixtures (P0-B-
       expect(pollQuestionSchema.safeParse(FIXTURE_ACTIVE_POLL).success).toBe(true);
     });
 
-    it("validates lecture snapshot schema", () => {
+    it("validates lecture snapshot schema and public poll projection", () => {
+      const { expectedAnswer: _omitted, ...publicPoll } = FIXTURE_ACTIVE_POLL;
+      expect(publicPollQuestionSchema.safeParse(publicPoll).success).toBe(true);
+
       const snapshot = {
         lecture: FIXTURE_LIVE_LECTURE,
-        activePoll: FIXTURE_ACTIVE_POLL,
+        activePoll: publicPoll,
         recentChunks: [
           {
             id: FIXTURE_CHUNK_ID,
@@ -436,6 +445,79 @@ describe("Lane B: Classroom & Collaboration Contracts & Realtime Fixtures (P0-B-
       expect(lectureSnapshotSchema.safeParse(snapshot).success).toBe(true);
     });
 
+    it("validates teacher poll schemas and response count events", () => {
+      const draftInput = {
+        question: "What is gradient descent optimization?",
+        expectedAnswer: "An iterative first-order optimization algorithm for finding a local minimum.",
+      };
+      expect(pollDraftInputSchema.safeParse(draftInput).success).toBe(true);
+
+      // Trim and length boundaries
+      expect(pollDraftInputSchema.safeParse({ question: "Short?", expectedAnswer: "Too short" }).success).toBe(false);
+
+      const summary = {
+        poll: FIXTURE_ACTIVE_POLL,
+        responseCount: 5,
+      };
+      expect(teacherPollSummarySchema.safeParse(summary).success).toBe(true);
+
+      const teacherSnapshot = {
+        lectureId: FIXTURE_LECTURE_ID,
+        draft: null,
+        active: summary,
+        closed: null,
+      };
+      expect(teacherPollSnapshotSchema.safeParse(teacherSnapshot).success).toBe(true);
+
+      const countEvent = {
+        eventId: "99999999-9999-4999-8999-999999999999",
+        occurredAt: "2026-10-20T14:15:00.000Z",
+        lectureId: FIXTURE_LECTURE_ID,
+        pollId: FIXTURE_POLL_ID,
+        responseCount: 3,
+      };
+      expect(pollResponseCountEventSchema.safeParse(countEvent).success).toBe(true);
+
+      // Leaking forbidden fields rejected
+      expect(
+        pollResponseCountEventSchema.safeParse({
+          ...countEvent,
+          expectedAnswer: "leak",
+        }).success
+      ).toBe(false);
+    });
+
+    it("validates course heatmap snapshot schema and distribution sum invariant", () => {
+      const validHeatmap = {
+        courseId: FIXTURE_COURSE_ID,
+        totalStudents: 4,
+        concepts: [
+          {
+            conceptId: FIXTURE_CONCEPT_ID_1,
+            label: "Gradient Descent",
+            category: "Optimization",
+            distribution: { gray: 1, red: 1, yellow: 1, green: 1 },
+            averageConfidence: 0.5,
+          },
+        ],
+      };
+      expect(courseHeatmapSnapshotSchema.safeParse(validHeatmap).success).toBe(true);
+
+      const invalidSumHeatmap = {
+        courseId: FIXTURE_COURSE_ID,
+        totalStudents: 5,
+        concepts: [
+          {
+            conceptId: FIXTURE_CONCEPT_ID_1,
+            label: "Gradient Descent",
+            category: "Optimization",
+            distribution: { gray: 1, red: 1, yellow: 1, green: 1 }, // sum is 4 != 5
+            averageConfidence: 0.5,
+          },
+        ],
+      };
+      expect(courseHeatmapSnapshotSchema.safeParse(invalidSumHeatmap).success).toBe(false);
+    });
     it("validates poll response evaluation and outcome schemas", () => {
       expect(pollResponseOutcomeSchema.safeParse("correct").success).toBe(true);
       expect(pollResponseOutcomeSchema.safeParse("partial").success).toBe(true);
