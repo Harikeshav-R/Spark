@@ -2,7 +2,7 @@
 
 This checklist tracks project completion from Phase 0 to Phase 7. Tasks are identified by stable IDs matching `docs/04-build-plan.md`.
 
-> **Status Notice**: Phase 0, Phase 1, Phase 2, Phase 3, and Phase 4 are complete. In Phase 4 (Formative Polls & Teaching Interventions), all tasks including student poll modal (P4-D-02), course effort and Class Sky service (P4-A-03), and instructor Class Sky visualization and roster (P4-D-03) have been implemented, verified, and merged into `main`. The dependency frontier has advanced to Phase 5 (Autonomous Learning & Socratic Tutoring), with unblocked tasks P5-A-01 (Quiz & Tutoring Evidence RPC Integration) and P5-C-04 (OpenRouter Academic Resource Search & Cited Q&A). In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
+> **Status Notice**: Phase 0, Phase 1, Phase 2, Phase 3, and Phase 4 are complete. In Phase 5 (Autonomous Learning & Socratic Tutoring), Lane A has completed both core backend tasks: Quiz & Tutoring Evidence RPC Integration (P5-A-01) and Daily Quests, Streak Calculation, XP Ledger & Eclipse Service (P5-A-02). Merged frontend and AI milestones include P5-C-01, P5-C-02, P5-D-01, P5-D-02, and P5-D-03. In accordance with the Single-Writer protocol ([ADR 0011](docs/adr/0011-single-writer-migrations-and-integration.md)), Lane A synchronizes this checklist after feature PRs merge with verified checkpoint evidence.
 
 ---
 
@@ -76,18 +76,18 @@ This checklist tracks project completion from Phase 0 to Phase 7. Tasks are iden
 
 ## Phase 5: Autonomous Learning & Socratic Tutoring
 
-- [ ] P5-A-01 — Quiz & Tutoring Evidence RPC Integration
-- [ ] P5-C-01 — Socratic Tutoring Dialogue Pipeline & Understanding Verification
-- [ ] P5-C-02 — Concept Learning Page Generation Pipeline
+- [x] P5-A-01 — Quiz & Tutoring Evidence RPC Integration
+- [x] P5-C-01 — Socratic Tutoring Dialogue Pipeline & Understanding Verification
+- [x] P5-C-02 — Concept Learning Page Generation Pipeline
 - [ ] P5-C-03 — Practice Quiz Generation & Server-Side Scoring Engine
 - [ ] P5-C-04 — OpenRouter Academic Resource Search & Cited Q&A (Perplexity Models)
 - [ ] P5-C-05 — TutorFeature, LearningFeature & StudyGroupFeature UI Modules
-- [ ] P5-D-01 — Student Concept Learning & Quiz Route Shell Mounting
-- [ ] P5-D-02 — Student Tutoring & Lecture Summaries Shell Mounting
-- [ ] P5-A-02 — Daily Quests, Streak Calculation, XP Ledger & Eclipse Service
+- [x] P5-D-01 — Student Concept Learning & Quiz Route Shell Mounting
+- [x] P5-D-02 — Student Tutoring & Lecture Summaries Shell Mounting
+- [x] P5-A-02 — Daily Quests, Streak Calculation, XP Ledger & Eclipse Service
 - [ ] P5-C-06 — Hint-Capable Question Generation & Practice Encounter Orchestration
 - [ ] P5-C-07 — Exported EncounterFeature Component & Hint Drawer
-- [ ] P5-D-03 — Student Quests, Eclipse, Mascot Shell Mounting & Encounter Integration
+- [x] P5-D-03 — Student Quests, Eclipse, Mascot Shell Mounting & Encounter Integration
 
 ---
 
