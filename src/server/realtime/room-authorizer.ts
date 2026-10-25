@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { ActorContext, UUID } from "../../contracts/common.js";
 import { uuidSchema } from "../../contracts/common.js";
 import { AppError } from "../../contracts/errors.js";
+import { MessagingRepository } from "../study-groups/index.js";
 
 export interface RoomAuthorizer {
   authorizeRoom(actor: ActorContext, room: string): Promise<void>;
@@ -20,6 +21,8 @@ const lectureSessionRowSchema = z.object({
 export function createRoomAuthorizer(
   databaseClient: Pick<SupabaseClient, "from">
 ): RoomAuthorizer {
+  const messagingRepository = new MessagingRepository(databaseClient);
+
   async function getTeacherCourseIds(teacherId: UUID): Promise<UUID[]> {
     try {
       const { data, error } = await databaseClient
@@ -123,7 +126,12 @@ export function createRoomAuthorizer(
       }
 
       const [prefix, id] = parts;
-      if (prefix !== "lecture" && prefix !== "professor" && prefix !== "student") {
+      if (
+        prefix !== "lecture" &&
+        prefix !== "professor" &&
+        prefix !== "student" &&
+        prefix !== "study-group"
+      ) {
         throw new AppError({
           code: "FORBIDDEN",
           statusCode: 403,
@@ -141,6 +149,11 @@ export function createRoomAuthorizer(
       }
 
       const resourceId = parsedId.data;
+
+      if (prefix === "study-group") {
+        await messagingRepository.requireMatchMember(actor, resourceId);
+        return;
+      }
 
       if (prefix === "student") {
         if (actor.role !== "student") {

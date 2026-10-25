@@ -18,3 +18,10 @@ export {
   type MatchProfile,
   type ComplementaryCandidate,
 } from "./matchmaker.js";
+
+export { MessagingRepository } from "./messaging-repository.js";
+
+export {
+  MessagingService,
+  type MessagingServiceDependencies,
+} from "./messaging-service.js";
