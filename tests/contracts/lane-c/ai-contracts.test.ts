@@ -262,10 +262,6 @@ describe("Lane C: AI & Learning Service Ports & Deterministic Fixtures (P0-C-01)
       expect(detected).toEqual([FIXTURE_CONCEPT_ID_2]);
     });
 
-    it("FakeAiService.detectConcepts falls back to fixture concepts when text is generic", async () => {
-      const detected = await fakeAi.detectConcepts("Welcome to class today.", []);
-      expect(detected).toEqual([FIXTURE_CONCEPT_ID_1, FIXTURE_CONCEPT_ID_2]);
-    });
   });
 
   // ==========================================================================

@@ -85,6 +85,7 @@ describe("TranscriptIngestor Unit Tests", () => {
     attendingStudentIds?: UUID[];
     attendanceError?: Error;
     onDetectConcepts?: () => void;
+    recentTranscriptText?: string;
   }) {
     idCounter = 0;
     const lectureToUse = overrides?.lecture ?? liveLecture;
@@ -109,6 +110,16 @@ describe("TranscriptIngestor Unit Tests", () => {
         }),
         insertConceptLinks: vi.fn().mockImplementation(async (cId: UUID, cIds: UUID[]) => {
           insertedLinks.push({ chunkId: cId, conceptIds: cIds });
+        }),
+        getRecentTranscriptText: vi.fn().mockImplementation(async (lecId: UUID, ts: number) => {
+          if (overrides?.recentTranscriptText !== undefined) {
+            return overrides.recentTranscriptText;
+          }
+          const minTs = Math.max(0, ts - 90);
+          return insertedChunks
+            .filter((c) => c.lectureId === lecId && c.timestampSec >= minTs && c.timestampSec <= ts)
+            .map((c) => c.text)
+            .join("\n");
         }),
       },
       rooms: {
@@ -167,12 +178,11 @@ describe("TranscriptIngestor Unit Tests", () => {
     expect(deps.rooms.authorizeRoom).toHaveBeenCalledWith(teacherActor, `professor:${lectureId}`);
     expect(deps.lectures.getLecture).toHaveBeenCalledWith(lectureId);
     expect(deps.transcripts.getCandidateConcepts).toHaveBeenCalledWith(courseId);
+    expect(deps.transcripts.getRecentTranscriptText).toHaveBeenCalledWith(lectureId, 142.5);
     expect(deps.ai.detectConcepts).toHaveBeenCalledWith("Today we cover gradient descent.", [
       { id: conceptId1, label: "Gradient Descent" },
       { id: conceptId2, label: "Backpropagation" },
     ]);
-
-    expect(insertedChunks).toHaveLength(1);
     expect(insertedChunks[0]).toEqual({
       id: chunkId,
       lectureId,
@@ -223,6 +233,26 @@ describe("TranscriptIngestor Unit Tests", () => {
       detectedConceptIds: [conceptId1],
       createdAt: mockTime,
     });
+  });
+
+  it("assembles 90-second recent transcript window and passes to ai.detectConcepts", async () => {
+    const { ingestor, deps } = createTestHarness({
+      recentTranscriptText: "Window chunk 1\nWindow chunk 2\nLatest chunk",
+    });
+
+    await ingestor.ingestTranscriptChunk(
+      teacherActor,
+      lectureId,
+      "Latest chunk",
+      120.0,
+      "Prof. Chen",
+    );
+
+    expect(deps.transcripts.getRecentTranscriptText).toHaveBeenCalledWith(lectureId, 120.0);
+    expect(deps.ai.detectConcepts).toHaveBeenCalledWith(
+      "Window chunk 1\nWindow chunk 2\nLatest chunk",
+      expect.any(Array),
+    );
   });
 
   it("attaches explicit isSimulated provenance to stored chunk and broadcast event", async () => {

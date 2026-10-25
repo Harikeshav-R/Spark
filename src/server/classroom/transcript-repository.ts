@@ -21,11 +21,17 @@ const transcriptChunkRowSchema = z.object({
   created_at: z.string().min(1),
 });
 
+export interface TranscriptSelectQuery extends PromiseLike<{ data: unknown; error: unknown }> {
+  eq(column: string, value: string): this;
+  gte(column: string, value: number): this;
+  lte(column: string, value: number): this;
+  order(column: string, options: { ascending: boolean }): this;
+  range(from: number, to: number): this;
+}
+
 export interface TranscriptDatabaseClientPort {
   from(table: string): {
-    select(columns?: string): {
-      eq(column: string, value: string): Promise<{ data: unknown; error: unknown }>;
-    };
+    select(columns?: string): TranscriptSelectQuery;
     insert(values: unknown): {
       select(columns?: string): {
         single(): Promise<{ data: unknown; error: unknown }>;
@@ -33,6 +39,17 @@ export interface TranscriptDatabaseClientPort {
     };
   };
 }
+
+const recentTranscriptRowSchema = z.object({
+  id: uuidSchema,
+  text: z.string().min(1),
+  timestamp_sec: z
+    .union([z.number(), z.string()])
+    .transform((val) => Number(val))
+    .refine((val) => Number.isFinite(val) && val >= 0, {
+      message: "timestamp_sec must be a finite non-negative number",
+    }),
+});
 
 export class TranscriptRepository {
   private readonly client: TranscriptDatabaseClientPort;
@@ -233,5 +250,88 @@ export class TranscriptRepository {
         cause: result.error,
       });
     }
+  }
+
+  async getRecentTranscriptText(lectureId: UUID, timestampSec: number): Promise<string> {
+    if (!uuidSchema.safeParse(lectureId).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid lecture ID format",
+      });
+    }
+
+    if (typeof timestampSec !== "number" || !Number.isFinite(timestampSec) || timestampSec < 0) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Timestamp seconds must be a finite non-negative number",
+      });
+    }
+
+    const minTimestamp = Math.max(0, timestampSec - 90);
+    const maxTimestamp = timestampSec;
+    const PAGE_SIZE = 500;
+    let offset = 0;
+    const allTexts: string[] = [];
+
+    while (true) {
+      let result: { data: unknown; error: unknown };
+      try {
+        result = await this.client
+          .from("transcript_chunks")
+          .select("id, text, timestamp_sec")
+          .eq("lecture_id", lectureId)
+          .gte("timestamp_sec", minTimestamp)
+          .lte("timestamp_sec", maxTimestamp)
+          .order("timestamp_sec", { ascending: true })
+          .order("id", { ascending: true })
+          .range(offset, offset + PAGE_SIZE - 1);
+      } catch (err: unknown) {
+        throw new AppError({
+          code: "SERVICE_UNAVAILABLE",
+          statusCode: 503,
+          message: "Database service unavailable while fetching recent transcript window",
+          cause: err,
+        });
+      }
+
+      if (result.error) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database error querying recent transcript window",
+          cause: result.error,
+        });
+      }
+
+      if (!Array.isArray(result.data)) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database returned non-array for transcript chunks window",
+        });
+      }
+
+      for (const rawRow of result.data) {
+        const parsed = recentTranscriptRowSchema.safeParse(rawRow);
+        if (!parsed.success) {
+          throw new AppError({
+            code: "INTERNAL_SERVER_ERROR",
+            statusCode: 500,
+            message: "Database returned malformed transcript chunk row in window",
+            cause: parsed.error,
+          });
+        }
+        allTexts.push(parsed.data.text);
+      }
+
+      if (result.data.length < PAGE_SIZE) {
+        break;
+      }
+      offset += PAGE_SIZE;
+    }
+
+    return allTexts.join("\n");
   }
 }

@@ -20,3 +20,5 @@ export {
 } from "./fixtures/prerequisite-graph.js";
 
 export { ExtractGraphAi } from "./pipelines/extract-graph.js";
+export { DetectConceptsAi } from "./pipelines/detect-concepts.js";
+export { fixtureDetectConcepts } from "./fixtures/detected-concepts.js";

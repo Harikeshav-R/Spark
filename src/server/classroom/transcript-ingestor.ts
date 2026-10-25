@@ -30,7 +30,7 @@ export interface TranscriptIngestorDependencies {
   lectures: Pick<LectureRepository, "getLecture">;
   transcripts: Pick<
     TranscriptRepository,
-    "getCandidateConcepts" | "insertChunk" | "insertConceptLinks"
+    "getCandidateConcepts" | "insertChunk" | "insertConceptLinks" | "getRecentTranscriptText"
   >;
   rooms: RoomAuthorizer;
   ai: Pick<AiService, "detectConcepts">;
@@ -149,7 +149,11 @@ export class TranscriptIngestor implements Pick<ClassroomService, "ingestTranscr
     const acceptedConceptIds: UUID[] = [];
     if (candidates.length > 0) {
       const candidateIdSet = new Set(candidates.map((c) => c.id));
-      const detectedResult = await this.deps.ai.detectConcepts(storedChunk.text, candidates);
+      const windowText = await this.deps.transcripts.getRecentTranscriptText(
+        storedChunk.lectureId,
+        storedChunk.timestampSec,
+      );
+      const detectedResult = await this.deps.ai.detectConcepts(windowText, candidates);
 
       const parsedDetected = z.array(uuidSchema).safeParse(detectedResult);
       if (!parsedDetected.success) {
