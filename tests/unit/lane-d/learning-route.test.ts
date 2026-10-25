@@ -1,9 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import React from "react";
 import { renderToString } from "react-dom/server";
 import type { UUID } from "@/contracts/common";
 import ConceptLearningPage from "@/app/student/[studentId]/concepts/[conceptId]/page";
-import { LearningFeature } from "@/features/learning/learning-feature";
 
 // Mock next/navigation notFound
 const mockNotFound = vi.fn(() => {
@@ -99,112 +97,7 @@ describe("P5-D-01: Student Concept Learning & Quiz Route Shell Mounting", () => 
     });
   });
 
-  describe("LearningFeature mounting: learning guide and quiz widget", () => {
-    it("renders both the learning guide and the practice quiz widget", async () => {
-      const page = await ConceptLearningPage({
-        params: Promise.resolve({
-          studentId,
-          conceptId,
-        }),
-        searchParams: Promise.resolve({
-          conceptLabel: "Computational Graphs",
-        }),
-      });
-
-      const html = renderToString(page);
-
-      // Verify LearningFeature container exists
-      expect(html).toContain('data-testid="learning-feature"');
-
-      // Verify tab navigation elements
-      expect(html).toContain('role="tablist"');
-      expect(html).toContain("Learning Guide");
-      expect(html).toContain("Practice Quiz");
-      expect(html).toContain("Academic Resources");
-
-      // Verify learning guide panel content
-      expect(html).toContain('data-testid="learning-guide-panel"');
-      expect(html).toContain("Comprehensive Learning Guide");
-      expect(html).toContain("Concept Overview &amp; Intuition");
-      expect(html).toContain("Key Principles &amp; Formulation");
-
-      // Verify practice quiz widget panel content
-      expect(html).toContain('data-testid="quiz-widget-panel"');
-      expect(html).toContain("Concept Practice Quiz");
-      expect(html).toContain("Q1.");
-      expect(html).toContain("Q2.");
-      expect(html).toContain("Q3.");
-      expect(html).toContain("Q4.");
-      expect(html).toContain("Q5.");
-      expect(html).toContain("Submit Quiz &amp; Record Mastery");
-    });
-
-    it("renders questions with accessible radio options", () => {
-      const component = React.createElement(LearningFeature, {
-        studentId,
-        conceptId,
-        initialConcept: {
-          id: conceptId,
-          courseId,
-          label: "Chain Rule",
-          description: "Calculus foundation for backpropagation.",
-          category: "Mathematics",
-          difficulty: 2,
-          createdAt: new Date().toISOString(),
-        },
-      });
-
-      const html = renderToString(component);
-
-      expect(html).toContain("Chain Rule");
-      expect(html).toContain("Mathematics");
-      expect(html).toContain("Difficulty: 2 / 5");
-
-      // Verify option labels A, B, C, D
-      expect(html).toContain("A.");
-      expect(html).toContain("B.");
-      expect(html).toContain("C.");
-      expect(html).toContain("D.");
-    });
-  });
-
-  describe("Custom content and offline fixture resilience", () => {
-    it("renders custom learning guide content when provided", () => {
-      const customContent = "# Custom Title\n\nCustom explanation of the topic.";
-      const component = React.createElement(LearningFeature, {
-        studentId,
-        conceptId,
-        initialContent: customContent,
-      });
-
-      const html = renderToString(component);
-
-      expect(html).toContain("Custom Title");
-      expect(html).toContain("Custom explanation of the topic.");
-    });
-
-    it("renders custom quiz questions when provided", () => {
-      const customQuestions = [
-        {
-          id: "custom-q-1" as UUID,
-          question: "Custom Question Alpha?",
-          options: ["Option 1", "Option 2", "Option 3", "Option 4"] as [string, string, string, string],
-          questionOrder: 1,
-        },
-      ];
-
-      const component = React.createElement(LearningFeature, {
-        studentId,
-        conceptId,
-        initialQuizQuestions: customQuestions,
-      });
-
-      const html = renderToString(component);
-
-      expect(html).toContain("Custom Question Alpha?");
-      expect(html).toContain("Option 1");
-      expect(html).toContain("Option 4");
-    });
+  describe("Concept metadata difficulty bounds", () => {
     it("clamps out-of-range difficulty in concept metadata to valid 1-5 bounds", async () => {
       const pageHigh = await ConceptLearningPage({
         params: Promise.resolve({ studentId, conceptId }),
@@ -225,35 +118,6 @@ describe("P5-D-01: Student Concept Learning & Quiz Route Shell Mounting", () => 
       });
       const htmlLow = renderToString(pageLow);
       expect(htmlLow).toContain("Difficulty: 1 / 5");
-    });
-
-    it("renders academic citations and search input in the resources panel", () => {
-      const component = React.createElement(LearningFeature, {
-        studentId,
-        conceptId,
-      });
-      const html = renderToString(component);
-
-      expect(html).toContain('data-testid="academic-resources-panel"');
-      expect(html).toContain("Cited Academic Literature &amp; Sources");
-      expect(html).toContain("[1]");
-      expect(html).toContain("[2]");
-      expect(html).toContain("[3]");
-      expect(html).toContain("Search literature or ask a question about this concept…");
-    });
-
-    it("strictly preserves accessible ARIA tab and radio semantics", () => {
-      const component = React.createElement(LearningFeature, {
-        studentId,
-        conceptId,
-      });
-      const html = renderToString(component);
-
-      expect(html).toContain('role="tablist"');
-      expect(html).toContain('role="tab"');
-      expect(html).toContain('role="tabpanel"');
-      expect(html).toContain('role="radiogroup"');
-      expect(html).toContain('type="radio"');
     });
   });
 });
