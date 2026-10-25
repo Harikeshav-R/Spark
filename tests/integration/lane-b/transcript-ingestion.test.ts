@@ -38,7 +38,7 @@ import {
   MasteryService,
 } from "../../../src/server/core/index.js";
 import { createFixtureAttendanceService } from "./helpers/attendance-fixture.js";
-import { FakeAiService } from "../../fixtures/ai.fixture.js";
+import { DetectConceptsAi, OpenRouterClient } from "../../../src/server/ai/index.js";
 import {
   SupabaseTestHarness,
   type TestContext,
@@ -162,13 +162,12 @@ describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)
     const lectureRepository = new LectureRepository(fixtureSupabase);
     const transcriptRepository = new TranscriptRepository(fixtureSupabase);
 
-    const fakeAi = new FakeAiService();
+    const realDetector = new DetectConceptsAi(
+      new OpenRouterClient({ env: { INTEGRATION_MODE: "fixture" } }),
+    );
     const detector = options.detectorOverride
       ? { detectConcepts: options.detectorOverride }
-      : {
-          detectConcepts: (text: string, cands: { id: string; label: string }[]) =>
-            fakeAi.detectConcepts(text, cands),
-        };
+      : realDetector;
 
     const app = express();
     httpServer = http.createServer(app);
@@ -343,6 +342,135 @@ describe("P3-B-02: Live Transcript Chunk Ingestion & Broadcasting (Fixture Mode)
     );
     expect(res.status).toBe(201);
     expect(hookChecked).toBe(true);
+  });
+
+  it("P3-C-01 sliding window transition: t=10 (Loss Functions) -> t=80 (Gradients + Loss Functions) -> t=171 (empty outside 90s window), with link persistence before event and cross-lecture isolation", async () => {
+    const idLoss = "11111111-1111-4111-8111-111111111111";
+    const idGradient = "22222222-2222-4222-8222-222222222222";
+    const idRegularization = "33333333-3333-4333-8333-333333333333";
+
+    const candidateConcepts = [
+      { id: idLoss, course_id: FIXTURE_IDS.teacher1.courseId, label: "Loss Functions" },
+      { id: idGradient, course_id: FIXTURE_IDS.teacher1.courseId, label: "Gradients" },
+      { id: idRegularization, course_id: FIXTURE_IDS.teacher1.courseId, label: "Regularization" },
+      {
+        id: "44444444-4444-4444-8444-444444444444",
+        course_id: FIXTURE_IDS.teacher2.courseId,
+        label: "Loss Functions",
+      },
+    ];
+
+    const emittedLinksAtEvent: number[] = [];
+
+    const { port, transcriptConceptsTable } = await setupFixtureEnvironment({
+      candidateConcepts,
+      onEmitHook: async (lecId, ev, _payload) => {
+        if (ev === "lecture:concept-detected" && lecId === FIXTURE_IDS.teacher1.lectureId) {
+          emittedLinksAtEvent.push(transcriptConceptsTable.length);
+        }
+      },
+    });
+
+    const studentSocket = connectClient(port, FIXTURE_IDS.studentCourse1Only.token);
+    activeSockets.push(studentSocket);
+    await waitForConnect(studentSocket);
+    await emitWithAck(studentSocket, "lecture:join", {
+      lectureId: FIXTURE_IDS.teacher1.lectureId,
+    });
+
+    // Step 1: Ingest chunk 1 at t=10 with "Loss Functions"
+    const event1Promise = waitForEvent<ConceptDetectedEvent>(studentSocket, "lecture:concept-detected");
+    const res1 = await fetch(
+      `http://127.0.0.1:${port}/api/lectures/${FIXTURE_IDS.teacher1.lectureId}/transcript`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIXTURE_IDS.teacher1.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Loss Functions measure prediction error.",
+          timestampSec: 10,
+        }),
+      },
+    );
+    expect(res1.status).toBe(201);
+    const body1 = (await res1.json()) as { chunkId: string; detectedConceptIds: string[] };
+    expect(body1.detectedConceptIds).toEqual([idLoss]);
+    const event1 = await event1Promise;
+    expect(event1.conceptIds).toEqual([idLoss]);
+    // Step 2: Ingest chunk in lecture 2 (different course/lecture) at t=50 with "Loss Functions"
+    const resLec2 = await fetch(
+      `http://127.0.0.1:${port}/api/lectures/${FIXTURE_IDS.teacher2.lectureId}/transcript`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIXTURE_IDS.teacher2.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Lecture 2 also mentions Loss Functions.",
+          timestampSec: 50,
+        }),
+      },
+    );
+    expect(resLec2.status).toBe(201);
+
+    // Step 3: Ingest chunk 2 in lecture 1 at t=80 with "Gradients"
+    // Window [0, 80] contains chunk 1 (t=10) and chunk 2 (t=80). Both detected!
+    const event2Promise = waitForEvent<ConceptDetectedEvent>(studentSocket, "lecture:concept-detected");
+    const res2 = await fetch(
+      `http://127.0.0.1:${port}/api/lectures/${FIXTURE_IDS.teacher1.lectureId}/transcript`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIXTURE_IDS.teacher1.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Gradients point uphill.",
+          timestampSec: 80,
+        }),
+      },
+    );
+    expect(res2.status).toBe(201);
+    const body2 = (await res2.json()) as { chunkId: string; detectedConceptIds: string[] };
+    expect(body2.detectedConceptIds).toEqual([idLoss, idGradient]);
+    const event2 = await event2Promise;
+    expect(event2.conceptIds).toEqual([idLoss, idGradient]);
+
+    // Step 4: Ingest chunk 3 in lecture 1 at t=171 with unrelated text
+    // Window [81, 171] excludes chunk 1 (t=10) and chunk 2 (t=80). Returns []!
+    const event3Promise = waitForEvent<ConceptDetectedEvent>(studentSocket, "lecture:concept-detected");
+    const res3 = await fetch(
+      `http://127.0.0.1:${port}/api/lectures/${FIXTURE_IDS.teacher1.lectureId}/transcript`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${FIXTURE_IDS.teacher1.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Now we will take a brief five minute intermission.",
+          timestampSec: 171,
+        }),
+      },
+    );
+    expect(res3.status).toBe(201);
+    const body3 = (await res3.json()) as { chunkId: string; detectedConceptIds: string[] };
+    expect(body3.detectedConceptIds).toEqual([]);
+    const event3 = await event3Promise;
+    expect(event3.conceptIds).toEqual([]);
+
+    // Verify persist-before-publish
+    expect(emittedLinksAtEvent[0]).toBeGreaterThanOrEqual(1);
+    expect(emittedLinksAtEvent[1]).toBeGreaterThanOrEqual(3);
+
+    // Chunk 3 has no links
+    const chunk3Links = transcriptConceptsTable.filter(
+      (link) => link["transcript_chunk_id"] === body3.chunkId,
+    );
+    expect(chunk3Links).toHaveLength(0);
   });
 
   describe("Validation & Rejection Rules", () => {
@@ -1079,7 +1207,9 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       const roomAuthorizer = createRoomAuthorizer(harness.serviceClient);
       const lectureRepo = new LectureRepository(harness.serviceClient);
       const transcriptRepo = new TranscriptRepository(harness.serviceClient);
-      const fakeAi = new FakeAiService();
+      const realDetector = new DetectConceptsAi(
+        new OpenRouterClient({ env: { INTEGRATION_MODE: "fixture" } }),
+      );
 
       const app = express();
       httpServer = http.createServer(app);
@@ -1106,9 +1236,7 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
         lectures: lectureRepo,
         transcripts: transcriptRepo,
         rooms: roomAuthorizer,
-        ai: {
-          detectConcepts: (t, c) => fakeAi.detectConcepts(t, c),
-        },
+        ai: realDetector,
         presence,
         attendance: attendanceService,
         publisher,
@@ -1148,7 +1276,6 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
           speakerName: "Prof. Real",
         }),
       });
-
       expect(postRes.status).toBe(201);
       const body = (await postRes.json()) as { chunkId: string; detectedConceptIds: string[] };
       expect(body.chunkId).toBeDefined();

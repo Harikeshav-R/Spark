@@ -14,6 +14,7 @@ import {
   FIXTURE_33_CONCEPTS,
   fixturePrerequisiteGraph,
 } from "../../src/server/ai/index.js";
+import { fixtureDetectConcepts } from "../../src/server/ai/fixtures/detected-concepts.js";
 
 // ============================================================================
 // Canonical Fixture IDs
@@ -138,16 +139,7 @@ export class FakeAiService implements AiService {
     chunkText: string,
     candidateConcepts: { id: UUID; label: string }[]
   ): Promise<UUID[]> {
-    const textLower = chunkText.toLowerCase();
-    const matched = candidateConcepts
-      .filter((candidate) => textLower.includes(candidate.label.toLowerCase()))
-      .map((c) => c.id);
-
-    if (matched.length > 0) {
-      return matched;
-    }
-
-    return [FIXTURE_CONCEPT_ID_1, FIXTURE_CONCEPT_ID_2];
+    return fixtureDetectConcepts(chunkText, candidateConcepts).conceptIds;
   }
 
   async generatePollQuestion(

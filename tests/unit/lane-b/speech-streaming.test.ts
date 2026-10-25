@@ -122,6 +122,7 @@ describe("P3-B-04: Lecture Simulator & Zoom RTMS Streaming Adapter", () => {
           return chunk;
         }),
         insertConceptLinks: vi.fn().mockResolvedValue(undefined),
+        getRecentTranscriptText: vi.fn().mockResolvedValue(""),
       },
       rooms: {
         authorizeRoom: vi.fn().mockResolvedValue(undefined),

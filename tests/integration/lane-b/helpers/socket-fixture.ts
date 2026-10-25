@@ -254,16 +254,84 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
       let filtered = [...records];
 
       for (const [key, val] of url.searchParams.entries()) {
-        if (key === "select") continue;
+        if (key === "select" || key === "order" || key === "offset" || key === "limit") continue;
         if (val.startsWith("eq.")) {
           const target = val.slice(3);
           filtered = filtered.filter((r) => String(r[key]) === target);
+        } else if (val.startsWith("gte.")) {
+          const target = Number(val.slice(4));
+          filtered = filtered.filter((r) => Number(r[key]) >= target);
+        } else if (val.startsWith("lte.")) {
+          const target = Number(val.slice(4));
+          filtered = filtered.filter((r) => Number(r[key]) <= target);
         } else if (val.startsWith("in.(") && val.endsWith(")")) {
           const targets = val.slice(4, -1).split(",").map(decodeURIComponent);
           filtered = filtered.filter((r) => targets.includes(String(r[key])));
         }
       }
 
+      const orderParams = url.searchParams.getAll("order");
+      const orderClauses = orderParams
+        .flatMap((p) => p.split(","))
+        .map((c) => c.trim())
+        .filter(Boolean);
+
+      if (orderClauses.length > 0) {
+        filtered.sort((a, b) => {
+          for (const clause of orderClauses) {
+            const parts = clause.split(".");
+            const col = parts[0]!;
+            const isDesc = parts[1]?.toLowerCase() === "desc";
+            const valA = a[col];
+            const valB = b[col];
+            if (valA === valB) continue;
+            if (valA === undefined || valA === null) return isDesc ? -1 : 1;
+            if (valB === undefined || valB === null) return isDesc ? 1 : -1;
+            if (typeof valA === "number" && typeof valB === "number") {
+              return isDesc ? valB - valA : valA - valB;
+            }
+            const strA = String(valA);
+            const strB = String(valB);
+            const cmp = strA.localeCompare(strB);
+            if (cmp !== 0) {
+              return isDesc ? -cmp : cmp;
+            }
+          }
+          return 0;
+        });
+      }
+
+      let offset = 0;
+      let limit: number | undefined;
+
+      const offsetParam = url.searchParams.get("offset");
+      if (offsetParam !== null) {
+        offset = Math.max(0, parseInt(offsetParam, 10) || 0);
+      }
+      const limitParam = url.searchParams.get("limit");
+      if (limitParam !== null) {
+        limit = parseInt(limitParam, 10);
+      }
+
+      const rangeHeader =
+        headers.Range ||
+        headers.range ||
+        (init?.headers instanceof Headers ? init.headers.get("Range") : null);
+
+      if (rangeHeader) {
+        const rangeMatch = rangeHeader.match(/(?:items=)?(\d+)-(\d+)/);
+        if (rangeMatch) {
+          const from = parseInt(rangeMatch[1]!, 10);
+          const to = parseInt(rangeMatch[2]!, 10);
+          offset = from;
+          limit = to - from + 1;
+        }
+      }
+
+      if (offset > 0 || limit !== undefined) {
+        const end = limit !== undefined ? offset + limit : undefined;
+        filtered = filtered.slice(offset, end);
+      }
       if (acceptHeader.includes("application/vnd.pgrst.object+json")) {
         if (filtered.length === 0) {
           return new Response(
