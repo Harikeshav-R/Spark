@@ -24,3 +24,8 @@ export {
   createAuthRouter,
   type AuthRouterDependencies,
 } from "./auth-router";
+
+export {
+  readServerConfig,
+  type ServerConfig,
+} from "./server-config.js";

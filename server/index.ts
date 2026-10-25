@@ -1,5 +1,9 @@
 import "dotenv/config";
 import http from "node:http";
+import path from "node:path";
+import { pathToFileURL } from "node:url";
+import packageJson from "../package.json";
+import { AppError } from "../src/contracts/errors.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import express from "express";
 import type { Express, Request, Response } from "express";
@@ -83,6 +87,7 @@ import {
   createAuthRouter,
   createSupabaseClients,
   apiErrorHandler,
+  readServerConfig,
 } from "../src/server/platform/index.js";
 import {
   type RealtimeSocketServer,
@@ -132,11 +137,46 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
   const app = express();
   app.use(express.json());
 
+  let isClosing = false;
+  const inFlightResponses = new Set<Response>();
+
+  // Admission middleware: reject new requests once closing begins
+  app.use((_req: Request, res: Response, nextMiddleware) => {
+    if (isClosing) {
+      res.setHeader("Connection", "close");
+      res.status(503).json({
+        error: {
+          code: "SERVICE_UNAVAILABLE",
+          message: "Server is shutting down",
+          requestId:
+            typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+              ? crypto.randomUUID()
+              : "00000000-0000-0000-0000-000000000000",
+        },
+      });
+      return;
+    }
+
+    inFlightResponses.add(res);
+    const onDone = () => {
+      res.removeListener("finish", onDone);
+      res.removeListener("close", onDone);
+      inFlightResponses.delete(res);
+    };
+    res.once("finish", onDone);
+    res.once("close", onDone);
+
+    nextMiddleware();
+  });
+
   // Base preflight healthcheck endpoint
   app.get("/api/health", (_req: Request, res: Response) => {
+    res.setHeader("Cache-Control", "no-store");
     res.json({
       status: "ok",
-      timestamp: new Date().toISOString(),
+      timestamp: dependencies.clock.nowISO(),
+      version: packageJson.version,
+      mode: dependencies.aiClient.getIntegrationMode(),
     });
   });
 
@@ -154,6 +194,13 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     lectures: lectureRepository,
     origin:
       dependencies.origin ?? process.env.APP_ORIGIN ?? "http://localhost:3000",
+  });
+  io.use((_socket, nextSocket) => {
+    if (isClosing) {
+      nextSocket(new Error("Server is shutting down"));
+      return;
+    }
+    nextSocket();
   });
 
   const courseRepository = new CourseRepository(dependencies.databaseClient);
@@ -573,86 +620,295 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
   );
 
   app.use(apiErrorHandler);
+  let disposePromise: Promise<void> | null = null;
   const dispose = async (): Promise<void> => {
-    await speech.dispose();
-    io.close();
-    const { promise, resolve } = Promise.withResolvers<void>();
-    httpServer.close(() => resolve());
-    await promise;
+    if (disposePromise) {
+      return disposePromise;
+    }
+    disposePromise = (async () => {
+      isClosing = true;
+
+      if (inFlightResponses.size > 0) {
+        const promises: Promise<void>[] = [];
+        for (const res of inFlightResponses) {
+          if (res.writableEnded || res.destroyed) continue;
+          const { promise, resolve } = Promise.withResolvers<void>();
+          const onDone = () => {
+            res.removeListener("finish", onDone);
+            res.removeListener("close", onDone);
+            resolve();
+          };
+          res.once("finish", onDone);
+          res.once("close", onDone);
+          promises.push(promise);
+        }
+        await Promise.all(promises);
+      }
+
+      let speechErr: unknown = null;
+      try {
+        await speech.dispose();
+      } catch (err) {
+        speechErr = err;
+      }
+
+      let ioErr: unknown = null;
+      try {
+        const { promise, resolve, reject } = Promise.withResolvers<void>();
+        io.close((err) => {
+          if (err) reject(err);
+          else resolve();
+        });
+        await promise;
+      } catch (err) {
+        ioErr = err;
+      }
+
+      let httpErr: unknown = null;
+      if (httpServer.listening) {
+        try {
+          const { promise, resolve, reject } = Promise.withResolvers<void>();
+          httpServer.close((err) => {
+            if (err) {
+              const code = (err as NodeJS.ErrnoException).code;
+              if (code === "ERR_SERVER_NOT_RUNNING") {
+                resolve();
+              } else {
+                reject(err);
+              }
+            } else {
+              resolve();
+            }
+          });
+          await promise;
+        } catch (err) {
+          const code = (err as NodeJS.ErrnoException).code;
+          if (code !== "ERR_SERVER_NOT_RUNNING") {
+            httpErr = err;
+          }
+        }
+      }
+
+      let presenceErr: unknown = null;
+      try {
+        presence.dispose();
+      } catch (err) {
+        presenceErr = err;
+      }
+
+      const firstErr = speechErr || ioErr || httpErr || presenceErr;
+      if (firstErr) {
+        throw firstErr;
+      }
+    })();
+
+    return disposePromise;
   };
 
   return { app, httpServer, io, dispose };
 }
 
 export async function startServer(
-  port = Number(process.env.PORT) || 3000
+  port?: number
 ): Promise<ServerInstance> {
-  const supabase = createSupabaseClients(process.env);
-  const auth = createAuthGateway(
-    supabase.authClient,
-    supabase.databaseClient
-  );
-  const aiClient = new OpenRouterClient({ env: process.env });
-  const ids = new CryptoIdGenerator();
-  const clock: Clock = {
-    now: () => new Date(),
-    nowISO: () => new Date().toISOString(),
-  };
+  let instance: ServerInstance | null = null;
+  let nextApp: { prepare(): Promise<void>; getRequestHandler(): (req: http.IncomingMessage, res: http.ServerResponse) => Promise<void>; close(): Promise<void> } | null = null;
 
-  const instance = createServer({
-    auth,
-    databaseClient: supabase.databaseClient,
-    aiClient,
-    clock,
-    ids,
-    env: process.env,
-    sessionClientFactory: () => supabase.authClient,
-  });
+  try {
+    const config = readServerConfig(process.env);
+    let targetPort = config.port;
+    if (port !== undefined) {
+      if (port === 0) {
+        targetPort = 0;
+      } else if (Number.isInteger(port) && port >= 1 && port <= 65535) {
+        targetPort = port;
+      } else {
+        throw new AppError({
+          code: "VALIDATION_ERROR",
+          statusCode: 400,
+          message: "Invalid port argument. Must be 0 or an integer between 1 and 65535",
+        });
+      }
+    }
 
-  // Attach Next.js custom server after Express API routers
-  const nextApp = next({
-    dev: process.env.NODE_ENV !== "production",
-  });
-  await nextApp.prepare();
-  const nextHandler = nextApp.getRequestHandler();
-
-  instance.app.all(/^\/api(\/.*)?$/, (_req: Request, res: Response) => {
-    res.status(404).json({
-      code: "NOT_FOUND",
-      statusCode: 404,
-      message: "API endpoint not found",
-    });
-  });
-
-  instance.app.use((req: Request, res: Response) => {
-    return nextHandler(req, res);
-  });
-
-  const { promise, resolve } = Promise.withResolvers<ServerInstance>();
-
-  instance.httpServer.listen(port, () => {
-    console.log(
-      `[server] Spark composition root running on http://localhost:${port}`
+    const supabase = createSupabaseClients(process.env);
+    const auth = createAuthGateway(
+      supabase.authClient,
+      supabase.databaseClient
     );
-    resolve(instance);
-  });
-  const shutdown = async () => {
-    console.log("[server] Shutting down gracefully...");
-    await instance.dispose();
-    console.log("[server] HTTP and WebSocket server closed.");
-    process.exit(0);
-  };
+    const aiClient = new OpenRouterClient({ env: process.env });
+    const ids = new CryptoIdGenerator();
+    const clock: Clock = {
+      now: () => new Date(),
+      nowISO: () => new Date().toISOString(),
+    };
 
-  process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
+    instance = createServer({
+      auth,
+      databaseClient: supabase.databaseClient,
+      aiClient,
+      clock,
+      ids,
+      origin: config.origin,
+      env: process.env,
+      sessionClientFactory: () => supabase.authClient,
+    });
 
-  return promise;
+    nextApp = next({
+      dev: config.nodeEnv !== "production",
+      hostname: "0.0.0.0",
+      port: targetPort,
+    });
+    await nextApp.prepare();
+    const nextHandler = nextApp.getRequestHandler();
+
+    instance.app.all(/^\/api(\/.*)?$/, (_req: Request, res: Response) => {
+      res.status(404).json({
+        code: "NOT_FOUND",
+        statusCode: 404,
+        message: "API endpoint not found",
+      });
+    });
+
+    instance.app.use((req: Request, res: Response) => {
+      return nextHandler(req, res);
+    });
+
+    const { promise: listenPromise, resolve: listenResolve, reject: listenReject } = Promise.withResolvers<void>();
+    const onListening = () => {
+      cleanup();
+      listenResolve();
+    };
+    const onError = (err: Error) => {
+      cleanup();
+      listenReject(err);
+    };
+    const cleanup = () => {
+      instance?.httpServer.removeListener("listening", onListening);
+      instance?.httpServer.removeListener("error", onError);
+    };
+
+    instance?.httpServer.once("listening", onListening);
+    instance?.httpServer.once("error", onError);
+    instance?.httpServer.listen(targetPort, "0.0.0.0");
+    await listenPromise;
+
+    const address = instance.httpServer.address();
+    const actualPort =
+      typeof address === "object" && address !== null ? address.port : targetPort;
+
+    console.log(
+      `[server] Spark composition root running on http://localhost:${actualPort}`
+    );
+
+    const originalDispose = instance.dispose;
+    let startServerDisposePromise: Promise<void> | null = null;
+
+    const wrappedDispose = async (): Promise<void> => {
+      if (startServerDisposePromise) {
+        return startServerDisposePromise;
+      }
+
+      process.removeListener("SIGTERM", handleSigterm);
+      process.removeListener("SIGINT", handleSigint);
+
+      startServerDisposePromise = (async () => {
+        const results = await Promise.allSettled([
+          originalDispose(),
+          nextApp ? nextApp.close() : Promise.resolve(),
+        ]);
+
+        const rejected = results.find((r) => r.status === "rejected");
+        if (rejected && rejected.status === "rejected") {
+          throw rejected.reason;
+        }
+      })();
+
+      return startServerDisposePromise;
+    };
+
+    instance.dispose = wrappedDispose;
+
+    let shutdownInitiated = false;
+    let shutdownTimer: NodeJS.Timeout | null = null;
+
+    const handleSignal = (signalName: string) => {
+      if (shutdownInitiated) {
+        return;
+      }
+      shutdownInitiated = true;
+
+      shutdownTimer = setTimeout(() => {
+        console.error("[server] Graceful shutdown timed out after 10000ms");
+        try {
+          instance?.io.disconnectSockets(true);
+        } catch {
+          // Ignore socket disconnection errors during forced shutdown timeout
+        }
+        try {
+          if (typeof instance?.httpServer.closeAllConnections === "function") {
+            instance.httpServer.closeAllConnections();
+          }
+        } catch {
+          // Ignore connection closing errors during forced shutdown timeout
+        }
+        process.exit(1);
+      }, 10_000);
+
+      (async () => {
+        console.log(`[server] Received ${signalName}, shutting down gracefully...`);
+        try {
+          await instance?.dispose();
+          clearTimeout(shutdownTimer);
+          console.log("[server] HTTP and WebSocket server closed.");
+          process.exit(0);
+        } catch (err) {
+          clearTimeout(shutdownTimer);
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[server] Error during shutdown: ${msg}`);
+          process.exit(1);
+        }
+      })();
+    };
+
+    const handleSigterm = () => handleSignal("SIGTERM");
+    const handleSigint = () => handleSignal("SIGINT");
+
+    process.on("SIGTERM", handleSigterm);
+    process.on("SIGINT", handleSigint);
+
+    return instance;
+  } catch (err) {
+    if (instance) {
+      try {
+        await instance.dispose();
+      } catch {
+        // Ignore disposal error during startup rollback
+      }
+    }
+    if (nextApp) {
+      try {
+        await nextApp.close();
+      } catch {
+        // Ignore Next.js close error during startup rollback
+      }
+    }
+    throw err;
+  }
 }
 
 // Direct execution guard
-if (
-  process.env.NODE_ENV !== "test" &&
-  process.argv[1]?.replace(/\\/g, "/").endsWith("server/index.ts")
-) {
-  void startServer();
+if (process.env.NODE_ENV !== "test" && process.argv[1]) {
+  try {
+    const entryUrl = pathToFileURL(path.resolve(process.argv[1])).href;
+    if (entryUrl === import.meta.url) {
+      startServer().catch((err) => {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`[server] Startup failed: ${message}`);
+        process.exit(1);
+      });
+    }
+  } catch {
+    // Ignore resolution failure on non-direct invocation
+  }
 }

@@ -1,0 +1,17 @@
+.git
+.worktrees
+.codebase-memory
+.next
+dist
+node_modules
+.env
+.env.*
+*.tsbuildinfo
+test-results
+coverage
+playwright-report
+.omp
+.claude
+.agents
+mcp.json
+mcp.json.*
