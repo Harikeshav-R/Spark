@@ -4,17 +4,25 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import express from "express";
 import type { Express, Request, Response } from "express";
 import type { Clock, IdGenerator } from "../src/contracts/common.js";
+import next from "next";
 import {
   DetectConceptsAi,
+  EvaluatePollAi,
+  GeneratePollAi,
   OpenRouterClient,
   SummarizeLectureAi,
 } from "../src/server/ai/index.js";
 import {
   LectureRepository,
   LectureService,
+  PollRepository,
+  PollService,
+  TeacherPollService,
   TranscriptIngestor,
   TranscriptRepository,
+  createLectureRouter,
   createLectureSummaryRouter,
+  createPollRouter,
   createTranscriptRouter,
 } from "../src/server/classroom/index.js";
 import {
@@ -22,9 +30,12 @@ import {
   CourseRepository,
   CourseService,
   CryptoIdGenerator,
+  GraphRepository,
   HeatmapService,
   MasteryRepository,
   MasteryService,
+  PollEvidenceService,
+  createGraphRouter,
   createHeatmapRouter,
 } from "../src/server/core/index.js";
 import {
@@ -85,8 +96,9 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
       dependencies.origin ?? process.env.APP_ORIGIN ?? "http://localhost:3000",
   });
 
+  const courseRepository = new CourseRepository(dependencies.databaseClient);
   const courses = new CourseService(
-    new CourseRepository(dependencies.databaseClient),
+    courseRepository,
     new CryptoIdGenerator()
   );
   const heatmap = new HeatmapService({
@@ -96,8 +108,9 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     clock: dependencies.clock,
     ids: dependencies.ids,
   });
+  const masteryRepository = new MasteryRepository(dependencies.databaseClient);
   const mastery = new MasteryService(
-    new MasteryRepository(dependencies.databaseClient),
+    masteryRepository,
     (actor, studentId, conceptId) =>
       heatmap.afterEvidenceApplied(actor, studentId, conceptId)
   );
@@ -105,6 +118,19 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
     createHeatmapRouter({
       auth: dependencies.auth,
       heatmap,
+    })
+  );
+
+  const graphRepository = new GraphRepository(
+    dependencies.databaseClient,
+    courseRepository
+  );
+  app.use(
+    createGraphRouter({
+      auth: dependencies.auth,
+      courses: courseRepository,
+      graphRepository,
+      masteryRepository,
     })
   );
   const attendance = new AttendanceEvidenceService(
@@ -171,6 +197,55 @@ export function createServer(dependencies: ServerDependencies): ServerInstance {
   });
   app.use(lectureSummaryRouter);
 
+  const pollRepository = new PollRepository(dependencies.databaseClient);
+  const pollEvidenceService = new PollEvidenceService(
+    dependencies.databaseClient,
+    courses,
+    mastery
+  );
+  const pollService = new PollService({
+    polls: pollRepository,
+    rooms,
+    presence,
+    ai: new EvaluatePollAi(dependencies.aiClient),
+    evidence: pollEvidenceService,
+    publisher,
+    ids: dependencies.ids,
+    clock: dependencies.clock,
+  });
+
+  const teacherPollService = new TeacherPollService({
+    lectures: lectureRepository,
+    rooms,
+    graph: graphRepository,
+    transcripts: transcriptRepository,
+    ai: new GeneratePollAi(dependencies.aiClient),
+    polls: pollRepository,
+    clock: dependencies.clock,
+    ids: dependencies.ids,
+  });
+
+  app.use(
+    createLectureRouter({
+      auth: dependencies.auth,
+      courses,
+      lectures: lectureRepository,
+      lectureService,
+      polls: pollRepository,
+      transcripts: transcriptRepository,
+      rooms,
+    })
+  );
+
+  app.use(
+    createPollRouter({
+      auth: dependencies.auth,
+      polls: pollService,
+      teacherPolls: teacherPollService,
+      pollRepo: pollRepository,
+    })
+  );
+
   return { app, httpServer, io };
 }
 
@@ -197,6 +272,25 @@ export async function startServer(
     ids,
   });
 
+  // Attach Next.js custom server after Express API routers
+  const nextApp = next({
+    dev: process.env.NODE_ENV !== "production",
+  });
+  await nextApp.prepare();
+  const nextHandler = nextApp.getRequestHandler();
+
+  instance.app.all(/^\/api(\/.*)?$/, (_req: Request, res: Response) => {
+    res.status(404).json({
+      code: "NOT_FOUND",
+      statusCode: 404,
+      message: "API endpoint not found",
+    });
+  });
+
+  instance.app.use((req: Request, res: Response) => {
+    return nextHandler(req, res);
+  });
+
   const { promise, resolve } = Promise.withResolvers<ServerInstance>();
 
   instance.httpServer.listen(port, () => {
@@ -205,7 +299,6 @@ export async function startServer(
     );
     resolve(instance);
   });
-
   const shutdown = () => {
     console.log("[server] Shutting down gracefully...");
     instance.io.close();

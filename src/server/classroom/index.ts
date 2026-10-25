@@ -66,3 +66,8 @@ export {
   createPollRouter,
   type PollRouterDependencies,
 } from "./poll-router.js";
+
+export {
+  createLectureRouter,
+  type LectureRouterDependencies,
+} from "./lecture-router.js";

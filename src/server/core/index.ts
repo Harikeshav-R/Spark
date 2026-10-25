@@ -67,6 +67,11 @@ export {
 } from "./graph/graph-service";
 
 export {
+  createGraphRouter,
+  type GraphRouterDependencies,
+} from "./graph/graph-router";
+
+export {
   MAX_SYLLABUS_BYTES,
   MAX_SYLLABUS_PAGES,
   type ProcessedSyllabusPdf,
