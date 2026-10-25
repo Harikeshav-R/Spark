@@ -1,9 +1,11 @@
+import { execFileSync } from "node:child_process";
 import { describe, expect, it, afterAll, beforeAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   seedDemoDatabase,
   resetDemoDatabase,
 } from "../../../src/server/platform/demo/seed-store.js";
+import { detectDbContainer } from "../../../src/server/platform/demo/config.js";
 import {
   buildDemoDataset,
   demoId,
@@ -18,8 +20,28 @@ import { AppError } from "../../../src/contracts/errors.js";
 
 const TEST_NAMESPACE = "spark-test-seed:integ-p7-a-02";
 const FROZEN_DATE = new Date("2026-10-24T12:00:00.000Z");
+function isLocalSupabaseReachable(): boolean {
+  try {
+    const container = detectDbContainer(process.env.SUPABASE_DB_CONTAINER);
+    const status = execFileSync(
+      "docker",
+      ["inspect", "-f", "{{.State.Running}}", container],
+      { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+    ).trim();
+    if (status !== "true") return false;
 
-describe("Demo Database Seed and Reset (Integration)", () => {
+    execFileSync("curl", ["-s", "-m", "1", "http://127.0.0.1:54321/auth/v1/health"], {
+      stdio: "ignore",
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const shouldSkip = !isLocalSupabaseReachable();
+
+describe.skipIf(shouldSkip)("Demo Database Seed and Reset (Integration)", () => {
   let adminClient: SupabaseClient;
   const dataset = buildDemoDataset(FROZEN_DATE, TEST_NAMESPACE);
   const testEnv = {
