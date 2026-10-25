@@ -5,6 +5,10 @@ import { transcriptChunkSchema } from "../../contracts/classroom.js";
 import type { UUID } from "../../contracts/common.js";
 import { uuidSchema } from "../../contracts/common.js";
 import { AppError } from "../../contracts/errors.js";
+export interface LectureTranscriptChunk {
+  text: string;
+  timestampSec: number;
+}
 
 const candidateConceptRowSchema = z.object({
   id: uuidSchema,
@@ -333,5 +337,81 @@ export class TranscriptRepository {
     }
 
     return allTexts.join("\n");
+  }
+
+  async getLectureTranscript(
+    lectureId: UUID
+  ): Promise<{ text: string; timestampSec: number }[]> {
+    if (!uuidSchema.safeParse(lectureId).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid lecture ID format",
+      });
+    }
+
+    const PAGE_SIZE = 500;
+    let offset = 0;
+    const allChunks: { text: string; timestampSec: number }[] = [];
+
+    while (true) {
+      let result: { data: unknown; error: unknown };
+      try {
+        result = await this.client
+          .from("transcript_chunks")
+          .select("id, text, timestamp_sec")
+          .eq("lecture_id", lectureId)
+          .order("timestamp_sec", { ascending: true })
+          .order("id", { ascending: true })
+          .range(offset, offset + PAGE_SIZE - 1);
+      } catch (err: unknown) {
+        throw new AppError({
+          code: "SERVICE_UNAVAILABLE",
+          statusCode: 503,
+          message: "Database service unavailable while fetching lecture transcript",
+          cause: err,
+        });
+      }
+
+      if (result.error) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database error querying lecture transcript",
+          cause: result.error,
+        });
+      }
+
+      if (!Array.isArray(result.data)) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database returned non-array for lecture transcript chunks",
+        });
+      }
+
+      for (const rawRow of result.data) {
+        const parsed = recentTranscriptRowSchema.safeParse(rawRow);
+        if (!parsed.success) {
+          throw new AppError({
+            code: "INTERNAL_SERVER_ERROR",
+            statusCode: 500,
+            message: "Database returned malformed transcript chunk row",
+            cause: parsed.error,
+          });
+        }
+        allChunks.push({
+          text: parsed.data.text,
+          timestampSec: parsed.data.timestamp_sec,
+        });
+      }
+
+      if (result.data.length < PAGE_SIZE) {
+        break;
+      }
+      offset += PAGE_SIZE;
+    }
+
+    return allChunks;
   }
 }

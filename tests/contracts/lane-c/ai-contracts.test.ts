@@ -483,8 +483,12 @@ describe("Lane C: AI & Learning Service Ports & Deterministic Fixtures (P0-C-01)
         { text: "Today we start gradient descent.", timestampSec: 0 },
       ]);
       expect(summarizedLectureSchema.safeParse(summary).success).toBe(true);
-      expect(summary.summary.length).toBeGreaterThanOrEqual(100);
-      expect(summary.keyConceptsCovered).toHaveLength(2);
+      expect(summary.keyConceptsCovered).toEqual([FIXTURE_CONCEPT_ID_2]);
+      expect(summary.timelineHighlights).toHaveLength(1);
+      expect(summary.timelineHighlights[0].timestampSec).toBe(0);
+      expect(summary.timelineHighlights[0].description).toBe(
+        "Today we start gradient descent."
+      );
     });
   });
 
