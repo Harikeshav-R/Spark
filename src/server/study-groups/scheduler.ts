@@ -16,6 +16,7 @@ import { timeIntervalSchema } from "../../contracts/classroom.js";
 import type { RealtimePublisher } from "../../contracts/realtime.js";
 import { studyGroupUpdatedEventSchema } from "../../contracts/realtime.js";
 import { AppError } from "../../contracts/errors.js";
+import type { ZoomMeetingService } from "../zoom/index.js";
 import type { MessagingRepository } from "./messaging-repository.js";
 import type {
   SchedulerRepository,
@@ -26,8 +27,9 @@ export interface SchedulerDependencies {
   membership: Pick<MessagingRepository, "requireMatchMember">;
   repository: Pick<
     SchedulerRepository,
-    "getMatch" | "getAvailability" | "compareAndSet"
+    "getMatch" | "getAvailability" | "compareAndSet" | "setMeetingResult"
   >;
+  meetings: Pick<ZoomMeetingService, "createForCourse">;
   publisher: Pick<RealtimePublisher, "emitToStudyGroup">;
   clock: Clock;
   ids: Pick<IdGenerator, "generateId">;
@@ -129,8 +131,9 @@ export class Scheduler
   private readonly membership: Pick<MessagingRepository, "requireMatchMember">;
   private readonly repository: Pick<
     SchedulerRepository,
-    "getMatch" | "getAvailability" | "compareAndSet"
+    "getMatch" | "getAvailability" | "compareAndSet" | "setMeetingResult"
   >;
+  private readonly meetings: Pick<ZoomMeetingService, "createForCourse">;
   private readonly publisher: Pick<RealtimePublisher, "emitToStudyGroup">;
   private readonly clock: Clock;
   private readonly ids: Pick<IdGenerator, "generateId">;
@@ -138,6 +141,7 @@ export class Scheduler
   constructor(dependencies: SchedulerDependencies) {
     this.membership = dependencies.membership;
     this.repository = dependencies.repository;
+    this.meetings = dependencies.meetings;
     this.publisher = dependencies.publisher;
     this.clock = dependencies.clock;
     this.ids = dependencies.ids;
@@ -356,20 +360,32 @@ export class Scheduler
       : match.student2Accepted;
 
     if (alreadyAcceptedByCaller) {
-      const result: {
-        bothAccepted: boolean;
-        zoomMeetingId?: string;
-        zoomLink?: string;
-      } = {
-        bothAccepted: match.schedulingStatus === "accepted",
+      if (match.schedulingStatus === "accepted") {
+        if (match.meetingStatus === "created") {
+          return {
+            bothAccepted: true,
+            zoomMeetingId: match.zoomMeetingId ?? undefined,
+            zoomLink: match.zoomLink ?? undefined,
+          };
+        }
+        if (match.meetingStatus === "unavailable") {
+          throw new AppError({
+            code: "SERVICE_UNAVAILABLE",
+            statusCode: 503,
+            message: "Zoom meeting is unavailable for this session",
+          });
+        }
+        if (match.meetingStatus === "pending") {
+          throw new AppError({
+            code: "SERVICE_UNAVAILABLE",
+            statusCode: 503,
+            message: "Zoom meeting creation is incomplete",
+          });
+        }
+      }
+      return {
+        bothAccepted: false,
       };
-      if (match.zoomMeetingId) {
-        result.zoomMeetingId = match.zoomMeetingId;
-      }
-      if (match.zoomLink) {
-        result.zoomLink = match.zoomLink;
-      }
-      return result;
     }
 
     const desired = {
@@ -388,24 +404,60 @@ export class Scheduler
       });
     }
 
-    await this.emitSchedulingEvent(updated);
+    if (!bothAccepted) {
+      await this.emitSchedulingEvent(updated);
+      return {
+        bothAccepted: false,
+      };
+    }
 
-    const result: {
-      bothAccepted: boolean;
-      zoomMeetingId?: string;
-      zoomLink?: string;
-    } = {
-      bothAccepted: updated.schedulingStatus === "accepted",
+    let meetingResult: { meetingId: string; joinUrl: string };
+    try {
+      meetingResult = await this.meetings.createForCourse(
+        actor,
+        updated.courseId,
+        "Peer Study Session",
+        updated.proposedSlot!.startsAt,
+        30
+      );
+    } catch (meetingErr) {
+      const unavailableMatch = await this.repository.setMeetingResult(updated, {
+        meetingStatus: "unavailable",
+      });
+
+      if (unavailableMatch) {
+        try {
+          await this.emitSchedulingEvent(unavailableMatch);
+        } catch {
+          // If emit fails, do not mask DB commit, continue to propagate original meeting error
+        }
+      }
+
+      throw meetingErr;
+    }
+
+    const persisted = await this.repository.setMeetingResult(updated, {
+      meetingStatus: "created",
+      zoomMeetingId: meetingResult.meetingId,
+      zoomLink: meetingResult.joinUrl,
+    });
+
+    if (!persisted) {
+      throw new AppError({
+        code: "CONFLICT",
+        statusCode: 409,
+        message: "Study group schedule state changed concurrently while persisting meeting",
+      });
+    }
+
+    await this.emitSchedulingEvent(persisted);
+
+    return {
+      bothAccepted: true,
+      zoomMeetingId: persisted.zoomMeetingId ?? undefined,
+      zoomLink: persisted.zoomLink ?? undefined,
     };
-    if (updated.zoomMeetingId) {
-      result.zoomMeetingId = updated.zoomMeetingId;
-    }
-    if (updated.zoomLink) {
-      result.zoomLink = updated.zoomLink;
-    }
-    return result;
   }
-
   private async emitSchedulingEvent(match: SchedulingMatch): Promise<void> {
     const eventId = this.ids.generateId();
     if (!uuidSchema.safeParse(eventId).success) {

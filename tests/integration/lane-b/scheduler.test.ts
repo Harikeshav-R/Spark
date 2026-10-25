@@ -142,15 +142,21 @@ describe("P6-B-03: Scheduler Integration (Offline Suite)", () => {
     };
     const clock = new SystemClock();
     const ids = new CryptoIdGenerator();
+    const meetings = {
+      createForCourse: async () => ({
+        meetingId: "9876543210",
+        joinUrl: "https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123",
+      }),
+    };
 
     const scheduler = new Scheduler({
       membership,
       repository,
+      meetings,
       publisher,
       clock,
       ids,
     });
-
     // 1. Propose schedule
     const prop = await scheduler.proposeSchedule(actor1, matchId);
     expect(prop.schedulingStatus).toBe("proposed");
@@ -166,12 +172,17 @@ describe("P6-B-03: Scheduler Integration (Offline Suite)", () => {
     // 3. Accept as Student 2
     const accept2 = await scheduler.acceptSchedule(actor2, matchId, prop.proposedSlot!);
     expect(accept2.bothAccepted).toBe(true);
+    expect(accept2.zoomMeetingId).toBe("9876543210");
+    expect(accept2.zoomLink).toBe("https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123");
 
     // Verify DB snapshot
     const finalMatch = await repository.getMatch(courseId, matchId);
     expect(finalMatch?.schedulingStatus).toBe("accepted");
     expect(finalMatch?.student1Accepted).toBe(true);
     expect(finalMatch?.student2Accepted).toBe(true);
+    expect(finalMatch?.meetingStatus).toBe("created");
+    expect(finalMatch?.zoomMeetingId).toBe("9876543210");
+    expect(finalMatch?.zoomLink).toBe("https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123");
 
     // Verify events were emitted in order
     expect(emittedEvents).toHaveLength(3);
@@ -180,9 +191,10 @@ describe("P6-B-03: Scheduler Integration (Offline Suite)", () => {
     expect(emittedEvents[1]?.schedulingStatus).toBe("proposed");
     expect(emittedEvents[2]?.student2Accepted).toBe(true);
     expect(emittedEvents[2]?.schedulingStatus).toBe("accepted");
+    expect(emittedEvents[2]?.meetingStatus).toBe("created");
+    expect(emittedEvents[2]?.zoomLink).toBe("https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123");
   });
 });
-
 describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
   "P6-B-03: Scheduler (Local PostgreSQL & Real Realtime Server)",
   () => {
@@ -383,14 +395,20 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       // Instantiate fresh services
       const membership = new MessagingRepository(harness.serviceClient);
       const repository = new SchedulerRepository(harness.serviceClient);
+      const meetings = {
+        createForCourse: async () => ({
+          meetingId: "9876543210",
+          joinUrl: "https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123",
+        }),
+      };
       const scheduler = new Scheduler({
         membership,
         repository,
+        meetings,
         publisher,
         clock,
         ids: idGenerator,
       });
-
       function nextEvent(socket: ClientSocket, eventName: string): Promise<StudyGroupUpdatedEvent> {
         const { promise, resolve } = Promise.withResolvers<StudyGroupUpdatedEvent>();
         socket.once(eventName, (evt) => resolve(evt as StudyGroupUpdatedEvent));
@@ -442,6 +460,7 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
       const freshScheduler = new Scheduler({
         membership,
         repository: freshRepo,
+        meetings,
         publisher,
         clock,
         ids: idGenerator,
@@ -454,16 +473,24 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
         propResult.proposedSlot!
       );
       expect(accept2.bothAccepted).toBe(true);
+      expect(accept2.zoomMeetingId).toBe("9876543210");
+      expect(accept2.zoomLink).toBe("https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123");
 
       const ev3 = await ev3Promise;
       expect(ev3.student1Accepted).toBe(true);
       expect(ev3.student2Accepted).toBe(true);
       expect(ev3.schedulingStatus).toBe("accepted");
+      expect(ev3.meetingStatus).toBe("created");
+      expect(ev3.zoomLink).toBe("https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123");
+
       // Verify final PostgreSQL state
       const postgreMatchFinal = await freshRepo.getMatch(course.courseId, matchId);
       expect(postgreMatchFinal?.schedulingStatus).toBe("accepted");
       expect(postgreMatchFinal?.student1Accepted).toBe(true);
       expect(postgreMatchFinal?.student2Accepted).toBe(true);
+      expect(postgreMatchFinal?.meetingStatus).toBe("created");
+      expect(postgreMatchFinal?.zoomMeetingId).toBe("9876543210");
+      expect(postgreMatchFinal?.zoomLink).toBe("https://us05web.zoom.us/j/9876543210?pwd=syntheticMeetingPassword123");
     });
   }
 );
