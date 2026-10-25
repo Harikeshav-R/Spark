@@ -135,6 +135,23 @@ export interface ClassroomService {
   closePoll(actor: ActorContext, pollId: UUID): Promise<PollQuestion>;
 }
 
+export interface TeacherPollService {
+  generatePoll(
+    actor: ActorContext,
+    lectureId: UUID,
+    conceptId?: UUID
+  ): Promise<PollQuestion>;
+  editDraft(
+    actor: ActorContext,
+    pollId: UUID,
+    input: PollDraftInput
+  ): Promise<PollQuestion>;
+  getSnapshot(
+    actor: ActorContext,
+    lectureId: UUID
+  ): Promise<TeacherPollSnapshot>;
+}
+
 export interface StudyGroupService {
   optIntoPool(
     actor: ActorContext,

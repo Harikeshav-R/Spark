@@ -421,6 +421,7 @@ describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
         publisher: {
           emitToLecture: async () => {},
           emitToStudent: async () => {},
+          emitToTeacher: async () => {},
         },
         ids: new CryptoIdGenerator(),
         clock: testClock,

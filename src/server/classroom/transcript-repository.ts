@@ -25,12 +25,22 @@ const transcriptChunkRowSchema = z.object({
   created_at: z.string().min(1),
 });
 
+const transcriptConceptLinkRowSchema = z.object({
+  concept_id: uuidSchema,
+});
+
+const recentChunkWithConceptsRowSchema = transcriptChunkRowSchema.extend({
+  transcript_concepts: z.array(transcriptConceptLinkRowSchema).optional().nullable(),
+});
+
 export interface TranscriptSelectQuery extends PromiseLike<{ data: unknown; error: unknown }> {
   eq(column: string, value: string): this;
+  in?(column: string, values: string[]): this;
   gte(column: string, value: number): this;
   lte(column: string, value: number): this;
   order(column: string, options: { ascending: boolean }): this;
   range(from: number, to: number): this;
+  limit?(count: number): this;
 }
 
 export interface TranscriptDatabaseClientPort {
@@ -419,5 +429,157 @@ export class TranscriptRepository {
     lectureId: UUID
   ): Promise<{ text: string; timestampSec: number }[]> {
     return this.getLectureTranscript(lectureId);
+  }
+
+  async getRecentChunks(lectureId: UUID, limit = 50): Promise<TranscriptChunk[]> {
+    if (!uuidSchema.safeParse(lectureId).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid lecture ID format",
+      });
+    }
+
+    if (typeof limit !== "number" || !Number.isFinite(limit) || limit <= 0) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Limit must be a positive integer",
+      });
+    }
+
+    let result: { data: unknown; error: unknown };
+    try {
+      result = await this.client
+        .from("transcript_chunks")
+        .select("id, lecture_id, text, timestamp_sec, speaker_name, is_simulated, created_at, transcript_concepts(concept_id)")
+        .eq("lecture_id", lectureId)
+        .order("timestamp_sec", { ascending: false })
+        .order("id", { ascending: false })
+        .range(0, limit - 1);
+    } catch (err: unknown) {
+      throw new AppError({
+        code: "SERVICE_UNAVAILABLE",
+        statusCode: 503,
+        message: "Database service unavailable while fetching recent transcript chunks",
+        cause: err,
+      });
+    }
+
+    if (result.error) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database error querying recent transcript chunks",
+        cause: result.error,
+      });
+    }
+
+    if (!Array.isArray(result.data)) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database returned non-array for transcript chunks",
+      });
+    }
+
+    if (result.data.length === 0) {
+      return [];
+    }
+
+    const chunkRows: z.infer<typeof recentChunkWithConceptsRowSchema>[] = [];
+    for (const raw of result.data) {
+      const parsed = recentChunkWithConceptsRowSchema.safeParse(raw);
+      if (!parsed.success) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database returned malformed transcript chunk row",
+          cause: parsed.error,
+        });
+      }
+      chunkRows.push(parsed.data);
+    }
+
+    const chunkIds = chunkRows.map((r) => r.id);
+    const conceptsByChunkId = new Map<UUID, UUID[]>();
+
+    const needsJunctionQuery = chunkRows.some(
+      (r) => r.transcript_concepts === undefined || r.transcript_concepts === null
+    );
+
+    if (needsJunctionQuery) {
+      let junctionResult: { data: unknown; error: unknown };
+      try {
+        const q = this.client
+          .from("transcript_concepts")
+          .select("transcript_chunk_id, concept_id");
+        junctionResult = typeof q.in === "function"
+          ? await q.in("transcript_chunk_id", chunkIds)
+          : await q;
+      } catch (err: unknown) {
+        throw new AppError({
+          code: "SERVICE_UNAVAILABLE",
+          statusCode: 503,
+          message: "Database service unavailable while fetching transcript concept links",
+          cause: err,
+        });
+      }
+
+      if (junctionResult.error) {
+        throw new AppError({
+          code: "INTERNAL_SERVER_ERROR",
+          statusCode: 500,
+          message: "Database error querying transcript concept links",
+          cause: junctionResult.error,
+        });
+      }
+
+      if (Array.isArray(junctionResult.data)) {
+        for (const row of junctionResult.data) {
+          if (
+            row &&
+            typeof row === "object" &&
+            "transcript_chunk_id" in row &&
+            "concept_id" in row &&
+            typeof row.transcript_chunk_id === "string" &&
+            typeof row.concept_id === "string"
+          ) {
+            const list = conceptsByChunkId.get(row.transcript_chunk_id) ?? [];
+            list.push(row.concept_id);
+            conceptsByChunkId.set(row.transcript_chunk_id, list);
+          }
+        }
+      }
+    } else {
+      for (const r of chunkRows) {
+        if (r.transcript_concepts) {
+          conceptsByChunkId.set(
+            r.id,
+            r.transcript_concepts.map((tc) => tc.concept_id)
+          );
+        }
+      }
+    }
+
+    const mappedChunks: TranscriptChunk[] = chunkRows.map((r) => {
+      const detectedConceptIds = conceptsByChunkId.get(r.id) ?? [];
+      const chunk: TranscriptChunk = {
+        id: r.id,
+        lectureId: r.lecture_id,
+        text: r.text,
+        timestampSec: r.timestamp_sec,
+        ...(r.speaker_name ? { speakerName: r.speaker_name } : {}),
+        detectedConceptIds,
+        ...(r.is_simulated !== null && r.is_simulated !== undefined
+          ? { isSimulated: Boolean(r.is_simulated) }
+          : {}),
+        createdAt: new Date(r.created_at).toISOString(),
+      };
+      return transcriptChunkSchema.parse(chunk);
+    });
+
+    mappedChunks.reverse();
+    return mappedChunks;
   }
 }

@@ -51,7 +51,7 @@ export const DEFAULT_MODELS: Record<ModelTier, string> = {
 };
 
 export interface OpenRouterClientOptions {
-  env?: NodeJS.ProcessEnv;
+  env?: NodeJS.ProcessEnv | Record<string, string | undefined>;
   fetch?: typeof globalThis.fetch;
 }
 

@@ -10,7 +10,12 @@ import {
 } from "../../contracts/common.js";
 import {
   pollQuestionSchema,
+  publicPollQuestionSchema,
+  pollDraftInputSchema,
   type PollQuestion,
+  type PublicPollQuestion,
+  type PollDraftInput,
+  type TeacherPollSnapshot,
   type LectureStatus,
 } from "../../contracts/classroom.js";
 import type { EvaluatedPollResponse } from "../../contracts/ai.js";
@@ -211,7 +216,7 @@ export class PollRepository {
       });
     }
 
-    const { data, error } = await this.client
+    const query = this.client
       .from("poll_questions")
       .select(`
         id,
@@ -233,8 +238,9 @@ export class PollRepository {
           )
         )
       `)
-      .eq("id", pollId)
-      .single();
+      .eq("id", pollId);
+
+    const { data, error } = await query.single();
 
     if (error || !data) {
       throw new AppError({
@@ -470,5 +476,360 @@ export class PollRepository {
       response: mapStoredResponse(existing as Record<string, unknown>),
       stored: false,
     };
+  }
+
+  async insertDraft(actor: ActorContext, poll: PollQuestion): Promise<PollQuestion> {
+    const validated = pollQuestionSchema.parse(poll);
+    if (validated.status !== "draft") {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Initial poll status must be draft",
+      });
+    }
+
+    if (actor.role !== "teacher" || !actor.teacherId) {
+      throw new AppError({
+        code: "FORBIDDEN",
+        statusCode: 403,
+        message: "Only teachers can insert poll drafts",
+      });
+    }
+
+    const { data: lectureData, error: lectureError } = await this.client
+      .from("lecture_sessions")
+      .select("id, course_id, status, courses(teacher_id)")
+      .eq("id", validated.lectureId)
+      .maybeSingle();
+
+    if (lectureError || !lectureData) {
+      throw new AppError({
+        code: "NOT_FOUND",
+        statusCode: 404,
+        message: "Lecture session not found",
+      });
+    }
+
+    const coursesRaw = (lectureData as Record<string, unknown>).courses;
+    const courseObj = Array.isArray(coursesRaw) ? coursesRaw[0] : coursesRaw;
+    if (!courseObj || (courseObj as Record<string, unknown>).teacher_id !== actor.teacherId) {
+      throw new AppError({
+        code: "FORBIDDEN",
+        statusCode: 403,
+        message: "Forbidden lecture access",
+      });
+    }
+
+    const { data, error } = await this.client
+      .from("poll_questions")
+      .insert({
+        id: validated.id,
+        lecture_id: validated.lectureId,
+        concept_id: validated.conceptId,
+        question: validated.question,
+        expected_answer: validated.expectedAnswer,
+        status: "draft",
+        generated_at: validated.generatedAt,
+      })
+      .select("id, lecture_id, concept_id, question, expected_answer, status, generated_at, activated_at, closed_at")
+      .single();
+
+    if (error || !data) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database error inserting poll draft",
+        cause: error,
+      });
+    }
+
+    return mapPollQuestion(data as Record<string, unknown>);
+  }
+
+  async updateDraft(actor: ActorContext, pollId: UUID, input: PollDraftInput): Promise<PollQuestion> {
+    const validatedInput = pollDraftInputSchema.parse(input);
+    const pollContext = await this.getPoll(actor, pollId);
+
+    if (actor.role !== "teacher") {
+      throw new AppError({
+        code: "FORBIDDEN",
+        statusCode: 403,
+        message: "Only teachers can edit poll drafts",
+      });
+    }
+
+    if (pollContext.lectureStatus !== "live") {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Lecture is not live",
+      });
+    }
+
+    if (pollContext.poll.status !== "draft") {
+      throw new AppError({
+        code: "INVALID_POLL_STATUS",
+        statusCode: 400,
+        message: "Poll is not in draft status",
+      });
+    }
+
+    const { data, error } = await this.client
+      .from("poll_questions")
+      .update({
+        question: validatedInput.question,
+        expected_answer: validatedInput.expectedAnswer,
+      })
+      .eq("id", pollId)
+      .eq("status", "draft")
+      .select("id, lecture_id, concept_id, question, expected_answer, status, generated_at, activated_at, closed_at")
+      .maybeSingle();
+
+    if (error) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database error updating poll draft",
+        cause: error,
+      });
+    }
+
+    if (!data) {
+      throw new AppError({
+        code: "INVALID_POLL_STATUS",
+        statusCode: 400,
+        message: "Poll is no longer in draft status",
+      });
+    }
+
+    return mapPollQuestion(data as Record<string, unknown>);
+  }
+
+  async getResponseCount(actor: ActorContext, pollId: UUID): Promise<number> {
+    await this.getPoll(actor, pollId);
+
+    const clientWithCount = this.client as unknown as {
+      from(t: string): {
+        select(c: string, opts?: { count?: string; head?: boolean }): {
+          eq(col: string, val: string): Promise<{ data: unknown; count: number | null; error: unknown }>;
+        };
+      };
+    };
+    const result = await clientWithCount
+      .from("poll_responses")
+      .select("id", { count: "exact", head: true })
+      .eq("question_id", pollId);
+
+    if (result.error) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database error querying poll response count",
+        cause: result.error,
+      });
+    }
+
+    if (typeof result.count === "number" && result.count >= 0) {
+      return result.count;
+    }
+
+    if (Array.isArray(result.data)) {
+      return result.data.length;
+    }
+
+    throw new AppError({
+      code: "INTERNAL_SERVER_ERROR",
+      statusCode: 500,
+      message: "Database returned invalid response count",
+    });
+  }
+
+  async getLatestPolls(actor: ActorContext, lectureId: UUID): Promise<TeacherPollSnapshot> {
+    if (!uuidSchema.safeParse(lectureId).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid lecture ID format",
+      });
+    }
+
+    if (actor.role !== "teacher" || !actor.teacherId) {
+      throw new AppError({
+        code: "FORBIDDEN",
+        statusCode: 403,
+        message: "Only teachers can view teacher poll snapshot",
+      });
+    }
+
+    const { data: lectureData, error: lectureError } = await this.client
+      .from("lecture_sessions")
+      .select("id, course_id, courses(teacher_id)")
+      .eq("id", lectureId)
+      .maybeSingle();
+
+    if (lectureError || !lectureData) {
+      throw new AppError({
+        code: "NOT_FOUND",
+        statusCode: 404,
+        message: "Lecture session not found",
+      });
+    }
+
+    const coursesRaw = (lectureData as Record<string, unknown>).courses;
+    const courseObj = Array.isArray(coursesRaw) ? coursesRaw[0] : coursesRaw;
+    if (!courseObj || (courseObj as Record<string, unknown>).teacher_id !== actor.teacherId) {
+      throw new AppError({
+        code: "FORBIDDEN",
+        statusCode: 403,
+        message: "Forbidden lecture access",
+      });
+    }
+
+    const { data, error } = await this.client
+      .from("poll_questions")
+      .select("id, lecture_id, concept_id, question, expected_answer, status, generated_at, activated_at, closed_at")
+      .eq("lecture_id", lectureId);
+
+    if (error) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database error querying lecture polls",
+        cause: error,
+      });
+    }
+
+    const rawRows = Array.isArray(data) ? data : [];
+    const allPolls: PollQuestion[] = rawRows.map((r) => mapPollQuestion(r as Record<string, unknown>));
+
+    const drafts = allPolls
+      .filter((p) => p.status === "draft")
+      .sort((a, b) => {
+        const timeCmp = new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime();
+        return timeCmp !== 0 ? timeCmp : a.id.localeCompare(b.id);
+      });
+
+    const actives = allPolls
+      .filter((p) => p.status === "active")
+      .sort((a, b) => {
+        const timeA = a.activatedAt ? new Date(a.activatedAt).getTime() : 0;
+        const timeB = b.activatedAt ? new Date(b.activatedAt).getTime() : 0;
+        const timeCmp = timeB - timeA;
+        return timeCmp !== 0 ? timeCmp : a.id.localeCompare(b.id);
+      });
+
+    const closeds = allPolls
+      .filter((p) => p.status === "closed")
+      .sort((a, b) => {
+        const timeA = a.closedAt ? new Date(a.closedAt).getTime() : 0;
+        const timeB = b.closedAt ? new Date(b.closedAt).getTime() : 0;
+        const timeCmp = timeB - timeA;
+        return timeCmp !== 0 ? timeCmp : a.id.localeCompare(b.id);
+      });
+
+    const latestDraft = drafts[0] ?? null;
+    const activePoll = actives[0] ?? null;
+    const latestClosed = closeds[0] ?? null;
+
+    const [draftCount, activeCount, closedCount] = await Promise.all([
+      latestDraft ? this.getResponseCount(actor, latestDraft.id) : Promise.resolve(0),
+      activePoll ? this.getResponseCount(actor, activePoll.id) : Promise.resolve(0),
+      latestClosed ? this.getResponseCount(actor, latestClosed.id) : Promise.resolve(0),
+    ]);
+
+    return {
+      lectureId,
+      draft: latestDraft ? { poll: latestDraft, responseCount: draftCount } : null,
+      active: activePoll ? { poll: activePoll, responseCount: activeCount } : null,
+      closed: latestClosed ? { poll: latestClosed, responseCount: closedCount } : null,
+    };
+  }
+
+  async getActivePoll(actor: ActorContext, lectureId: UUID): Promise<PublicPollQuestion | null> {
+    if (!uuidSchema.safeParse(lectureId).success) {
+      throw new AppError({
+        code: "VALIDATION_ERROR",
+        statusCode: 400,
+        message: "Invalid lecture ID format",
+      });
+    }
+
+    const { data: lectureData, error: lectureError } = await this.client
+      .from("lecture_sessions")
+      .select("id, course_id, courses(teacher_id)")
+      .eq("id", lectureId)
+      .maybeSingle();
+
+    if (lectureError || !lectureData) {
+      throw new AppError({
+        code: "NOT_FOUND",
+        statusCode: 404,
+        message: "Lecture session not found",
+      });
+    }
+
+    const courseId = (lectureData as Record<string, unknown>).course_id as UUID;
+    const coursesRaw = (lectureData as Record<string, unknown>).courses;
+    const courseObj = Array.isArray(coursesRaw) ? coursesRaw[0] : coursesRaw;
+    const teacherId = courseObj ? (courseObj as Record<string, unknown>).teacher_id : undefined;
+
+    if (actor.role === "teacher") {
+      if (teacherId !== actor.teacherId) {
+        throw new AppError({
+          code: "FORBIDDEN",
+          statusCode: 403,
+          message: "Forbidden lecture access",
+        });
+      }
+    } else if (actor.role === "student") {
+      const isEnrolled = (actor.enrolledCourses ?? []).some((e) => e.courseId === courseId);
+      if (!isEnrolled) {
+        throw new AppError({
+          code: "FORBIDDEN",
+          statusCode: 403,
+          message: "Forbidden lecture access",
+        });
+      }
+    } else {
+      throw new AppError({
+        code: "FORBIDDEN",
+        statusCode: 403,
+        message: "Forbidden lecture access",
+      });
+    }
+
+    const { data, error } = await this.client
+      .from("poll_questions")
+      .select("id, lecture_id, concept_id, question, status, generated_at, activated_at, closed_at")
+      .eq("lecture_id", lectureId)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (error) {
+      throw new AppError({
+        code: "INTERNAL_SERVER_ERROR",
+        statusCode: 500,
+        message: "Database error querying active poll",
+        cause: error,
+      });
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    const raw = data as Record<string, unknown>;
+    const publicPoll: PublicPollQuestion = {
+      id: raw.id as UUID,
+      lectureId: raw.lecture_id as UUID,
+      conceptId: raw.concept_id as UUID,
+      question: String(raw.question ?? ""),
+      status: raw.status as "active",
+      generatedAt: new Date(String(raw.generated_at)).toISOString(),
+      ...(raw.activated_at ? { activatedAt: new Date(String(raw.activated_at)).toISOString() } : {}),
+      ...(raw.closed_at ? { closedAt: new Date(String(raw.closed_at)).toISOString() } : {}),
+    };
+
+    return publicPollQuestionSchema.parse(publicPoll);
   }
 }

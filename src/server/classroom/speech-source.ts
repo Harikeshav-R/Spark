@@ -39,7 +39,7 @@ interface ActiveSession {
   done: Promise<void>;
 }
 
-export function readSpeechSourceConfig(env: NodeJS.ProcessEnv): SpeechSourceConfig {
+export function readSpeechSourceConfig(env: NodeJS.ProcessEnv | Record<string, string | undefined>): SpeechSourceConfig {
   const integrationModeRaw = env.INTEGRATION_MODE ?? "fixture";
   if (integrationModeRaw !== "fixture" && integrationModeRaw !== "live") {
     throw new AppError({

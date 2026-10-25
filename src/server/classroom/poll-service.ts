@@ -16,8 +16,10 @@ import {
 import {
   pollNewQuestionEventSchema,
   pollClosedEventSchema,
+  pollResponseCountEventSchema,
   type PollNewQuestionEvent,
   type PollClosedEvent,
+  type PollResponseCountEvent,
   type RealtimePublisher,
 } from "../../contracts/realtime.js";
 import {
@@ -43,12 +45,13 @@ export interface PollServiceDependencies {
     | "storeEvaluation"
     | "markEvaluationFailed"
     | "storeMasteryResult"
+    | "getResponseCount"
   >;
   rooms: Pick<RoomAuthorizer, "authorizeRoom">;
   presence: Pick<PresenceTracker, "getAttendingStudentIds">;
   ai: Pick<AiService, "evaluatePollResponse">;
   evidence: Pick<PollEvidenceService, "applyResponse">;
-  publisher: Pick<RealtimePublisher, "emitToLecture" | "emitToStudent">;
+  publisher: Pick<RealtimePublisher, "emitToLecture" | "emitToStudent" | "emitToTeacher">;
   ids: Pick<IdGenerator, "generateId">;
   clock: Clock;
 }
@@ -213,6 +216,24 @@ export class PollService
       answer,
       answeredAt,
     );
+
+    try {
+      const responseCount = await this.deps.polls.getResponseCount(actor, pollId);
+      const countEventPayload: PollResponseCountEvent = {
+        eventId: this.deps.ids.generateId(),
+        occurredAt: this.deps.clock.nowISO ? this.deps.clock.nowISO() : this.deps.clock.now().toISOString(),
+        lectureId: context.poll.lectureId,
+        pollId,
+        responseCount,
+      };
+      const validCountEvent = pollResponseCountEventSchema.parse(countEventPayload);
+      await this.deps.publisher.emitToTeacher(context.poll.lectureId, "poll:response-count", validCountEvent);
+    } catch (countErr) {
+      console.error(
+        `Failed to publish poll:response-count for lectureId=${context.poll.lectureId} pollId=${pollId}:`,
+        countErr
+      );
+    }
 
     if (!inserted) {
       if (response.status === "pending") {

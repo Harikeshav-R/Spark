@@ -427,10 +427,24 @@ export function createFixtureSupabaseClient(options: TestFixtureOptions = {}): S
           headers: { "Content-Type": "application/json" },
         });
       }
+      const preferHeader = headers.Prefer || headers.prefer || "";
+      const isHead = method === "HEAD";
+      const totalCount = filtered.length;
+      const respHeaders: Record<string, string> = { "Content-Type": "application/json" };
+      if (preferHeader.includes("count=exact") || isHead) {
+        respHeaders["Content-Range"] = `0-${Math.max(0, totalCount - 1)}/${totalCount}`;
+      }
+
+      if (isHead) {
+        return new Response(null, {
+          status: 200,
+          headers: respHeaders,
+        });
+      }
 
       return new Response(JSON.stringify(filtered), {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: respHeaders,
       });
     }
 
