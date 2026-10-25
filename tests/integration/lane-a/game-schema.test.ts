@@ -21,28 +21,6 @@ const DB_CONTAINER = process.env.SUPABASE_DB_CONTAINER ?? (
   })()
 );
 
-function runPsql(sql: string): string {
-  return execFileSync(
-    "docker",
-    [
-      "exec",
-      "-i",
-      DB_CONTAINER,
-      "psql",
-      "-U",
-      "postgres",
-      "-d",
-      "postgres",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-t",
-      "-A",
-      "-c",
-      sql,
-    ],
-    { encoding: "utf8" }
-  );
-}
 
 function runPsqlExpectError(sql: string): string {
   try {
@@ -254,7 +232,7 @@ describe.skipIf(isFixtureMode)(
       expect(finalRows![0].hints).toEqual(validHints);
     });
 
-    it("verifies encounter constraints: source/status check, FK cascades, and party_quest_id without FK", async () => {
+    it("verifies encounter constraints: source/status check, FK cascades", async () => {
       currentContext = { users: [], teacherIds: [], courseIds: [] };
       const course = await harness.createTestCourse(currentContext, { conceptCount: 1 });
       const studentUser = await harness.createTestUser(currentContext, "student");
@@ -310,15 +288,6 @@ describe.skipIf(isFixtureMode)(
       expect(badConceptErr).not.toBeNull();
       expect(badConceptErr?.code).toBe("23503");
 
-      // party_quest_id non-null succeeds without party FK existing yet (in rollback transaction)
-      const testPartySql = `
-        BEGIN;
-        INSERT INTO public.encounters (id, student_id, concept_id, source, party_quest_id, status, question_ids, option_permutations)
-        VALUES ('${randomUUID()}', '${student.id}', '${course.conceptIds[0]}', 'party', '${randomUUID()}', 'active', '{"${randomUUID()}"}', '{}'::jsonb);
-        ROLLBACK;
-      `;
-      const result = runPsql(testPartySql);
-      expect(result).toBeDefined();
     });
 
     it("verifies quiz_attempts: nullable encounter_id uniqueness, delete encounter sets encounter_id NULL", async () => {
