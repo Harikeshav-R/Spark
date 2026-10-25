@@ -62,27 +62,26 @@ export class LearningEvidenceService {
     private readonly mastery: Pick<MasteryService, "applyEvidence">,
   ) {}
 
-  async applyQuizAttempt(
+  private async validateAndAuthorizeSource(
     actor: ActorContext,
     courseId: UUID,
-    attemptId: UUID,
-  ): Promise<LearningEvidenceResult> {
-    // 1. Validate courseId and attemptId UUID parameters
+    sourceId: UUID,
+    evidenceType: "quiz" | "tutor",
+  ): Promise<{ courseId: UUID; sourceId: UUID }> {
     const courseIdParsed = uuidSchema.safeParse(courseId);
-    const attemptIdParsed = uuidSchema.safeParse(attemptId);
+    const sourceIdParsed = uuidSchema.safeParse(sourceId);
 
-    if (!courseIdParsed.success || !attemptIdParsed.success) {
+    if (!courseIdParsed.success || !sourceIdParsed.success) {
       throw new AppError({
         code: "VALIDATION_ERROR",
         statusCode: 400,
-        message: "Invalid UUID parameter provided for quiz evidence",
+        message: `Invalid UUID parameter provided for ${evidenceType} evidence`,
       });
     }
 
     const validCourseId = courseIdParsed.data;
-    const validAttemptId = attemptIdParsed.data;
+    const validSourceId = sourceIdParsed.data;
 
-    // 2. Authorize course via courses.getCourse(actor, courseId)
     try {
       await this.courses.getCourse(actor, validCourseId);
     } catch (err: unknown) {
@@ -96,6 +95,17 @@ export class LearningEvidenceService {
         cause: err,
       });
     }
+
+    return { courseId: validCourseId, sourceId: validSourceId };
+  }
+
+  async applyQuizAttempt(
+    actor: ActorContext,
+    courseId: UUID,
+    attemptId: UUID,
+  ): Promise<LearningEvidenceResult> {
+    const { courseId: validCourseId, sourceId: validAttemptId } =
+      await this.validateAndAuthorizeSource(actor, courseId, attemptId, "quiz");
 
     // 3. Query quiz attempt with inner joins on students and concept_nodes
     let query = this.client
@@ -214,35 +224,8 @@ export class LearningEvidenceService {
     courseId: UUID,
     messageId: UUID,
   ): Promise<LearningEvidenceResult> {
-    // 1. Validate courseId and messageId UUID parameters
-    const courseIdParsed = uuidSchema.safeParse(courseId);
-    const messageIdParsed = uuidSchema.safeParse(messageId);
-
-    if (!courseIdParsed.success || !messageIdParsed.success) {
-      throw new AppError({
-        code: "VALIDATION_ERROR",
-        statusCode: 400,
-        message: "Invalid UUID parameter provided for tutor evidence",
-      });
-    }
-
-    const validCourseId = courseIdParsed.data;
-    const validMessageId = messageIdParsed.data;
-
-    // 2. Authorize course via courses.getCourse(actor, courseId)
-    try {
-      await this.courses.getCourse(actor, validCourseId);
-    } catch (err: unknown) {
-      if (err instanceof AppError) {
-        throw err;
-      }
-      throw new AppError({
-        code: "SERVICE_UNAVAILABLE",
-        statusCode: 503,
-        message: "Failed to verify course authorization",
-        cause: err,
-      });
-    }
+    const { courseId: validCourseId, sourceId: validMessageId } =
+      await this.validateAndAuthorizeSource(actor, courseId, messageId, "tutor");
 
     // 3. Query tutoring message with inner joins on tutoring_sessions, students, and concept_nodes
     let query = this.client
