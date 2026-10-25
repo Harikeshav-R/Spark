@@ -10,8 +10,10 @@ export {
   DEFAULT_MODELS,
 } from "./providers/openrouter-client.js";
 
-export { SocraticTutorAi } from "./tutoring-ai.js";
+export { SocraticTutorAi } from "./pipelines/socratic-tutor.js";
 export { fixtureSocraticTutorTurn } from "./fixtures/tutoring-turn.js";
+export { CheckUnderstandingAi } from "./pipelines/check-understanding.js";
+export { fixtureCheckUnderstanding } from "./fixtures/understanding-check.js";
 export {
   FIXTURE_COURSE_ID,
   FIXTURE_33_CONCEPTS,
