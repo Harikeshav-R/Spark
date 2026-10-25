@@ -28,7 +28,9 @@ class SystemClock implements Clock {
   }
 }
 
-describe("P6-B-01: Matchmaking Engine Integration (Local PostgreSQL)", () => {
+describe.skipIf(process.env.RUN_LOCAL_SUPABASE !== "1")(
+  "P6-B-01: Matchmaking Engine Integration (Local PostgreSQL)",
+  () => {
   let harness: SupabaseTestHarness;
   let context: TestContext;
   let enrollmentService: EnrollmentService;
@@ -405,4 +407,5 @@ describe("P6-B-01: Matchmaking Engine Integration (Local PostgreSQL)", () => {
       .eq("course_id", course.courseId);
     expect(matches).toHaveLength(0);
   });
-});
+  },
+);
